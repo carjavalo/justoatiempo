@@ -4,7 +4,7 @@ namespace App\Enums;
 
 enum EstadoCarga: string
 {
-    case Procesando = 'procesando';
+    case EnRevision = 'en_revision';
     case Procesada = 'procesada';
     case ConErrores = 'con_errores';
     case Anulada = 'anulada';
@@ -12,9 +12,9 @@ enum EstadoCarga: string
     public function label(): string
     {
         return match ($this) {
-            self::Procesando => 'Procesando',
-            self::Procesada => 'Procesada',
-            self::ConErrores => 'Con errores',
+            self::EnRevision => 'En revisión',
+            self::Procesada => 'Importada',
+            self::ConErrores => 'Importada con filas omitidas',
             self::Anulada => 'Anulada',
         };
     }

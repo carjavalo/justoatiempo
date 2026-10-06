@@ -64,12 +64,18 @@ class DemoOperacionSeeder extends Seeder
             'No alcanzó tiempo en ruta' => 3,
         ];
 
-        $hoy = Carbon::parse('2026-10-06');
+        $hoy = today();
         $consecutivo = 28000;
+
+        // La jornada anterior queda sin cargar a propósito: se prueba con php artisan drivin:ejemplo
+        $pendiente = $hoy->copy()->subDay();
+        if ($pendiente->isSunday()) {
+            $pendiente->subDay();
+        }
 
         for ($d = self::DIAS; $d >= 1; $d--) {
             $fecha = $hoy->copy()->subDays($d);
-            if ($fecha->isSunday()) {
+            if ($fecha->isSunday() || $fecha->isSameDay($pendiente)) {
                 continue;
             }
 
@@ -161,7 +167,7 @@ class DemoOperacionSeeder extends Seeder
             }
             DB::table('auditorias_pod')->insert($filasAuditoria);
 
-            $carga->update(['total_filas' => count($filas), 'filas_validas' => count($filas)]);
+            $carga->update(['total_filas' => count($filas), 'filas_validas' => count($filas), 'ordenes_importadas' => count($filas), 'hoja' => 'PoE']);
 
             foreach ($consolidador->consolidarFecha($fecha) as $informe) {
                 $estado = $d > 2 ? EstadoInforme::Cerrado : EstadoInforme::Seguimiento;

@@ -11,6 +11,17 @@
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">
         <meta name="theme-color" content="#12244a">
 
+        {{-- Tema antes del primer pintado: evita el destello blanco a quien usa modo oscuro --}}
+        <script>
+            try {
+                var a = localStorage.getItem('appearance') || 'system';
+                if (a === 'dark' || (a === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                }
+            } catch (e) {}
+        </script>
+        <style>html { background: #f5f7fb; } html.dark { background: #0a1020; }</style>
+
         @routes
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
@@ -18,5 +29,7 @@
     </head>
     <body class="font-sans antialiased">
         @inertia
+        {{-- Anuncia el título de cada página nueva (la navegación es sin recarga) --}}
+        <div id="anunciador-ruta" class="sr-only" aria-live="polite" aria-atomic="true"></div>
     </body>
 </html>

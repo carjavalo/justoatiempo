@@ -11,6 +11,8 @@ export function NavUser() {
     const { auth } = usePage<SharedData>().props;
     const { state } = useSidebar();
     const isMobile = useIsMobile();
+    // Con el menú colapsado el disparador solo muestra el avatar: ahí sí hace falta el nombre en el desplegable
+    const colapsado = state === 'collapsed' && !isMobile;
 
     return (
         <SidebarMenu>
@@ -19,15 +21,15 @@ export function NavUser() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton size="lg" className="text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent group">
                             <UserInfo user={auth.user} />
-                            <ChevronsUpDown className="ml-auto size-4" />
+                            <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                         className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
                         align="end"
-                        side={isMobile ? 'bottom' : state === 'collapsed' ? 'left' : 'bottom'}
+                        side={isMobile ? 'bottom' : colapsado ? 'left' : 'top'}
                     >
-                        <UserMenuContent user={auth.user} />
+                        <UserMenuContent user={auth.user} encabezadoCompleto={colapsado} />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>

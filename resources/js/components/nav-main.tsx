@@ -8,13 +8,13 @@ export function NavMain({ groups = [] }: { groups: NavGroup[] }) {
     const actual = page.url.split('?')[0];
 
     return (
-        <>
-            {groups.map((grupo) => (
+        <nav aria-label="Menú principal" className="flex flex-col gap-1">
+            {groups.map((grupo, g) => (
                 <SidebarGroup key={grupo.title} className="px-3 py-1.5">
-                    <SidebarGroupLabel className="text-sidebar-foreground/55 text-[0.68rem] font-semibold tracking-[0.12em] uppercase">
+                    <SidebarGroupLabel id={`grupo-menu-${g}`} className="text-sidebar-foreground/80 text-[0.72rem] font-semibold tracking-[0.12em] uppercase">
                         {grupo.title}
                     </SidebarGroupLabel>
-                    <SidebarMenu className="gap-0.5">
+                    <SidebarMenu className="gap-0.5" aria-labelledby={`grupo-menu-${g}`}>
                         {grupo.items.map((item) => {
                             const activo = actual === item.url || actual.startsWith(item.url + '/');
 
@@ -28,11 +28,12 @@ export function NavMain({ groups = [] }: { groups: NavGroup[] }) {
                                             'h-9 rounded-lg font-medium transition-colors',
                                             'text-sidebar-foreground hover:text-white',
                                             'data-[active=true]:bg-white/10 data-[active=true]:font-semibold data-[active=true]:text-white',
-                                            'relative data-[active=true]:before:absolute data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:-left-3 data-[active=true]:before:w-1 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-brand-coral',
+                                            // Barra coral de la opción activa: señal que no depende solo del color del texto
+                                            'relative data-[active=true]:before:absolute data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:left-0 data-[active=true]:before:w-1 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-brand-coral',
                                         )}
                                     >
-                                        <Link href={item.url} prefetch>
-                                            {item.icon && <item.icon className={cn('size-[1.1rem]', activo && 'text-brand-coral')} />}
+                                        <Link href={item.url} prefetch aria-current={activo ? 'page' : undefined}>
+                                            {item.icon && <item.icon className={cn('size-[1.1rem]', activo && 'text-brand-coral')} aria-hidden="true" />}
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
@@ -42,6 +43,6 @@ export function NavMain({ groups = [] }: { groups: NavGroup[] }) {
                     </SidebarMenu>
                 </SidebarGroup>
             ))}
-        </>
+        </nav>
     );
 }

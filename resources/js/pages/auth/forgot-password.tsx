@@ -1,63 +1,64 @@
-// Components
 import { Head, useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
+import { BotonEnviar } from '@/components/boton-enviar';
 import InputError from '@/components/input-error';
+import { MensajeEstado } from '@/components/mensaje-estado';
 import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
+import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 
 export default function ForgotPassword({ status }: { status?: string }) {
     const { data, setData, post, processing, errors } = useForm({
         email: '',
     });
 
+    useFocoPrimerError(errors, ['email']);
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
+        if (processing) return;
         post(route('password.email'));
     };
 
     return (
-        <AuthLayout title="Forgot password" description="Enter your email to receive a password reset link">
-            <Head title="Forgot password" />
+        <AuthLayout title="Recupera tu contraseña" description="Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña.">
+            <Head title="Recuperar contraseña" />
 
-            {status && <div className="mb-4 text-center text-sm font-medium text-green-600">{status}</div>}
+            <MensajeEstado mensaje={status} />
 
-            <div className="space-y-6">
-                <form onSubmit={submit}>
-                    <div className="grid gap-2">
-                        <Label htmlFor="email">Email address</Label>
+            <form onSubmit={submit} className="grid gap-6" noValidate>
+                <div className="grid gap-2">
+                    <Label htmlFor="email">Correo electrónico</Label>
+                    <div className="relative">
+                        <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
                         <Input
-                            id="email"
+                            {...propsCampo('email', errors.email)}
                             type="email"
                             name="email"
-                            autoComplete="off"
+                            required
+                            autoComplete="username"
                             value={data.email}
                             autoFocus
                             onChange={(e) => setData('email', e.target.value)}
-                            placeholder="email@example.com"
+                            placeholder="nombre@justoatiempo.com"
+                            className="h-11 rounded-lg pl-9"
                         />
-
-                        <InputError message={errors.email} />
                     </div>
-
-                    <div className="my-6 flex items-center justify-start">
-                        <Button className="w-full" disabled={processing}>
-                            {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                            Email password reset link
-                        </Button>
-                    </div>
-                </form>
-
-                <div className="text-muted-foreground space-x-1 text-center text-sm">
-                    <span>Or, return to</span>
-                    <TextLink href={route('login')}>log in</TextLink>
+                    <InputError id="email-error" message={errors.email} />
                 </div>
-            </div>
+
+                <BotonEnviar procesando={processing} className="h-11 w-full rounded-lg text-[0.95rem] font-semibold">
+                    Enviar enlace
+                </BotonEnviar>
+
+                <p className="text-muted-foreground text-center text-sm">
+                    ¿La recordaste? <TextLink href={route('login')}>Inicia sesión</TextLink>
+                </p>
+            </form>
         </AuthLayout>
     );
 }

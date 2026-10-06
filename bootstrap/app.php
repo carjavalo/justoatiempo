@@ -24,5 +24,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Sesión vencida (419): volver a la página con un aviso claro en vez de la pantalla "Page Expired"
+        $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response) {
+            if ($response->getStatusCode() === 419) {
+                $mensaje = 'Tu sesión expiró por inactividad. Vuelve a intentarlo.';
+
+                return back()->with(['status' => $mensaje, 'error' => $mensaje]);
+            }
+
+            return $response;
+        });
     })->create();

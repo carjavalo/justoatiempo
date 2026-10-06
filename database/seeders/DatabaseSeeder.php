@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
 
         // Usuarios de desarrollo. Contraseña para todos: "password" (cambiar en producción).
         User::updateOrCreate(['email' => 'admin@justoatiempo.test'], [
-            'name' => 'Administrador',
+            'name' => 'Natalia Restrepo',
             'password' => 'password',
             'rol' => Rol::Admin,
             'email_verified_at' => now(),

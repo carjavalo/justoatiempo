@@ -1,9 +1,9 @@
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar';
 import { navegacionPara } from '@/lib/navegacion';
 import { type SharedData } from '@/types';
-import { Link, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
@@ -11,16 +11,11 @@ export function AppSidebar() {
 
     return (
         <Sidebar collapsible="icon" variant="inset">
+            {/* La marca no es enlace: "Panel", justo debajo, es el único acceso al inicio */}
             <SidebarHeader className="pt-3 pb-2">
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild className="hover:bg-transparent active:bg-transparent">
-                            <Link href="/dashboard" prefetch>
-                                <AppLogo />
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                <div className="flex h-12 items-center gap-2 px-2 group-data-[collapsible=icon]:px-0">
+                    <AppLogo />
+                </div>
             </SidebarHeader>
 
             <SidebarContent className="gap-1 pt-2">

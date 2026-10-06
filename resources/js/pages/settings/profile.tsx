@@ -1,23 +1,16 @@
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Transition } from '@headlessui/react';
+import { type SharedData } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { CheckCircle2 } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
-import DeleteUser from '@/components/delete-user';
-import HeadingSmall from '@/components/heading-small';
+import { BotonEnviar } from '@/components/boton-enviar';
 import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
+import { MensajeEstado } from '@/components/mensaje-estado';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: '/settings/profile',
-    },
-];
+import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 
 export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
     const { auth } = usePage<SharedData>().props;
@@ -27,93 +20,73 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
         email: auth.user.email,
     });
 
+    useFocoPrimerError(errors, ['name', 'email']);
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
-        patch(route('profile.update'));
+        if (processing) return;
+        patch(route('profile.update'), { preserveScroll: true });
     };
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profile settings" />
+        <AppLayout>
+            <Head title="Perfil" />
 
-            <SettingsLayout>
-                <div className="space-y-6">
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
+            <SettingsLayout descripcion="Tu nombre y el correo con el que ingresas a la plataforma.">
+                <form onSubmit={submit} className="space-y-6" noValidate>
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">Nombre completo</Label>
+                        <Input
+                            {...propsCampo('name', errors.name)}
+                            className="h-11 rounded-lg"
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                            required
+                            autoComplete="name"
+                        />
+                        <InputError id="name-error" message={errors.name} />
+                    </div>
 
-                    <form onSubmit={submit} className="space-y-6">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Name</Label>
+                    <div className="grid gap-2">
+                        <Label htmlFor="email">Correo electrónico</Label>
+                        <Input
+                            {...propsCampo('email', errors.email)}
+                            type="email"
+                            className="h-11 rounded-lg"
+                            value={data.email}
+                            onChange={(e) => setData('email', e.target.value)}
+                            required
+                            autoComplete="username"
+                        />
+                        <InputError id="email-error" message={errors.email} />
+                    </div>
 
-                            <Input
-                                id="name"
-                                className="mt-1 block w-full"
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                required
-                                autoComplete="name"
-                                placeholder="Full name"
-                            />
-
-                            <InputError className="mt-2" message={errors.name} />
+                    {mustVerifyEmail && auth.user.email_verified_at === null && (
+                        <div className="bg-warning-soft rounded-lg p-3 text-sm">
+                            Tu correo aún no está verificado.{' '}
+                            <Link href={route('verification.send')} method="post" as="button" className="text-warning font-semibold underline underline-offset-2">
+                                Reenviar el correo de verificación
+                            </Link>
+                            <MensajeEstado mensaje={status === 'verification-link-sent' ? 'Te enviamos un nuevo enlace de verificación.' : null} className="mt-2 mb-0" />
                         </div>
+                    )}
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="email">Email address</Label>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-6">
+                        <BotonEnviar procesando={processing} textoProcesando="Guardando…" className="h-10 rounded-lg px-5 font-semibold">
+                            Guardar cambios
+                        </BotonEnviar>
 
-                            <Input
-                                id="email"
-                                type="email"
-                                className="mt-1 block w-full"
-                                value={data.email}
-                                onChange={(e) => setData('email', e.target.value)}
-                                required
-                                autoComplete="username"
-                                placeholder="Email address"
-                            />
-
-                            <InputError className="mt-2" message={errors.email} />
-                        </div>
-
-                        {mustVerifyEmail && auth.user.email_verified_at === null && (
-                            <div>
-                                <p className="mt-2 text-sm text-neutral-800">
-                                    Your email address is unverified.
-                                    <Link
-                                        href={route('verification.send')}
-                                        method="post"
-                                        as="button"
-                                        className="rounded-md text-sm text-neutral-600 underline hover:text-neutral-900 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
-                                    >
-                                        Click here to re-send the verification email.
-                                    </Link>
+                        {/* Región siempre presente: el aviso se anuncia al aparecer (WCAG 4.1.3) */}
+                        <div role="status" className="min-h-5">
+                            {recentlySuccessful && (
+                                <p className="text-good flex items-center gap-1.5 text-sm font-medium">
+                                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                                    Cambios guardados
                                 </p>
-
-                                {status === 'verification-link-sent' && (
-                                    <div className="mt-2 text-sm font-medium text-green-600">
-                                        A new verification link has been sent to your email address.
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-4">
-                            <Button disabled={processing}>Save</Button>
-
-                            <Transition
-                                show={recentlySuccessful}
-                                enter="transition ease-in-out"
-                                enterFrom="opacity-0"
-                                leave="transition ease-in-out"
-                                leaveTo="opacity-0"
-                            >
-                                <p className="text-sm text-neutral-600">Saved</p>
-                            </Transition>
+                            )}
                         </div>
-                    </form>
-                </div>
-
-                <DeleteUser />
+                    </div>
+                </form>
             </SettingsLayout>
         </AppLayout>
     );

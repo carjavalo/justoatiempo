@@ -1,62 +1,51 @@
-import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { KeyRound, UserRound } from 'lucide-react';
+import { type ReactNode } from 'react';
 
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        url: '/settings/profile',
-        icon: null,
-    },
-    {
-        title: 'Password',
-        url: '/settings/password',
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        url: '/settings/appearance',
-        icon: null,
-    },
+const SECCIONES = [
+    { titulo: 'Perfil', url: '/settings/profile', icono: UserRound },
+    { titulo: 'Contraseña', url: '/settings/password', icono: KeyRound },
 ];
 
-export default function SettingsLayout({ children }: { children: React.ReactNode }) {
-    const currentPath = window.location.pathname;
+/** "Mi cuenta": el título vive aquí; cada sección solo agrega su descripción. */
+export default function SettingsLayout({ descripcion, children }: { descripcion: string; children: ReactNode }) {
+    const actual = usePage().url.split('?')[0];
+    const seccion = SECCIONES.find((s) => s.url === actual);
 
     return (
-        <div className="px-4 py-6">
-            <Heading title="Settings" description="Manage your profile and account settings" />
+        <div className="mx-auto w-full max-w-3xl p-4 md:p-6 lg:p-8">
+            <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">Mi cuenta</h1>
 
-            <div className="flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav className="flex flex-col space-y-1 space-x-0">
-                        {sidebarNavItems.map((item) => (
-                            <Button
-                                key={item.url}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': currentPath === item.url,
-                                })}
-                            >
-                                <Link href={item.url} prefetch>
-                                    {item.title}
-                                </Link>
-                            </Button>
-                        ))}
-                    </nav>
-                </aside>
+            <nav aria-label="Secciones de mi cuenta" className="mt-6 flex gap-1 border-b">
+                {SECCIONES.map(({ titulo, url, icono: Icono }) => {
+                    const activa = actual === url;
+                    return (
+                        <Link
+                            key={url}
+                            href={url}
+                            prefetch
+                            aria-current={activa ? 'page' : undefined}
+                            className={cn(
+                                'focus-visible:ring-ring -mb-px flex items-center gap-2 rounded-t-md border-b-2 px-3 pb-3 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
+                                activa ? 'border-brand-coral-ink text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent',
+                            )}
+                        >
+                            <Icono className={cn('size-4', activa && 'text-brand-coral-ink')} aria-hidden="true" />
+                            {titulo}
+                        </Link>
+                    );
+                })}
+            </nav>
 
-                <Separator className="my-6 md:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">{children}</section>
-                </div>
-            </div>
+            <section aria-labelledby="titulo-seccion" className="bg-card mt-6 rounded-2xl border p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:p-8">
+                {/* El nombre de la sección ya se ve en la pestaña activa; aquí queda para quien navega por encabezados */}
+                <h2 id="titulo-seccion" className="sr-only">
+                    {seccion?.titulo}
+                </h2>
+                <p className="text-muted-foreground mb-6 text-sm">{descripcion}</p>
+                {children}
+            </section>
         </div>
     );
 }

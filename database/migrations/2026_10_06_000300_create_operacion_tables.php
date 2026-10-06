@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
 use Illuminate\Database\Migrations\Migration;
@@ -21,7 +20,7 @@ return new class extends Migration
             $table->string('archivo_path');
             $table->char('archivo_hash', 64)->unique(); // evita cargar el mismo archivo dos veces
             $table->date('fecha_operacion')->nullable()->index();
-            $table->enum('estado', EstadoCarga::values())->default(EstadoCarga::Procesando->value);
+            $table->enum('estado', ['procesando', 'procesada', 'con_errores', 'anulada'])->default('procesando'); // ajustado en 000500
             $table->unsignedInteger('total_filas')->default(0);
             $table->unsignedInteger('filas_validas')->default(0);
             $table->unsignedInteger('filas_error')->default(0);

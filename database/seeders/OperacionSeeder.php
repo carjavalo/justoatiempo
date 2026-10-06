@@ -20,14 +20,14 @@ class OperacionSeeder extends Seeder
         ]);
         $tugo->sedes()->updateOrCreate(['nombre' => 'Cali Sur'], ['alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
         $tugo->sedes()->updateOrCreate(['nombre' => 'Cali Norte'], ['alias_drivin' => 'CALI NORTE', 'ciudad' => 'Cali']);
-        $tugo->sedes()->updateOrCreate(['nombre' => 'Cañasgordas'], ['ciudad' => 'Cali']);
+        $tugo->sedes()->updateOrCreate(['nombre' => 'Cañasgordas'], ['alias_drivin' => 'CANASGORDAS', 'ciudad' => 'Cali']);
 
         $sodimac = Cliente::updateOrCreate(['nombre' => 'Sodimac'], [
             'codigo' => 'SODIMAC',
             'meta_efectividad' => 95,
             'color' => '#1F3A68',
         ]);
-        $sodimac->sedes()->updateOrCreate(['nombre' => 'Cali'], ['ciudad' => 'Cali']);
+        $sodimac->sedes()->updateOrCreate(['nombre' => 'Cali'], ['alias_drivin' => 'SODIMAC CALI', 'ciudad' => 'Cali']);
 
         Vehiculo::updateOrCreate(['placa' => 'SNX708'], ['tipo' => 'Furgón', 'descripcion' => 'Ruta urbana Cali Sur']);
         Vehiculo::updateOrCreate(['placa' => 'TTT768'], ['tipo' => 'Furgón']);

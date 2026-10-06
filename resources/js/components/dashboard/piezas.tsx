@@ -1,4 +1,4 @@
-import { type NivelEstado } from '@/lib/formato';
+import { fmt, type NivelEstado } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Minus, XCircle } from 'lucide-react';
 import { type ReactNode } from 'react';
@@ -82,11 +82,19 @@ export function Variacion({
         >
             <Icono className="size-3.5" aria-hidden="true" />
             <span className="tabular">{neutro ? 'sin cambio' : texto}</span>
+            {/* La flecha dice la dirección; si es buena o mala noticia no puede depender solo del color */}
+            <span className="sr-only">
+                {' '}
+                frente al periodo anterior{bueno === null ? '' : bueno ? ', favorable' : ', desfavorable'}
+            </span>
         </span>
     );
 }
 
-/** Control segmentado (periodos, pestañas de gráfica). */
+/**
+ * Control segmentado (periodos, tipo de gráfica): grupo de botones conmutables con aria-pressed.
+ * La opción activa va en azul de marca para que se distinga sin depender de un matiz sutil.
+ */
 export function Segmentado<T extends string | number>({
     opciones,
     valor,
@@ -99,19 +107,18 @@ export function Segmentado<T extends string | number>({
     etiqueta: string;
 }) {
     return (
-        <div role="radiogroup" aria-label={etiqueta} className="bg-muted inline-flex rounded-lg p-0.5">
+        <div role="group" aria-label={etiqueta} className="bg-muted inline-flex rounded-lg p-0.5">
             {opciones.map((o) => {
                 const activo = o.valor === valor;
                 return (
                     <button
                         key={String(o.valor)}
                         type="button"
-                        role="radio"
-                        aria-checked={activo}
+                        aria-pressed={activo}
                         onClick={() => onChange(o.valor)}
                         className={cn(
-                            'focus-visible:ring-ring rounded-md px-3 py-1.5 text-xs font-semibold transition-all outline-none focus-visible:ring-2',
-                            activo ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                            'focus-visible:ring-ring focus-visible:ring-offset-muted min-h-8 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden',
+                            activo ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                         )}
                     >
                         {o.texto}
@@ -142,17 +149,14 @@ export function BarraProgreso({
             role="meter"
             aria-label={etiqueta}
             aria-valuenow={Math.round(valor * 10) / 10}
+            aria-valuetext={`${fmt.pct(valor)}${meta !== undefined ? `, meta ${fmt.pctEntero(meta)}` : ''}`}
             aria-valuemin={0}
             aria-valuemax={100}
             className={cn('bg-muted relative h-2 w-full rounded-full', className)}
         >
             <div className={cn('h-full rounded-full transition-[width] duration-700 ease-out', colorClassName)} style={{ width: `${ancho}%` }} />
             {meta !== undefined && (
-                <div
-                    className="bg-foreground/70 absolute -top-1 -bottom-1 w-0.5 rounded-full"
-                    style={{ left: `calc(${Math.min(100, meta)}% - 1px)` }}
-                    title={`Meta ${meta}%`}
-                />
+                <div className="bg-foreground ring-card absolute -top-1 -bottom-1 w-0.5 rounded-full ring-2" style={{ left: `calc(${Math.min(100, meta)}% - 1px)` }} aria-hidden="true" />
             )}
         </div>
     );
@@ -160,4 +164,14 @@ export function BarraProgreso({
 
 export function Vacio({ children }: { children: ReactNode }) {
     return <div className="text-muted-foreground flex h-full min-h-32 items-center justify-center rounded-xl border border-dashed text-sm">{children}</div>;
+}
+
+/** Valor ausente: el guion se ve, el lector dice "sin datos". */
+export function SinDato() {
+    return (
+        <>
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">sin datos</span>
+        </>
+    );
 }

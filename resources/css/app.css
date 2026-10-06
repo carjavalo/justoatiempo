@@ -61,6 +61,8 @@
     --color-brand-navy-deep: var(--brand-navy-deep);
     --color-brand-coral: var(--brand-coral);
     --color-brand-coral-soft: var(--brand-coral-soft);
+    --color-brand-coral-ink: var(--brand-coral-ink);
+    --color-brand-coral-on-dark: var(--brand-coral-on-dark);
     --color-brand-steel: var(--brand-steel);
     --color-series-1: var(--series-1);
     --color-series-2: var(--series-2);
@@ -91,11 +93,16 @@
 }
 
 :root {
+    color-scheme: light;
     /* Marca Justo a Tiempo SP: azul marino del engranaje, coral de la placa, gris de la ciudad */
     --brand-navy: #1f3a68;
     --brand-navy-deep: #12244a;
     --brand-coral: #e8705f;
     --brand-coral-soft: #fbe3df;
+    /* Coral para texto o fondos con texto blanco: el #e8705f no llega a 4.5:1 sobre superficies claras */
+    --brand-coral-ink: #b4432f;
+    /* Coral claro para texto sobre el azul marino (8.56:1 sobre #12244a) */
+    --brand-coral-on-dark: #f4b2a8;
     --brand-steel: #6b7489;
 
     --background: #f5f7fb;
@@ -115,7 +122,7 @@
     --destructive: #d03b3b;
     --destructive-foreground: #ffffff;
     --border: #e3e8f0;
-    --input: #d9dfea;
+    --input: #7d879c; /* bordes de campos: ≥3:1 sobre fondo, tarjeta y muted (WCAG 1.4.11) */
     --ring: #2f5ba8;
     --radius: 0.75rem;
 
@@ -124,7 +131,7 @@
     --series-2: #e8705f;
     --chart-grid: #e8ecf3;
     --chart-axis: #c6cdda;
-    --chart-ink: #7a8396;
+    --chart-ink: #5b6577;
     --chart-1: #2f5ba8;
     --chart-2: #e8705f;
     --chart-3: #6b7489;
@@ -132,9 +139,9 @@
     --chart-5: #f4b2a8;
 
     /* Estados (reservados: solo significan bien / alerta / crítico; siempre con ícono + texto) */
-    --status-good: #0b8a3e;
+    --status-good: #077535; /* ≥4.5:1 como texto sobre blanco, fondo y su versión suave */
     --status-good-soft: #e3f5ea;
-    --status-warning: #b26a00;
+    --status-warning: #945800;
     --status-warning-soft: #fdf1dc;
     --status-critical: #c2352f;
     --status-critical-soft: #fbe5e3;
@@ -150,6 +157,8 @@
 }
 
 .dark {
+    color-scheme: dark;
+    --brand-coral-ink: #e8705f;
     --background: #0a1020;
     --foreground: #e7ecf5;
     --card: #111a2e;
@@ -167,7 +176,7 @@
     --destructive: #e5534b;
     --destructive-foreground: #ffffff;
     --border: #1f2a44;
-    --input: #26324f;
+    --input: #5f6c8c;
     --ring: #7d9fe0;
 
     --series-1: #6f93da;
@@ -207,6 +216,29 @@
         @apply bg-background text-foreground;
         font-feature-settings: 'ss01', 'cv11';
     }
+
+    /* La cabecera es fija (56 px): el foco al navegar hacia atrás no debe quedar debajo de ella (WCAG 2.4.11) */
+    html {
+        scroll-padding-top: 4.5rem;
+    }
+
+    /* Edge agrega su propio ojo a los campos de contraseña: ya hay un botón accesible para eso */
+    input::-ms-reveal,
+    input::-ms-clear {
+        display: none;
+    }
+}
+
+/* Movimiento reducido: sin animaciones ni transiciones para quien lo pidió en su sistema */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 @layer utilities {
@@ -216,8 +248,13 @@
     }
 }
 
-/* Recharts: sin contorno de foco por defecto sobre el SVG */
-.recharts-wrapper,
-.recharts-surface {
+/* Recharts hace la gráfica enfocable (flechas recorren los puntos): foco visible solo con teclado */
+.recharts-surface:focus {
     outline: none;
+}
+
+.recharts-surface:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 4px;
+    border-radius: 6px;
 }

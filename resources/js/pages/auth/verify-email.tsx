@@ -1,10 +1,9 @@
-// Components
 import { Head, useForm } from '@inertiajs/react';
-import { LoaderCircle } from 'lucide-react';
 import { FormEventHandler } from 'react';
 
+import { BotonEnviar } from '@/components/boton-enviar';
+import { MensajeEstado } from '@/components/mensaje-estado';
 import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import AuthLayout from '@/layouts/auth-layout';
 
 export default function VerifyEmail({ status }: { status?: string }) {
@@ -12,28 +11,23 @@ export default function VerifyEmail({ status }: { status?: string }) {
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-
+        if (processing) return;
         post(route('verification.send'));
     };
 
     return (
-        <AuthLayout title="Verify email" description="Please verify your email address by clicking on the link we just emailed to you.">
-            <Head title="Email verification" />
+        <AuthLayout title="Verifica tu correo" description="Abre el enlace que te enviamos por correo para activar tu acceso a la plataforma.">
+            <Head title="Verificar correo" />
 
-            {status === 'verification-link-sent' && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    A new verification link has been sent to the email address you provided during registration.
-                </div>
-            )}
+            <MensajeEstado mensaje={status === 'verification-link-sent' ? 'Te enviamos un nuevo enlace de verificación.' : null} />
 
-            <form onSubmit={submit} className="space-y-6 text-center">
-                <Button disabled={processing} variant="secondary">
-                    {processing && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                    Resend verification email
-                </Button>
+            <form onSubmit={submit} className="grid gap-4">
+                <BotonEnviar procesando={processing} variant="secondary" className="h-11 w-full rounded-lg font-semibold">
+                    Reenviar el correo
+                </BotonEnviar>
 
-                <TextLink href={route('logout')} method="post" className="mx-auto block text-sm">
-                    Log out
+                <TextLink href={route('logout')} method="post" as="button" className="mx-auto block text-sm">
+                    Cerrar sesión
                 </TextLink>
             </form>
         </AuthLayout>

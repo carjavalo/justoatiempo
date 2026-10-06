@@ -1,51 +1,39 @@
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAppearance } from '@/hooks/use-appearance';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { type Appearance, useAppearance } from '@/hooks/use-appearance';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { HTMLAttributes } from 'react';
 
+const TEMAS: { valor: Appearance; texto: string; icono: typeof Sun }[] = [
+    { valor: 'light', texto: 'Claro', icono: Sun },
+    { valor: 'dark', texto: 'Oscuro', icono: Moon },
+    { valor: 'system', texto: 'Según el sistema', icono: Monitor },
+];
+
+/** Selector de tema: opciones de radio para que se anuncie cuál está activa. */
 export default function AppearanceToggleDropdown({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
     const { appearance, updateAppearance } = useAppearance();
-
-    const getCurrentIcon = () => {
-        switch (appearance) {
-            case 'dark':
-                return <Moon className="h-[1.1rem] w-[1.1rem]" />;
-            case 'light':
-                return <Sun className="h-[1.1rem] w-[1.1rem]" />;
-            default:
-                return <Monitor className="h-[1.1rem] w-[1.1rem]" />;
-        }
-    };
+    const actual = TEMAS.find((t) => t.valor === appearance) ?? TEMAS[2];
 
     return (
         <div className={className} {...props}>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-9 w-9 rounded-lg">
-                        {getCurrentIcon()}
-                        <span className="sr-only">Cambiar tema</span>
+                        <actual.icono className="h-[1.1rem] w-[1.1rem]" aria-hidden="true" />
+                        <span className="sr-only">Tema: {actual.texto.toLowerCase()}. Cambiar tema</span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => updateAppearance('light')}>
-                        <span className="flex items-center gap-2">
-                            <Sun className="h-[1.1rem] w-[1.1rem]" />
-                            Claro
-                        </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateAppearance('dark')}>
-                        <span className="flex items-center gap-2">
-                            <Moon className="h-[1.1rem] w-[1.1rem]" />
-                            Oscuro
-                        </span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => updateAppearance('system')}>
-                        <span className="flex items-center gap-2">
-                            <Monitor className="h-[1.1rem] w-[1.1rem]" />
-                            Sistema
-                        </span>
-                    </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="min-w-44">
+                    <DropdownMenuLabel className="text-muted-foreground text-xs font-semibold">Tema</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={appearance} onValueChange={(v) => updateAppearance(v as Appearance)}>
+                        {TEMAS.map(({ valor, texto, icono: Icono }) => (
+                            <DropdownMenuRadioItem key={valor} value={valor} className="gap-2">
+                                <Icono className="size-4" aria-hidden="true" />
+                                {texto}
+                            </DropdownMenuRadioItem>
+                        ))}
+                    </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>

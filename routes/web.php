@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CargaController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -27,7 +28,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('rol:admin,coordinador')->group(function () use ($modulo) {
         Route::get('informes', $modulo('informes', 'Informe diario', 'Cuadro consolidado por fecha, cliente, sede, ruta, placa y auxiliar, con efectividad, devoluciones, averías y faltantes.', ['RF-05', 'RF-06', 'RF-07', 'RF-08']))->name('informes.index');
-        Route::get('cargas', $modulo('cargas', 'Cargas Drivin', 'Sube la preliquidación (.xlsx / .csv) exportada de Drivin; el sistema valida columnas y consolida en segundos.', ['RF-03', 'RF-04']))->name('cargas.index');
+        // Módulo 2: preliquidación de Drivin (subir → revisar → confirmar)
+        Route::get('cargas', [CargaController::class, 'index'])->name('cargas.index');
+        Route::post('cargas', [CargaController::class, 'store'])->name('cargas.store');
+        Route::get('cargas/{carga}', [CargaController::class, 'show'])->name('cargas.show');
+        Route::patch('cargas/{carga}', [CargaController::class, 'update'])->name('cargas.update');
+        Route::post('cargas/{carga}/confirmar', [CargaController::class, 'confirmar'])->name('cargas.confirmar');
+        Route::post('cargas/{carga}/anular', [CargaController::class, 'anular'])->name('cargas.anular');
+        Route::delete('cargas/{carga}', [CargaController::class, 'destroy'])->name('cargas.destroy');
+
         Route::get('auditoria', $modulo('auditoria', 'Auditoría POD', 'Checklist del protocolo de entrega por orden: fachada, producto sellado, destapado (o nota firmada) y remesa.', ['RF-09', 'RF-10']))->name('auditoria.index');
         Route::get('seguimiento', $modulo('seguimiento', 'Seguimiento y desempeño', 'Felicitaciones, retroalimentación y llamados de atención por auxiliar, y control de informes en seguimiento.', ['RF-11']))->name('seguimiento.index');
         Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por cliente, sede y fecha.', ['RF-02']))->name('programacion.index');
