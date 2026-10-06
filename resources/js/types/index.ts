@@ -1,5 +1,7 @@
 import { LucideIcon } from 'lucide-react';
 
+export type Rol = 'admin' | 'coordinador' | 'auxiliar';
+
 export interface Auth {
     user: User;
 }
@@ -19,12 +21,15 @@ export interface NavItem {
     url: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Roles que ven la opción; si se omite, todos. */
+    roles?: Rol[];
+    badge?: string;
 }
 
 export interface SharedData {
     name: string;
-    quote: { message: string; author: string };
     auth: Auth;
+    flash: { success?: string | null; error?: string | null };
     [key: string]: unknown;
 }
 
@@ -33,6 +38,9 @@ export interface User {
     name: string;
     email: string;
     avatar?: string;
+    rol: Rol;
+    rol_label: string;
+    empleado_id: number | null;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

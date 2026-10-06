@@ -7,7 +7,9 @@
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <meta name="theme-color" content="#12244a">
 
         @routes
         @viteReactRefresh

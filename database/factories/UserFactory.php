@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Rol;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -29,7 +30,19 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'rol' => Rol::Auxiliar,
+            'activo' => true,
         ];
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['rol' => Rol::Admin]);
+    }
+
+    public function coordinador(): static
+    {
+        return $this->state(fn () => ['rol' => Rol::Coordinador]);
     }
 
     /**

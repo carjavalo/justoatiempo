@@ -1,13 +1,14 @@
 import { SVGAttributes } from 'react';
 
-export default function AppLogoIcon(props: SVGAttributes<SVGElement>) {
+/** Isotipo de Justo a Tiempo SP: engranaje (operación) con reloj (puntualidad), como en el logo oficial. */
+const ENGRANAJE = 'M16.00 3.80 L16.91 1.53 L19.16 1.85 L19.40 4.28 L22.10 5.43 L24.02 3.92 L25.81 5.33 L24.81 7.56 L26.57 9.90 L28.99 9.55 L29.84 11.66 L27.85 13.09 L28.20 16.00 L30.47 16.91 L30.15 19.16 L27.72 19.40 L26.57 22.10 L28.08 24.02 L26.67 25.81 L24.44 24.81 L22.10 26.57 L22.45 28.99 L20.34 29.84 L18.91 27.85 L16.00 28.20 L15.09 30.47 L12.84 30.15 L12.60 27.72 L9.90 26.57 L7.98 28.08 L6.19 26.67 L7.19 24.44 L5.43 22.10 L3.01 22.45 L2.16 20.34 L4.15 18.91 L3.80 16.00 L1.53 15.09 L1.85 12.84 L4.28 12.60 L5.43 9.90 L3.92 7.98 L5.33 6.19 L7.56 7.19 L9.90 5.43 L9.55 3.01 L11.66 2.16 L13.09 4.15 Z M16 6.2 a9.8 9.8 0 1 0 0.001 0 Z';
+
+export default function AppLogoIcon({ gearClassName, ...props }: SVGAttributes<SVGElement> & { gearClassName?: string }) {
     return (
-        <svg {...props} viewBox="0 0 40 42" xmlns="http://www.w3.org/2000/svg">
-            <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M17.2 5.63325L8.6 0.855469L0 5.63325V32.1434L16.2 41.1434L32.4 32.1434V23.699L40 19.4767V9.85547L31.4 5.07769L22.8 9.85547V18.2999L17.2 21.411V5.63325ZM38 18.2999L32.4 21.411V15.2545L38 12.1434V18.2999ZM36.9409 10.4439L31.4 13.5221L25.8591 10.4439L31.4 7.36561L36.9409 10.4439ZM24.8 18.2999V12.1434L30.4 15.2545V21.411L24.8 18.2999ZM23.8 20.0323L29.3409 23.1105L16.2 30.411L10.6591 27.3328L23.8 20.0323ZM7.6 27.9212L15.2 32.1434V38.2999L2 30.9666V7.92116L7.6 11.0323V27.9212ZM8.6 9.29991L3.05913 6.22165L8.6 3.14339L14.1409 6.22165L8.6 9.29991ZM30.4 24.8101L17.2 32.1434V38.2999L30.4 30.9666V24.8101ZM9.6 11.0323L15.2 7.92117V22.5221L9.6 25.6333V11.0323Z"
-            />
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" {...props}>
+            <path d={ENGRANAJE} fillRule="evenodd" className={gearClassName ?? 'fill-brand-coral'} />
+            <circle cx="16" cy="16" r="7.2" fill="none" stroke="currentColor" strokeWidth="1.9" />
+            <path d="M16 11.6 V16 L19.2 18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
