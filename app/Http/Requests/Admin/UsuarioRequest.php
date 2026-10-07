@@ -23,7 +23,9 @@ class UsuarioRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'name' => $this->texto('name'),
+            'nombres' => $this->texto('nombres'),
+            'primer_apellido' => $this->texto('primer_apellido'),
+            'segundo_apellido' => $this->texto('segundo_apellido') ?: null,
             'email' => is_string($e = $this->texto('email')) ? mb_strtolower($e) : $e,
             'empresa_id' => $this->input('empresa_id') ?: null,
             'sede_id' => $this->input('sede_id') ?: null,
@@ -37,7 +39,9 @@ class UsuarioRequest extends FormRequest
         $usuario = $this->route('usuario');
 
         return [
-            'name' => ['required', 'string', 'max:120'],
+            'nombres' => ['required', 'string', 'max:80'],
+            'primer_apellido' => ['required', 'string', 'max:80'],
+            'segundo_apellido' => ['nullable', 'string', 'max:80'],
             'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol' => ['required', Rule::enum(Rol::class)],
             'empresa_id' => ['nullable', 'integer', Rule::exists('clientes', 'id')->whereNull('deleted_at')],
@@ -90,7 +94,7 @@ class UsuarioRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['name' => 'el nombre', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'password' => 'la contraseña'];
+        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'password' => 'la contraseña'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
@@ -99,7 +103,9 @@ class UsuarioRequest extends FormRequest
         $datos = $this->validated();
 
         $guardar = [
-            'name' => $datos['name'],
+            'nombres' => $datos['nombres'],
+            'primer_apellido' => $datos['primer_apellido'],
+            'segundo_apellido' => $datos['segundo_apellido'] ?? null,
             'email' => $datos['email'],
             'rol' => $datos['rol'],
             'cliente_id' => $datos['empresa_id'] ?? null,

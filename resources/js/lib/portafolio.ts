@@ -3,28 +3,34 @@
  * Justo a Tiempo SP S.A.S". Para cambiar textos o imágenes de la página principal, se edita aquí.
  */
 import {
+    ApoyoPlantas,
+    AseoConstruccion,
+    AseoIndustrial,
     Award,
     BadgeCheck,
-    Building2,
     CalendarRange,
     Cog,
+    ConjuntoResidencial,
     Factory,
     GraduationCap,
     HardHat,
     HeartPulse,
     Landmark,
     Layers,
-    type TipoIcono,
+    ListaChequeo,
     Map,
     PackageOpen,
     Scale,
-    Shirt,
+    Sectores,
+    ServicioLogistico,
     ShieldCheck,
+    Shirt,
     ShoppingBag,
     SprayCan,
     Sprout,
     Store,
     Telescope,
+    type TipoIcono,
     TreePine,
     Truck,
     UserCheck,
@@ -69,7 +75,7 @@ export const SERVICIOS: LineaServicio[] = [
     {
         id: 'logisticos',
         nombre: 'Servicios logísticos',
-        icono: Warehouse,
+        icono: ServicioLogistico,
         imagen: '/images/servicios/cargue-descargue.jpg',
         descripcion:
             'Soluciones logísticas mediante el suministro de personal especializado para apoyar todas las etapas de la cadena de abastecimiento, garantizando operaciones eficientes, seguras y organizadas.',
@@ -124,7 +130,7 @@ export const SERVICIOS: LineaServicio[] = [
     {
         id: 'aseo-industrial',
         nombre: 'Aseo industrial',
-        icono: Factory,
+        icono: AseoIndustrial,
         imagen: '/images/servicios/aseo-industrial.jpg',
         descripcion: 'Procesos especializados de limpieza en ambientes industriales y logísticos bajo protocolos de seguridad.',
         tituloLista: 'Incluye',
@@ -133,7 +139,7 @@ export const SERVICIOS: LineaServicio[] = [
     {
         id: 'aseo-construccion',
         nombre: 'Aseo de construcción y postobra',
-        icono: HardHat,
+        icono: AseoConstruccion,
         imagen: '/images/servicios/aseo-construccion.jpg',
         descripcion: 'Labores de limpieza durante y después de obras civiles, remodelaciones y adecuaciones.',
         tituloLista: 'Incluye',
@@ -160,7 +166,7 @@ export const SERVICIOS: LineaServicio[] = [
     {
         id: 'apoyo-plantas',
         nombre: 'Apoyo operativo para plantas y centros logísticos',
-        icono: Cog,
+        icono: ApoyoPlantas,
         imagen: '/images/servicios/operarios.jpg',
         descripcion: 'Personal de apoyo para fortalecer procesos productivos, logísticos y de almacenamiento.',
         tituloLista: 'Actividades',
@@ -194,19 +200,19 @@ export const SECTORES: { icono: TipoIcono; nombre: string }[] = [
     { icono: GraduationCap, nombre: 'Educación' },
     { icono: Landmark, nombre: 'Sector público' },
     { icono: Store, nombre: 'Centros comerciales' },
-    { icono: Building2, nombre: 'Conjuntos residenciales' },
+    { icono: ConjuntoResidencial, nombre: 'Conjuntos residenciales' },
 ];
 
 /** Datos clave de la portada (todos del portafolio, sin cifras inventadas). */
 export const DESTACADOS: { icono: TipoIcono; titulo: string; texto: string }[] = [
     { icono: Layers, titulo: '8 líneas de servicio', texto: 'Logística, personal, aseo y mantenimiento' },
-    { icono: Building2, titulo: '13 sectores', texto: 'Industria, logística, retail, salud y más' },
+    { icono: Sectores, titulo: '13 sectores', texto: 'Industria, logística, retail, salud y más' },
     { icono: Map, titulo: 'Cobertura nacional', texto: 'Personal disponible en todo el país' },
     { icono: ShieldCheck, titulo: 'SG-SST', texto: 'Seguridad y salud en el trabajo' },
 ];
 
 export const COMPROMISOS: { icono: TipoIcono; texto: string }[] = [
-    { icono: ShieldCheck, texto: 'Lineamientos del Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST)' },
+    { icono: ListaChequeo, texto: 'Lineamientos del Sistema de Gestión de Seguridad y Salud en el Trabajo (SG-SST)' },
     { icono: Shirt, texto: 'Uso adecuado de los Elementos de Protección Personal (EPP)' },
     { icono: BadgeCheck, texto: 'Cumplimiento de la normatividad vigente en seguridad y salud' },
 ];

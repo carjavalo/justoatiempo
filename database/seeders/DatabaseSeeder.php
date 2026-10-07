@@ -26,14 +26,16 @@ class DatabaseSeeder extends Seeder
 
         // Usuarios de desarrollo. Contraseña para todos: "password" (cambiar en producción).
         User::updateOrCreate(['email' => 'admin@justoatiempo.test'], [
-            'name' => 'Natalia Restrepo',
+            'nombres' => 'Natalia',
+            'primer_apellido' => 'Restrepo',
             'password' => 'password',
             'rol' => Rol::Admin,
             'email_verified_at' => now(),
         ]);
 
         User::updateOrCreate(['email' => 'coordinador@justoatiempo.test'], [
-            'name' => 'Carlos Valderrama',
+            'nombres' => 'Carlos',
+            'primer_apellido' => 'Valderrama',
             'password' => 'password',
             'rol' => Rol::Coordinador,
             'empleado_id' => Empleado::where('cedula', '1000000006')->value('id'),
@@ -43,7 +45,8 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::updateOrCreate(['email' => 'auxiliar@justoatiempo.test'], [
-            'name' => 'Andrés Moreno',
+            'nombres' => 'Andrés',
+            'primer_apellido' => 'Moreno',
             'password' => 'password',
             'rol' => Rol::Auxiliar,
             'empleado_id' => Empleado::where('cedula', '1000000002')->value('id'),

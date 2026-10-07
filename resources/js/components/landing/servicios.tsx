@@ -71,7 +71,7 @@ export function Servicios() {
                                     <span
                                         className={cn(
                                             'flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors',
-                                            sel ? 'bg-brand-coral text-brand-navy-deep' : 'bg-secondary text-primary',
+                                            sel ? 'bg-brand-coral text-brand-coral-foreground' : 'bg-secondary text-primary',
                                         )}
                                     >
                                         <Icono className="size-5" aria-hidden="true" />

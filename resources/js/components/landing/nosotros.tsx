@@ -1,6 +1,6 @@
 import LogoMarca from '@/components/logo-marca';
 import { EMPRESA } from '@/lib/portafolio';
-import { CheckCircle2, Target, Telescope } from '@/components/iconos';
+import { CheckCircle2, Target, Vision } from '@/components/iconos';
 import { EncabezadoSeccion, Revelar } from './piezas';
 
 export function Nosotros() {
@@ -28,7 +28,7 @@ export function Nosotros() {
                         <LogoMarca
                             grande
                             alt={`Logo de ${EMPRESA.nombre}`}
-                            className="absolute -bottom-6 left-4 w-36 rounded-2xl p-2.5 shadow-[0_18px_40px_rgba(18,36,74,0.22)] sm:-left-8 sm:w-44 sm:p-3"
+                            className="absolute -bottom-6 left-4 w-36 rounded-2xl p-2.5 shadow-[var(--sombra-flotante)] sm:-left-8 sm:w-44 sm:p-3"
                         />
                     </Revelar>
                 </div>
@@ -37,7 +37,7 @@ export function Nosotros() {
                 <div className="mt-16 grid gap-5 md:grid-cols-2">
                     {[
                         { icono: Target, titulo: 'Misión', texto: EMPRESA.mision },
-                        { icono: Telescope, titulo: 'Visión', texto: EMPRESA.vision },
+                        { icono: Vision, titulo: 'Visión', texto: EMPRESA.vision },
                     ].map(({ icono: Icono, titulo, texto }, i) => (
                         <Revelar key={titulo} retraso={i * 100} className="bg-card relative overflow-hidden rounded-3xl border p-7 shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:p-8">
                             <span className="bg-secondary text-primary flex size-12 items-center justify-center rounded-2xl">

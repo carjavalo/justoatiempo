@@ -88,14 +88,14 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                         key={id}
                         className={cn(
                             'group bg-card relative isolate flex flex-col overflow-hidden rounded-3xl border p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all md:p-7',
-                            'hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(18,36,74,0.12)]',
+                            'hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-[var(--sombra-elevada)]',
                             'has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-[3px] has-[a:focus-visible]:ring-ring/25',
                         )}
                     >
                         {/* Ícono grande de fondo: decorativo */}
                         <Icono className="text-primary/[0.05] absolute -right-6 -bottom-6 -z-10 size-40 transition-transform group-hover:scale-105" strokeWidth={1.2} aria-hidden="true" />
                         <span className="bg-brand-navy-deep flex size-14 items-center justify-center rounded-2xl shadow-md">
-                            <Icono className="text-brand-coral-on-dark size-7" aria-hidden="true" />
+                            <Icono className="text-brand-coral-on-dark size-8" aria-hidden="true" />
                         </span>
                         <h3 className="mt-6 text-xl font-extrabold tracking-tight">
                             {/* El enlace cubre toda la tarjeta (::after), pero su nombre es solo el título */}

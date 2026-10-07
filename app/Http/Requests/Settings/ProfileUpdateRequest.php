@@ -9,6 +9,15 @@ use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        foreach (['nombres', 'primer_apellido', 'segundo_apellido'] as $campo) {
+            if (is_string($valor = $this->input($campo))) {
+                $this->merge([$campo => trim($valor) ?: null]);
+            }
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -17,7 +26,9 @@ class ProfileUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'nombres' => ['required', 'string', 'max:80'],
+            'primer_apellido' => ['required', 'string', 'max:80'],
+            'segundo_apellido' => ['nullable', 'string', 'max:80'],
 
             'email' => [
                 'required',
@@ -28,5 +39,10 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
         ];
+    }
+
+    public function attributes(): array
+    {
+        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido'];
     }
 }

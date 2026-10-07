@@ -1,12 +1,12 @@
 import { type EstadoAuditoria } from '@/lib/protocolo';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, CircleDashed, FileX2, Paperclip, XCircle, type TipoIcono } from '@/components/iconos';
+import { AlertTriangle, CheckCircle2, CircleDashed, Paperclip, SinArchivos, type TipoIcono, XCircle } from '@/components/iconos';
 import { type FiltrosAuditoria, type OrdenCola } from './tipos';
 
 const ESTADOS: Record<EstadoAuditoria, { texto: string; icono: TipoIcono; clase: string }> = {
     pendiente: { texto: 'Por auditar', icono: CircleDashed, clase: 'bg-secondary text-secondary-foreground' },
-    pendiente_sin_archivos: { texto: 'Sin archivos', icono: FileX2, clase: 'bg-warning-soft text-warning' },
+    pendiente_sin_archivos: { texto: 'Sin archivos', icono: SinArchivos, clase: 'bg-warning-soft text-warning' },
     cumple: { texto: 'Cumple', icono: CheckCircle2, clase: 'bg-good-soft text-good' },
     no_cumple: { texto: 'No cumple', icono: AlertTriangle, clase: 'bg-critical-soft text-critical' },
     sin_evidencia: { texto: 'Sin evidencia', icono: XCircle, clase: 'bg-critical-soft text-critical' },

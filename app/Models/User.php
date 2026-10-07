@@ -21,6 +21,9 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'nombres',
+        'primer_apellido',
+        'segundo_apellido',
         'email',
         'password',
         'rol',
@@ -55,6 +58,24 @@ class User extends Authenticatable
             'activo' => 'boolean',
             'ultimo_acceso_en' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // El nombre completo (para mostrar y buscar) sale de las partes, cuando las hay
+        static::saving(function (User $user) {
+            if (filled($user->nombres)) {
+                $user->name = self::nombreCompleto($user->nombres, $user->primer_apellido, $user->segundo_apellido);
+            }
+        });
+    }
+
+    /** "Ana María", "Gómez", "Ruiz" → "Ana María Gómez Ruiz" (sin espacios de más). */
+    public static function nombreCompleto(?string $nombres, ?string $primerApellido, ?string $segundoApellido): string
+    {
+        $texto = implode(' ', array_filter([$nombres, $primerApellido, $segundoApellido], fn ($parte) => filled($parte)));
+
+        return trim(preg_replace('/\s+/u', ' ', $texto));
     }
 
     public function empleado(): BelongsTo

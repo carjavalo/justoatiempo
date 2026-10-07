@@ -138,7 +138,7 @@ export function Encabezado() {
                                 </ul>
                                 <Link
                                     href={acceso.href}
-                                    className="bg-brand-coral text-brand-navy-deep mt-auto flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                    className="bg-brand-coral text-brand-coral-foreground mt-auto flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                                 >
                                     <LogIn className="size-4" aria-hidden="true" />
                                     {acceso.texto}

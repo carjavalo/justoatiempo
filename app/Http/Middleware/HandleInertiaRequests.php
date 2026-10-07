@@ -42,7 +42,7 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $user ? [
-                    ...$user->only(['id', 'name', 'email', 'email_verified_at', 'created_at', 'updated_at', 'empleado_id']),
+                    ...$user->only(['id', 'name', 'nombres', 'primer_apellido', 'segundo_apellido', 'email', 'email_verified_at', 'created_at', 'updated_at', 'empleado_id']),
                     'rol' => $user->rol->value,
                     'rol_label' => $user->rol->label(),
                 ] : null,

@@ -52,7 +52,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     <div className="grid gap-2">
                         <Label htmlFor="email">Correo electrónico</Label>
                         <div className="relative">
-                            <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
+                            <Mail weight="bold" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
                             <Input
                                 {...propsCampo('email', errors.email)}
                                 type="email"
@@ -71,7 +71,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     <div className="grid gap-2">
                         <Label htmlFor="password">Contraseña</Label>
                         <div className="relative">
-                            <LockKeyhole className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" aria-hidden="true" />
+                            <LockKeyhole weight="bold" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" aria-hidden="true" />
                             <PasswordInput
                                 {...propsCampo('password', errors.password)}
                                 required

@@ -39,12 +39,17 @@ class UsuarioController extends Controller
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->where('cliente_id', $id))
             ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->where('sede_id', $id))
             ->orderByDesc('activo')
-            ->orderBy('name')
+            ->orderBy('primer_apellido')
+            ->orderBy('segundo_apellido')
+            ->orderBy('nombres')
             ->paginate(15)
             ->withQueryString()
             ->through(fn (User $u) => [
                 'id' => $u->id,
                 'nombre' => $u->name,
+                'nombres' => $u->nombres,
+                'primerApellido' => $u->primer_apellido,
+                'segundoApellido' => $u->segundo_apellido,
                 'email' => $u->email,
                 'rol' => $u->rol->value,
                 'rolLabel' => $u->rol->label(),

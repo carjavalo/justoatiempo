@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { evaluar, MIN_DESTAPADO, MIN_SELLADO, type Checklist } from '@/lib/protocolo';
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
-import { CheckCircle2, Lock, Minus, Plus, XCircle } from '@/components/iconos';
+import { AlertTriangle, CheckCircle2, Lock, Minus, Plus, XCircle } from '@/components/iconos';
 import { type FormEventHandler, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { consultaFiltros } from './cola';
 import { type FiltrosAuditoria, type OrdenDetalle, type TipoNovedad } from './tipos';
@@ -211,7 +211,7 @@ export function FormularioAuditoria({
                     role="status"
                     className={cn('mt-5 flex items-start gap-3 rounded-xl p-4 text-sm', evaluacion.cumple ? 'bg-good-soft text-good' : 'bg-critical-soft text-critical')}
                 >
-                    {evaluacion.cumple ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" /> : <XCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />}
+                    {evaluacion.cumple ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />}
                     <p>
                         <strong className="font-bold">{evaluacion.cumple ? 'Cumple el protocolo de entrega.' : 'No cumple el protocolo.'}</strong>{' '}
                         {!evaluacion.cumple && <span className="font-medium">Falta: {evaluacion.faltantes.join(', ')}.</span>}

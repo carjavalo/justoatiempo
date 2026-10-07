@@ -1,7 +1,7 @@
 import { Panel } from '@/components/dashboard/piezas';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Ban, Check, CheckCircle2, Clock3, type TipoIcono } from '@/components/iconos';
+import { AlertTriangle, Ban, Check, CheckCircle2, EnRevision, type TipoIcono } from '@/components/iconos';
 import { type ReactNode, useState } from 'react';
 
 export interface ErrorFila {
@@ -21,7 +21,7 @@ export interface Advertencia {
 export type EstadoCarga = 'en_revision' | 'procesada' | 'con_errores' | 'anulada';
 
 const ESTADOS: Record<EstadoCarga, { icono: TipoIcono; clase: string }> = {
-    en_revision: { icono: Clock3, clase: 'bg-warning-soft text-warning' },
+    en_revision: { icono: EnRevision, clase: 'bg-warning-soft text-warning' },
     procesada: { icono: CheckCircle2, clase: 'bg-good-soft text-good' },
     con_errores: { icono: AlertTriangle, clase: 'bg-warning-soft text-warning' },
     anulada: { icono: Ban, clase: 'bg-muted text-muted-foreground' },
@@ -31,7 +31,8 @@ export function EstadoCargaBadge({ estado, texto }: { estado: EstadoCarga; texto
     const { icono: Icono, clase } = ESTADOS[estado];
     return (
         <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-semibold whitespace-nowrap', clase)}>
-            <Icono className="size-3.5" aria-hidden="true" />
+            {/* Todos los estados rellenos: se leen igual y sin el acento coral de los conceptos */}
+            <Icono weight="fill" className="size-3.5" aria-hidden="true" />
             {texto}
         </span>
     );
@@ -72,7 +73,7 @@ export function Pasos({ actual }: { actual: 1 | 2 | 3 | 4 }) { // 4 = todos comp
                             className={cn(
                                 'flex size-6 items-center justify-center rounded-full text-[0.7rem]',
                                 hecho && 'bg-good-soft text-good',
-                                activo && 'bg-brand-coral text-brand-navy-deep',
+                                activo && 'bg-brand-coral text-brand-coral-foreground',
                                 !hecho && !activo && 'bg-muted text-muted-foreground',
                             )}
                         >

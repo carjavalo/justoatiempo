@@ -194,7 +194,7 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                                 <p className="text-muted-foreground text-xs">
                                     <span aria-hidden="true">*</span> Campos obligatorios
                                 </p>
-                                <BotonEnviar procesando={processing} className="bg-brand-coral text-brand-navy-deep h-11 rounded-xl px-6 font-bold hover:bg-[#ee8574]">
+                                <BotonEnviar procesando={processing} className="bg-brand-coral text-brand-coral-foreground h-11 rounded-xl px-6 font-bold hover:bg-[#ee8574]">
                                     Enviar solicitud
                                 </BotonEnviar>
                             </div>

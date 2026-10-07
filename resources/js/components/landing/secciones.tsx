@@ -17,7 +17,7 @@ export function PorQueElegirnos() {
                 <ul role="list" className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {RAZONES.map(({ icono: Icono, titulo, texto }, i) => (
                         <Revelar as="li" key={titulo} retraso={(i % 3) * 80} className="rounded-3xl bg-white/[0.06] p-6 ring-1 ring-white/10 transition-colors hover:bg-white/[0.09]">
-                            <span className="bg-brand-coral text-brand-navy-deep flex size-12 items-center justify-center rounded-2xl">
+                            <span className="bg-brand-coral text-brand-coral-foreground flex size-12 items-center justify-center rounded-2xl">
                                 <Icono className="size-6" aria-hidden="true" />
                             </span>
                             <h3 className="mt-5 text-lg font-bold">{titulo}</h3>
@@ -74,7 +74,7 @@ export function SeguridadCobertura() {
                     {/* Textura de marca: trama de puntos y un gran marcador de ubicación */}
                     <div className="absolute inset-0 -z-10 opacity-[0.1] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:20px_20px]" aria-hidden="true" />
                     <MapPin className="absolute -right-10 -bottom-10 -z-10 size-72 text-white/[0.06]" strokeWidth={1} aria-hidden="true" />
-                    <span className="bg-brand-coral text-brand-navy-deep flex size-14 items-center justify-center rounded-2xl">
+                    <span className="bg-brand-coral text-brand-coral-foreground flex size-14 items-center justify-center rounded-2xl">
                         <MapPin className="size-7" aria-hidden="true" />
                     </span>
                     <h3 className="mt-6 text-2xl font-extrabold tracking-tight md:text-3xl">Donde su operación lo necesite</h3>
@@ -84,7 +84,7 @@ export function SeguridadCobertura() {
                 {/* Compromiso con la seguridad */}
                 <Revelar retraso={100} className="bg-card rounded-3xl border p-7 shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:p-10">
                     <span className="bg-good-soft text-good flex size-14 items-center justify-center rounded-2xl">
-                        <ShieldCheck className="size-7" aria-hidden="true" />
+                        <ShieldCheck weight="fill" className="size-7" aria-hidden="true" />
                     </span>
                     <h3 className="mt-6 text-2xl font-extrabold tracking-tight md:text-3xl">Compromiso con la seguridad</h3>
                     <p className="text-muted-foreground mt-3 leading-relaxed">{EMPRESA.seguridad}</p>

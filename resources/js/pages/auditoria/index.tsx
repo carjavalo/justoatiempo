@@ -144,7 +144,7 @@ export default function Auditoria({ filtros, jornadas, clientes, resumen, ordene
                                 >
                                     {o.texto}
                                     {o.cuenta !== undefined && (
-                                        <span className={cn('tabular rounded-full px-1.5 text-[0.68rem]', activo ? 'bg-white/20' : 'bg-card')}>{fmt.numero(o.cuenta)}</span>
+                                        <span className={cn('tabular rounded-full px-1.5 text-[0.68rem]', activo ? 'bg-black/20' : 'bg-card')}>{fmt.numero(o.cuenta)}</span>
                                     )}
                                 </button>
                             );

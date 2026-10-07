@@ -1,6 +1,6 @@
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { Award, Clock3, FileSpreadsheet, MessageCircle, ShieldAlert } from '@/components/iconos';
+import { EnRevision, Felicitacion, FileSpreadsheet, MessageCircle, ShieldAlert } from '@/components/iconos';
 import { Panel, Vacio } from './piezas';
 import { type AccionReciente, type Pendientes } from './tipos';
 
@@ -17,7 +17,7 @@ export function InformesPendientes({ pendientes }: { pendientes: Pendientes }) {
                     {informes.map((i) => (
                         <li key={i.id} className="flex items-center gap-3 py-2.5 first:pt-0">
                             <span className="bg-warning-soft text-warning flex size-9 shrink-0 items-center justify-center rounded-lg">
-                                <Clock3 className="size-4" aria-hidden="true" />
+                                <EnRevision className="size-4" aria-hidden="true" />
                             </span>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold break-words">
@@ -54,7 +54,7 @@ export function InformesPendientes({ pendientes }: { pendientes: Pendientes }) {
 }
 
 const ACCION = {
-    felicitacion: { icono: Award, clase: 'bg-good-soft text-good' },
+    felicitacion: { icono: Felicitacion, clase: 'bg-good-soft text-good' },
     retroalimentacion: { icono: MessageCircle, clase: 'bg-warning-soft text-warning' },
     llamado_atencion: { icono: ShieldAlert, clase: 'bg-critical-soft text-critical' },
 } as const;

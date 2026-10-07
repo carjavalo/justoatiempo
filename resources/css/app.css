@@ -65,6 +65,7 @@
     --color-brand-coral-soft: var(--brand-coral-soft);
     --color-brand-coral-ink: var(--brand-coral-ink);
     --color-brand-coral-on-dark: var(--brand-coral-on-dark);
+    --color-brand-coral-foreground: var(--brand-coral-foreground);
     --color-brand-steel: var(--brand-steel);
     --color-series-1: var(--series-1);
     --color-series-2: var(--series-2);
@@ -105,6 +106,8 @@
     --brand-coral-ink: #b4432f;
     /* Coral claro para texto sobre el azul marino (8.56:1 sobre #12244a) */
     --brand-coral-on-dark: #f4b2a8;
+    /* Texto sobre coral: igual en claro y oscuro (5.0:1); no se redefine en .dark */
+    --brand-coral-foreground: #12244a;
     --brand-steel: #6b7489;
 
     --background: #f5f7fb;
@@ -163,6 +166,10 @@
     /* Barra de desplazamiento propia: ≥3:1 sobre el fondo para que se vea dónde está */
     --scroll-thumb: #848da1;
     --scroll-thumb-hover: #2f5ba8;
+
+    /* Sombras de elevación, teñidas del azul de marca en claro */
+    --sombra-elevada: 0 18px 40px rgba(18, 36, 74, 0.12);
+    --sombra-flotante: 0 18px 40px rgba(18, 36, 74, 0.22);
 }
 
 /*
@@ -186,7 +193,7 @@
     --popover-foreground: #e6e8eb;
     --primary: #8fadde; /* enlaces e íconos (7.5:1 sobre tarjeta) */
     --primary-foreground: #121417;
-    --accion: #3b65b5; /* botones: blanco encima 5.6:1 */
+    --accion: #3f6bbd; /* botones: blanco encima 5.2:1; frente a la pista muted 3.2:1 */
     --accion-foreground: #ffffff;
     --secondary: #1f2734; /* fondo de íconos y elementos de marca: grafito con un toque de azul */
     --secondary-foreground: #e6e8eb;
@@ -227,8 +234,11 @@
     --sidebar-border: rgba(255, 255, 255, 0.07);
     --sidebar-ring: #e8705f;
 
-    --scroll-thumb: #4b525d;
+    --scroll-thumb: #6b7482;
     --scroll-thumb-hover: #8fadde;
+
+    --sombra-elevada: 0 18px 40px rgba(0, 0, 0, 0.45);
+    --sombra-flotante: 0 18px 40px rgba(0, 0, 0, 0.55);
 }
 
 @layer base {

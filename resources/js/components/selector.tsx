@@ -79,7 +79,7 @@ export const Selector = React.forwardRef<HTMLButtonElement, Props>(
                         className={cn(
                             // Por encima de los paneles laterales y diálogos (z-50)
                             'bg-popover text-popover-foreground relative z-[60] max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border',
-                            'shadow-[0_16px_40px_rgba(18,36,74,0.16)] dark:shadow-[0_16px_40px_rgba(0,0,0,0.45)]',
+                            'shadow-[var(--sombra-elevada)]',
                             'motion-safe:data-[state=open]:animate-in motion-safe:data-[state=open]:fade-in-0 motion-safe:data-[state=open]:zoom-in-95',
                             'motion-safe:data-[side=bottom]:slide-in-from-top-1 motion-safe:data-[side=top]:slide-in-from-bottom-1',
                         )}
@@ -96,7 +96,7 @@ export const Selector = React.forwardRef<HTMLButtonElement, Props>(
                                     className={cn(
                                         'relative flex w-full cursor-pointer items-center rounded-lg py-2 pr-9 pl-3 outline-hidden select-none',
                                         tamano === 'sm' ? 'text-xs' : 'text-sm',
-                                        'data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground',
+                                        'data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground data-[highlighted]:shadow-[inset_3px_0_0_var(--color-ring)]',
                                         'data-[state=checked]:font-semibold data-disabled:pointer-events-none data-disabled:opacity-50',
                                     )}
                                 >

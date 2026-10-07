@@ -228,7 +228,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                         <tr key={u.id} className={cn('hover:bg-muted/40 transition-colors', !u.activo && 'text-muted-foreground')}>
                                             <th scope="row" className={cn(claseTd, 'font-normal')}>
                                                 <div className="flex items-center gap-3">
-                                                    <Iniciales texto={u.nombre} className={u.esUsted ? 'bg-brand-coral text-brand-navy-deep' : undefined} />
+                                                    <Iniciales texto={u.nombre} className={u.esUsted ? 'bg-brand-coral text-brand-coral-foreground' : undefined} />
                                                     <div className="min-w-0">
                                                         <p className="text-foreground flex items-center gap-2 font-semibold">
                                                             <span className="truncate">{u.nombre}</span>
@@ -412,7 +412,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     />
                     <div className="flex items-center justify-between gap-3">
                         <button type="button" onClick={generar} className="text-primary focus-visible:ring-ring inline-flex w-fit items-center gap-1.5 rounded-md text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
-                            <Sparkles className="size-3.5" aria-hidden="true" />
+                            <Sparkles weight="bold" className="size-3.5" aria-hidden="true" />
                             Generar una segura
                         </button>
                         <span role="status" className="text-good text-xs font-medium">

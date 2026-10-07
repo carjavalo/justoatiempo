@@ -1,7 +1,7 @@
 import { useInitials } from '@/hooks/use-initials';
 import { fmt, nivelFrenteAMeta } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ArrowUpDown, Award, MessageCircle, Search, ShieldAlert } from '@/components/iconos';
+import { ArrowDown, ArrowUp, ArrowUpDown, Felicitacion, MessageCircle, Search, ShieldAlert } from '@/components/iconos';
 import { useMemo, useState } from 'react';
 import { BarraProgreso, EstadoBadge, Panel, SinDato, Vacio } from './piezas';
 import { type FilaRanking } from './tipos';
@@ -11,7 +11,7 @@ type Columna = 'efectividad' | 'pod' | 'asignadas' | 'nombre';
 const VISIBLES = 8;
 
 const ACCIONES = [
-    { clave: 'felicitaciones', texto: 'Felicitaciones', icono: Award, clase: 'text-good' },
+    { clave: 'felicitaciones', texto: 'Felicitaciones', icono: Felicitacion, clase: 'text-good' },
     { clave: 'retroalimentaciones', texto: 'Retroalimentaciones', icono: MessageCircle, clase: 'text-warning' },
     { clave: 'llamados', texto: 'Llamados de atención', icono: ShieldAlert, clase: 'text-critical' },
 ] as const;
@@ -155,7 +155,7 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
                                                         className={cn(
                                                             'flex size-6 items-center justify-center rounded-full text-[0.7rem]',
                                                             // Azul sobre coral: 5:1 (el blanco no alcanza 4.5:1)
-                                                            puesto === 1 ? 'bg-brand-coral text-brand-navy-deep' : 'bg-secondary text-secondary-foreground',
+                                                            puesto === 1 ? 'bg-brand-coral text-brand-coral-foreground' : 'bg-secondary text-secondary-foreground',
                                                         )}
                                                     >
                                                         {puesto}
