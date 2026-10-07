@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { LockKeyhole, Mail } from 'lucide-react';
+import { LockKeyhole, Mail } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';
@@ -76,6 +76,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                 {...propsCampo('password', errors.password)}
                                 required
                                 autoComplete="current-password"
+                                placeholder="Escribe tu contraseña"
                                 value={data.password}
                                 onChange={(e) => setData('password', e.target.value)}
                                 className="h-11 rounded-lg pl-9"

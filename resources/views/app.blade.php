@@ -8,7 +8,8 @@
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <meta name="theme-color" content="#12244a">
 
         {{-- Tema antes del primer pintado: evita el destello blanco a quien usa modo oscuro --}}
@@ -20,7 +21,7 @@
                 }
             } catch (e) {}
         </script>
-        <style>html { background: #f5f7fb; } html.dark { background: #0a1020; }</style>
+        <style>html { background: #f5f7fb; } html.dark { background: #121417; }</style>
 
         @routes
         @viteReactRefresh

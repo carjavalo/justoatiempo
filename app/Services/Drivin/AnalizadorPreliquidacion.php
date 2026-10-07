@@ -125,14 +125,17 @@ class AnalizadorPreliquidacion
 
             if (! $fecha) {
                 $error($fila, 'fecha', 'Fecha vacía o con un formato no reconocido.', $valor($valores, 'fecha'));
+
                 continue;
             }
             if ($codigo === '') {
                 $error($fila, 'codigo_orden', 'La fila no tiene código de orden (NP).');
+
                 continue;
             }
             if (! $estado) {
                 $error($fila, 'estado', $estadoTexto === '' ? 'La fila no tiene estado.' : 'Estado no reconocido: debe ser aprobada, rechazada, pendiente o parcial.', $valor($valores, 'estado'));
+
                 continue;
             }
 
@@ -140,6 +143,7 @@ class AnalizadorPreliquidacion
             [$clienteId, $sedeId, $porDefecto] = $this->resolverClienteSede($ruta, $valor($valores, 'cliente'), $valor($valores, 'ciudad'), $opciones);
             if (! $clienteId) {
                 $error($fila, 'cliente', 'No se pudo identificar el cliente ni la sede. Elige un cliente por defecto en la revisión.', $ruta ?? $valor($valores, 'cliente'));
+
                 continue;
             }
 
@@ -198,10 +202,12 @@ class AnalizadorPreliquidacion
         foreach ($ordenes as $clave => $o) {
             if (isset($existentes[$clave])) {
                 $error($o['fila'], 'codigo_orden', "La orden {$o['codigo_orden']} del {$o['fecha_operacion']} ya fue importada (carga #{$existentes[$clave]}).", $o['codigo_orden']);
+
                 continue;
             }
             if (isset($cerrados[$o['fecha_operacion'].'|'.$o['cliente_id'].'|'.($o['sede_id'] ?? '')])) {
                 $error($o['fila'], 'fecha', 'El informe de esa jornada ya está cerrado y no admite nuevas órdenes.', $o['fecha_operacion']);
+
                 continue;
             }
 
@@ -306,6 +312,7 @@ class AnalizadorPreliquidacion
     {
         $this->sedesPorAlias = Sede::query()
             ->whereNotNull('alias_drivin')
+            ->whereNotNull('cliente_id')
             ->get(['id', 'cliente_id', 'alias_drivin'])
             ->map(fn (Sede $s) => ['id' => $s->id, 'cliente_id' => $s->cliente_id, 'alias' => MapeoColumnas::normalizar($s->alias_drivin)])
             ->filter(fn ($s) => $s['alias'] !== '')
@@ -350,9 +357,8 @@ class AnalizadorPreliquidacion
             if ($c) {
                 $activas = $c->sedes->where('activo', true);
                 $ciudadNorm = MapeoColumnas::normalizar((string) $ciudad);
-                $sede = $activas->count() === 1
-                    ? $activas->first()
-                    : $activas->filter(fn ($s) => $ciudadNorm !== '' && MapeoColumnas::normalizar($s->ciudad) === $ciudadNorm)->sole(fn () => true) ?? null;
+                $porCiudad = $activas->filter(fn ($s) => $ciudadNorm !== '' && MapeoColumnas::normalizar($s->ciudad) === $ciudadNorm);
+                $sede = $activas->count() === 1 ? $activas->first() : ($porCiudad->count() === 1 ? $porCiudad->first() : null);
 
                 return [$c->id, $sede?->id, false];
             }

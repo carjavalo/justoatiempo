@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LoaderCircle } from 'lucide-react';
+import { LoaderCircle } from '@/components/iconos';
 import { type ComponentProps } from 'react';
 
 /**

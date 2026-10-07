@@ -25,6 +25,8 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-accion: var(--accion);
+    --color-accion-foreground: var(--accion-foreground);
 
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -113,6 +115,9 @@
     --popover-foreground: #0f1b33;
     --primary: #1f3a68;
     --primary-foreground: #ffffff;
+    /* Relleno de botones y controles activos; en claro coincide con el azul de marca */
+    --accion: #1f3a68;
+    --accion-foreground: #ffffff;
     --secondary: #eef2f8;
     --secondary-foreground: #1f3a68;
     --muted: #f0f3f8;
@@ -154,57 +159,76 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: rgba(255, 255, 255, 0.09);
     --sidebar-ring: #e8705f;
+
+    /* Barra de desplazamiento propia: ≥3:1 sobre el fondo para que se vea dónde está */
+    --scroll-thumb: #848da1;
+    --scroll-thumb-hover: #2f5ba8;
 }
 
+/*
+ * Modo oscuro de la marca: superficies grafito con un leve tinte acero (el gris de la ciudad del logo),
+ * no azul marino saturado. La profundidad se lee por luminosidad: fondo < tarjeta < menú.
+ * Texto blanco roto, azul de marca sólido en botones y azul claro solo para enlaces e íconos.
+ * Contrastes verificados (WCAG 2.2 AA): texto 13-15:1, secundario ≥6.2:1, bordes de campo ≥3.3:1, foco ≥7.5:1.
+ */
 .dark {
     color-scheme: dark;
+    --brand-navy: #24427a;
+    --brand-navy-deep: #1a2f57;
     --brand-coral-ink: #e8705f;
-    --background: #0a1020;
-    --foreground: #e7ecf5;
-    --card: #111a2e;
-    --card-foreground: #e7ecf5;
-    --popover: #131d33;
-    --popover-foreground: #e7ecf5;
-    --primary: #7d9fe0;
-    --primary-foreground: #0a1020;
-    --secondary: #1a2540;
-    --secondary-foreground: #e7ecf5;
-    --muted: #172038;
-    --muted-foreground: #95a0b8;
-    --accent: #1a2540;
-    --accent-foreground: #e7ecf5;
-    --destructive: #e5534b;
+    --brand-coral-soft: rgba(232, 112, 95, 0.14);
+
+    --background: #121417;
+    --foreground: #e6e8eb;
+    --card: #191c20;
+    --card-foreground: #e6e8eb;
+    --popover: #1f2329;
+    --popover-foreground: #e6e8eb;
+    --primary: #8fadde; /* enlaces e íconos (7.5:1 sobre tarjeta) */
+    --primary-foreground: #121417;
+    --accion: #3b65b5; /* botones: blanco encima 5.6:1 */
+    --accion-foreground: #ffffff;
+    --secondary: #1f2734; /* fondo de íconos y elementos de marca: grafito con un toque de azul */
+    --secondary-foreground: #e6e8eb;
+    --muted: #1d2025;
+    --muted-foreground: #9ca3ae;
+    --accent: #23272e;
+    --accent-foreground: #e6e8eb;
+    --destructive: #c64038;
     --destructive-foreground: #ffffff;
-    --border: #1f2a44;
-    --input: #5f6c8c;
-    --ring: #7d9fe0;
+    --border: #2b3038;
+    --input: #6b7482;
+    --ring: #8fadde;
 
     --series-1: #6f93da;
     --series-2: #e0604d;
-    --chart-grid: #1c2640;
-    --chart-axis: #2c3858;
-    --chart-ink: #8792ab;
+    --chart-grid: #24282f;
+    --chart-axis: #363c45;
+    --chart-ink: #9ca3ae;
     --chart-1: #6f93da;
     --chart-2: #e0604d;
-    --chart-3: #8792ab;
-    --chart-4: #34508a;
+    --chart-3: #9ca3ae;
+    --chart-4: #3b5689;
     --chart-5: #8a3f35;
 
-    --status-good: #34c472;
-    --status-good-soft: rgba(52, 196, 114, 0.12);
-    --status-warning: #f0a83a;
-    --status-warning-soft: rgba(240, 168, 58, 0.13);
+    --status-good: #4cc584;
+    --status-good-soft: rgba(76, 197, 132, 0.12);
+    --status-warning: #e9a23b;
+    --status-warning-soft: rgba(233, 162, 59, 0.13);
     --status-critical: #f0716a;
     --status-critical-soft: rgba(240, 113, 106, 0.13);
 
-    --sidebar-background: #070c19;
-    --sidebar-foreground: #aab5cc;
+    --sidebar-background: #16191d;
+    --sidebar-foreground: #b4bac3;
     --sidebar-primary: #e8705f;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: rgba(255, 255, 255, 0.06);
+    --sidebar-accent: rgba(255, 255, 255, 0.05);
     --sidebar-accent-foreground: #ffffff;
     --sidebar-border: rgba(255, 255, 255, 0.07);
     --sidebar-ring: #e8705f;
+
+    --scroll-thumb: #4b525d;
+    --scroll-thumb-hover: #8fadde;
 }
 
 @layer base {
@@ -217,15 +241,72 @@
         font-feature-settings: 'ss01', 'cv11';
     }
 
+    /* Navegación por anclas de la página principal: desplazamiento suave solo si el sistema lo permite */
+    @media (prefers-reduced-motion: no-preference) {
+        html {
+            scroll-behavior: smooth;
+        }
+    }
+
     /* La cabecera es fija (56 px): el foco al navegar hacia atrás no debe quedar debajo de ella (WCAG 2.4.11) */
     html {
-        scroll-padding-top: 4.5rem;
+        scroll-padding-top: 5rem;
     }
 
     /* Edge agrega su propio ojo a los campos de contraseña: ya hay un botón accesible para eso */
     input::-ms-reveal,
     input::-ms-clear {
         display: none;
+    }
+}
+
+/*
+ * Barra de desplazamiento de la marca.
+ * Chrome/Edge/Safari: ::-webkit-scrollbar (cápsula redondeada con margen, azul al pasar el cursor).
+ * Firefox: scrollbar-color/width (solo se aplica donde no existe ::-webkit-scrollbar; en Chrome 121+
+ * declarar scrollbar-color anularía los estilos webkit).
+ */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--scroll-thumb);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+    background-color: var(--scroll-thumb-hover);
+    border-width: 2px;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scroll-thumb) transparent;
+    }
+}
+
+/* Dentro del menú lateral azul: cápsula clara */
+[data-sidebar='sidebar'] {
+    --scroll-thumb: #6b7a9e;
+    --scroll-thumb-hover: #e8705f;
+}
+
+/* Contraste alto de Windows: el sistema decide los colores */
+@media (forced-colors: active) {
+    ::-webkit-scrollbar-thumb {
+        background-color: CanvasText;
     }
 }
 
@@ -239,6 +320,15 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+/*
+ * Sello de los íconos de concepto (duotono de Phosphor): la capa de relleno va en coral de la marca.
+ * Sobre un fondo coral se funde con él, como debe; el trazo conserva el color del texto o del ícono.
+ */
+.icono-acento [opacity='0.2'] {
+    fill: var(--brand-coral);
+    opacity: 0.38;
 }
 
 @layer utilities {

@@ -1,8 +1,7 @@
-import AppLogoIcon from '@/components/app-logo-icon';
 import { fmt, nivelFrenteAMeta, variacion } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, PackageCheck, PackageX, Truck, XCircle } from 'lucide-react';
-import { type LucideIcon } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, PackageCheck, PackageX, Truck, XCircle } from '@/components/iconos';
+import { type TipoIcono } from '@/components/iconos';
 import { SinDato, Variacion } from './piezas';
 import { type DashboardProps, type Kpis } from './tipos';
 
@@ -25,10 +24,10 @@ export function HeroEfectividad({
 
     return (
         <section aria-labelledby="titulo-efectividad" className="from-brand-navy-deep via-brand-navy relative isolate flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br to-[#2a4f8f] p-6 text-white shadow-lg shadow-[#12244a]/20">
-            {/* Engranaje decorativo de la marca */}
-            <AppLogoIcon
-                className="pointer-events-none absolute -top-10 -right-12 -z-10 size-64 text-white/[0.04]"
-                gearClassName="fill-white/[0.06]"
+            {/* Textura de marca: trama de puntos que se desvanece hacia la izquierda */}
+            <div
+                className="pointer-events-none absolute inset-0 -z-10 opacity-[0.09] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(to_left,black,transparent_70%)]"
+                aria-hidden="true"
             />
 
             <div className="flex items-center justify-between gap-3">
@@ -93,7 +92,7 @@ function Tile({
     sufijo = '%',
     tono = 'navy',
 }: {
-    icono: LucideIcon;
+    icono: TipoIcono;
     titulo: string;
     valor: React.ReactNode;
     detalle: React.ReactNode;
@@ -113,7 +112,7 @@ function Tile({
                     className={cn(
                         'flex size-10 items-center justify-center rounded-xl',
                         tono === 'navy' && 'bg-secondary text-primary',
-                        tono === 'coral' && 'bg-brand-coral-soft text-[#b4432f] dark:bg-[#e8705f]/15 dark:text-[#f19a8c]',
+                        tono === 'coral' && 'bg-brand-coral-soft text-brand-coral-ink',
                         tono === 'steel' && 'bg-muted text-muted-foreground',
                     )}
                 >

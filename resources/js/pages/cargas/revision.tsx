@@ -6,8 +6,9 @@ import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, ChevronDown, FileSpreadsheet, LoaderCircle, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, FileSpreadsheet, LoaderCircle, Trash2, XCircle } from '@/components/iconos';
 import { useEffect, useId, useState } from 'react';
+import { Selector } from '@/components/selector';
 
 interface Columna {
     indice: number;
@@ -60,9 +61,6 @@ interface Props {
     analisis?: Analisis;
     clientes?: { id: number; nombre: string; sedes: { id: number; nombre: string }[] }[];
 }
-
-const claseSelect =
-    'border-input bg-background focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm outline-none focus-visible:ring-2 disabled:opacity-50';
 
 export default function Revision({ carga, errorLectura, lectura, campos, analisis, clientes }: Props) {
     const [guardando, setGuardando] = useState(false);
@@ -206,22 +204,16 @@ function MapeoColumnas({
                     {c.obligatorio && <span className="text-muted-foreground ml-1.5 text-xs font-normal">(obligatorio)</span>}
                 </label>
                 <div>
-                    <select
+                    <Selector
                         id={id}
-                        value={c.columna ?? ''}
+                        valor={c.columna !== null ? String(c.columna) : ''}
                         disabled={disabled}
-                        onChange={(e) => cambiar(c.clave, e.target.value)}
+                        onCambio={(v) => cambiar(c.clave, v)}
                         aria-invalid={falta || undefined}
                         aria-describedby={muestra ? `${id}-muestra` : undefined}
-                        className={cn(claseSelect, falta && 'border-critical')}
-                    >
-                        <option value="">Sin asignar</option>
-                        {lectura.columnas.map((col) => (
-                            <option key={col.indice} value={col.indice}>
-                                {col.encabezado}
-                            </option>
-                        ))}
-                    </select>
+                        className="h-9"
+                        opciones={[{ valor: '', texto: 'Sin asignar' }, ...lectura.columnas.map((col) => ({ valor: String(col.indice), texto: col.encabezado || `Columna ${col.indice + 1}` }))]}
+                    />
                     {muestra && (
                         <p id={`${id}-muestra`} className="text-muted-foreground mt-1 truncate text-xs">
                             Ejemplo: <span className="text-foreground font-mono">{muestra}</span>
@@ -239,13 +231,14 @@ function MapeoColumnas({
                     <label htmlFor={idHoja} className="text-sm font-semibold">
                         Hoja con los datos
                     </label>
-                    <select id={idHoja} value={lectura.hoja} disabled={disabled} onChange={(e) => onHoja(e.target.value)} className={claseSelect}>
-                        {lectura.hojas.map((h) => (
-                            <option key={h.nombre} value={h.nombre}>
-                                {h.nombre} ({fmt.numero(h.filas)} filas)
-                            </option>
-                        ))}
-                    </select>
+                    <Selector
+                        id={idHoja}
+                        valor={lectura.hoja}
+                        disabled={disabled}
+                        onCambio={onHoja}
+                        className="h-9"
+                        opciones={lectura.hojas.map((h) => ({ valor: h.nombre, texto: `${h.nombre} (${fmt.numero(h.filas)} filas)` }))}
+                    />
                 </div>
             )}
 
@@ -288,39 +281,27 @@ function ClientePorDefecto({
                     <label htmlFor="cliente-defecto" className="text-sm font-semibold">
                         Cliente
                     </label>
-                    <select
+                    <Selector
                         id="cliente-defecto"
-                        value={opciones.cliente_id ?? ''}
+                        valor={opciones.cliente_id ? String(opciones.cliente_id) : ''}
                         disabled={disabled}
-                        onChange={(e) => onCambio(e.target.value ? Number(e.target.value) : null, null)}
-                        className={claseSelect}
-                    >
-                        <option value="">Ninguno (marcar como error)</option>
-                        {clientes.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.nombre}
-                            </option>
-                        ))}
-                    </select>
+                        onCambio={(v) => onCambio(v ? Number(v) : null, null)}
+                        className="h-9"
+                        opciones={[{ valor: '', texto: 'Ninguno (marcar como error)' }, ...clientes.map((c) => ({ valor: String(c.id), texto: c.nombre }))]}
+                    />
                 </div>
                 <div className="grid gap-1.5">
                     <label htmlFor="sede-defecto" className="text-sm font-semibold">
                         Sede
                     </label>
-                    <select
+                    <Selector
                         id="sede-defecto"
-                        value={opciones.sede_id ?? ''}
+                        valor={opciones.sede_id ? String(opciones.sede_id) : ''}
                         disabled={disabled || !opciones.cliente_id}
-                        onChange={(e) => onCambio(opciones.cliente_id, e.target.value ? Number(e.target.value) : null)}
-                        className={claseSelect}
-                    >
-                        <option value="">Sin sede</option>
-                        {sedes.map((s) => (
-                            <option key={s.id} value={s.id}>
-                                {s.nombre}
-                            </option>
-                        ))}
-                    </select>
+                        onCambio={(v) => onCambio(opciones.cliente_id, v ? Number(v) : null)}
+                        className="h-9"
+                        opciones={[{ valor: '', texto: 'Sin sede' }, ...sedes.map((s) => ({ valor: String(s.id), texto: s.nombre }))]}
+                    />
                 </div>
             </div>
         </Panel>

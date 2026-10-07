@@ -1,6 +1,6 @@
 import { fmt, nivelFrenteAMeta } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { Info } from 'lucide-react';
+import { Info } from '@/components/iconos';
 import { BarraProgreso, EstadoBadge, Panel, Vacio } from './piezas';
 import { type EfectividadCliente, type MotivoRechazo, type Protocolo } from './tipos';
 

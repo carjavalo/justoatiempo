@@ -5,7 +5,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
 import { Head, router } from '@inertiajs/react';
-import { Ban, FileSpreadsheet, Undo2 } from 'lucide-react';
+import { Ban, FileSpreadsheet, Undo2 } from '@/components/iconos';
 import { useState } from 'react';
 
 interface Informe {

@@ -14,7 +14,7 @@
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "phpoffice/phpspreadsheet": "^5.10",
-        "smalot/pdfparser": "*",
+        "smalot/pdfparser": "^2.12",
         "tightenco/ziggy": "^2.4"
     },
     "require-dev": {

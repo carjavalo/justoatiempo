@@ -17,6 +17,27 @@ export const fmt = {
     diaSemana: (iso: string) => aFecha(iso).toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', ''),
 };
 
+const relativo = new Intl.RelativeTimeFormat('es-CO', { numeric: 'auto' });
+const UNIDADES: [Intl.RelativeTimeFormatUnit, number][] = [
+    ['year', 31_536_000],
+    ['month', 2_592_000],
+    ['week', 604_800],
+    ['day', 86_400],
+    ['hour', 3_600],
+    ['minute', 60],
+];
+
+/** "hace 3 horas", "ayer"… para fechas con hora (ISO 8601). */
+export function haceCuanto(iso: string): string {
+    const segundos = (new Date(iso).getTime() - Date.now()) / 1000;
+    for (const [unidad, tamano] of UNIDADES) {
+        if (Math.abs(segundos) >= tamano) return relativo.format(Math.round(segundos / tamano), unidad);
+    }
+    return 'hace un momento';
+}
+
+export const fechaHoraCompleta = new Intl.DateTimeFormat('es-CO', { dateStyle: 'long', timeStyle: 'short' });
+
 /** Diferencia en puntos porcentuales o relativa, para los indicadores de tendencia. */
 export function variacion(actual: number | null, previo: number | null, modo: 'puntos' | 'relativa' = 'relativa'): number | null {
     if (actual === null || previo === null) return null;

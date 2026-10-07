@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { type Appearance, useAppearance } from '@/hooks/use-appearance';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from '@/components/iconos';
 import { HTMLAttributes } from 'react';
 
 const TEMAS: { valor: Appearance; texto: string; icono: typeof Sun }[] = [

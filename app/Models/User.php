@@ -24,6 +24,8 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
+        'cliente_id',
+        'sede_id',
         'empleado_id',
         'activo',
         'ultimo_acceso_en',
@@ -58,6 +60,17 @@ class User extends Authenticatable
     public function empleado(): BelongsTo
     {
         return $this->belongsTo(Empleado::class);
+    }
+
+    /** Empresa cliente donde trabaja; sin empresa es personal propio de Justo a Tiempo. */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+
+    public function sede(): BelongsTo
+    {
+        return $this->belongsTo(Sede::class);
     }
 
     public function tieneRol(Rol ...$roles): bool

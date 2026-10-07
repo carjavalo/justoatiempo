@@ -1,8 +1,6 @@
-import AppLogoIcon from '@/components/app-logo-icon';
 import AppLayout from '@/layouts/app-layout';
-import { navegacion } from '@/lib/navegacion';
 import { Head } from '@inertiajs/react';
-import { Hammer } from 'lucide-react';
+import { Hammer } from '@/components/iconos';
 
 interface Props {
     clave: string;
@@ -11,17 +9,15 @@ interface Props {
     requisitos: string[];
 }
 
-/** Vista temporal de los módulos que aún no se han construido. Se navega desde el menú lateral. */
-export default function ModuloPendiente({ clave, titulo, descripcion, requisitos }: Props) {
-    const item = navegacion.flatMap((g) => g.items).find((i) => i.url === `/${clave}`);
-    const Icono = item?.icon ?? Hammer;
+/** Vista temporal de los módulos de la operación que aún no se han construido. */
+export default function ModuloPendiente({ titulo, descripcion, requisitos }: Props) {
+    const Icono = Hammer;
 
     return (
         <AppLayout>
             <Head title={titulo} />
             <div className="flex flex-1 items-center justify-center p-6">
                 <div className="bg-card relative isolate w-full max-w-xl overflow-hidden rounded-3xl border p-8 text-center shadow-sm md:p-12">
-                    <AppLogoIcon className="text-muted pointer-events-none absolute -right-16 -bottom-16 -z-10 size-72" gearClassName="fill-muted" />
                     <span className="bg-secondary text-primary mx-auto flex size-16 items-center justify-center rounded-2xl">
                         <Icono className="size-8" aria-hidden="true" />
                     </span>

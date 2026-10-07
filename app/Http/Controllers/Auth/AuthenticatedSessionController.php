@@ -33,7 +33,9 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $request->user()->forceFill(['ultimo_acceso_en' => now()])->save();
+
+        return redirect()->intended(route('panel', absolute: false));
     }
 
     /**

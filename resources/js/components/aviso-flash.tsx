@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { CheckCircle2, X, XCircle } from 'lucide-react';
+import { CheckCircle2, X, XCircle } from '@/components/iconos';
 import { useEffect, useState } from 'react';
 
 const DURACION_MS = 7000;
@@ -46,7 +46,7 @@ export function AvisoFlash() {
                         <button
                             type="button"
                             onClick={() => setAviso(null)}
-                            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -m-1 flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2"
+                            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -m-1 flex size-7 shrink-0 items-center justify-center rounded-md outline-hidden focus-visible:ring-2"
                         >
                             <X className="size-4" aria-hidden="true" />
                             <span className="sr-only">Cerrar aviso</span>

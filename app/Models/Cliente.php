@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/** Empresa cliente (en el panel se llama "Empresa"). */
 class Cliente extends Model
 {
     use HasFactory, SoftDeletes;
@@ -27,6 +28,11 @@ class Cliente extends Model
     public function sedes(): HasMany
     {
         return $this->hasMany(Sede::class);
+    }
+
+    public function usuarios(): HasMany
+    {
+        return $this->hasMany(User::class);
     }
 
     public function ordenes(): HasMany

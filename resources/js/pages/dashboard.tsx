@@ -11,7 +11,7 @@ import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, CalendarDays, PackageSearch } from 'lucide-react';
+import { AlertTriangle, CalendarDays, PackageSearch } from '@/components/iconos';
 import { useEffect, useState } from 'react';
 
 function saludo() {

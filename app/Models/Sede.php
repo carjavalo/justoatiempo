@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/** Sede de una empresa cliente o, sin empresa, sede propia de Justo a Tiempo. */
 class Sede extends Model
 {
     use HasFactory, SoftDeletes;
@@ -22,6 +23,11 @@ class Sede extends Model
     public function cliente(): BelongsTo
     {
         return $this->belongsTo(Cliente::class);
+    }
+
+    public function usuarios(): HasMany
+    {
+        return $this->hasMany(User::class);
     }
 
     public function ordenes(): HasMany

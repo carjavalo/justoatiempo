@@ -1,5 +1,3 @@
-import { LucideIcon } from 'lucide-react';
-
 export type Rol = 'admin' | 'coordinador' | 'auxiliar';
 
 export interface Auth {
@@ -11,19 +9,16 @@ export interface BreadcrumbItem {
     href: string;
 }
 
-export interface NavGroup {
-    title: string;
-    items: NavItem[];
-}
-
-export interface NavItem {
-    title: string;
-    url: string;
-    icon?: LucideIcon | null;
-    isActive?: boolean;
-    /** Roles que ven la opción; si se omite, todos. */
-    roles?: Rol[];
-    badge?: string;
+/** Respuesta de paginate() de Laravel. */
+export interface Paginado<T> {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+    prev_page_url: string | null;
+    next_page_url: string | null;
 }
 
 export interface SharedData {

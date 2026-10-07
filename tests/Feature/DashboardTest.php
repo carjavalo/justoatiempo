@@ -58,14 +58,14 @@ class DashboardTest extends TestCase
 
     public function test_guests_are_redirected_to_the_login_page()
     {
-        $this->get('/dashboard')->assertRedirect('/login');
+        $this->get('/indicadores')->assertRedirect('/login');
     }
 
     public function test_coordinador_ve_el_panel_gerencial_con_los_kpis_del_periodo()
     {
         $this->actingAs(User::factory()->coordinador()->create());
 
-        $this->get('/dashboard')
+        $this->get('/indicadores')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('dashboard')
@@ -82,7 +82,7 @@ class DashboardTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['empleado_id' => $this->juan->id]));
 
-        $this->get('/dashboard')
+        $this->get('/indicadores')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('vista', 'auxiliar')
@@ -105,7 +105,7 @@ class DashboardTest extends TestCase
         $this->actingAs($coordinador)->get('/auditoria')->assertOk();
         $this->actingAs($coordinador)->get('/empleados')->assertForbidden();
         $this->actingAs($admin)->get('/empleados')->assertOk();
-        $this->actingAs(User::factory()->admin()->create(['activo' => false]))->get('/empleados')->assertForbidden();
+        $this->actingAs(User::factory()->admin()->create(['activo' => false]))->get('/empleados')->assertRedirect('/login');
     }
 
     public function test_el_consolidador_calcula_la_linea_del_informe_y_el_protocolo()

@@ -9,12 +9,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Evidencia extends Model
 {
     protected $fillable = [
-        'orden_id', 'tipo', 'path', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'subido_por',
+        'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'imagenes', 'subido_por',
     ];
 
     protected function casts(): array
     {
         return ['tipo' => TipoEvidencia::class];
+    }
+
+    public function esPdf(): bool
+    {
+        return $this->mime === 'application/pdf';
     }
 
     public function orden(): BelongsTo

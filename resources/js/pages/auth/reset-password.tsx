@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { XCircle } from 'lucide-react';
+import { XCircle } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';
@@ -68,6 +68,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                         name="password"
                         required
                         autoComplete="new-password"
+                        placeholder="Escribe la nueva contraseña"
                         value={data.password}
                         autoFocus
                         onChange={(e) => setData('password', e.target.value)}
@@ -83,6 +84,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                         name="password_confirmation"
                         required
                         autoComplete="new-password"
+                        placeholder="Repítela para confirmar"
                         value={data.password_confirmation}
                         onChange={(e) => setData('password_confirmation', e.target.value)}
                         className="h-11 rounded-lg"

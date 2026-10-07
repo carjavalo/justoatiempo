@@ -1,6 +1,6 @@
-import AppLogoIcon from '@/components/app-logo-icon';
+import LogoMarca from '@/components/logo-marca';
 import { Link } from '@inertiajs/react';
-import { BarChart3, ClipboardCheck, FileSpreadsheet } from 'lucide-react';
+import { Building2, ShieldCheck, UsersRound } from '@/components/iconos';
 import { type PropsWithChildren } from 'react';
 
 interface AuthLayoutProps {
@@ -9,9 +9,9 @@ interface AuthLayoutProps {
 }
 
 const PUNTOS = [
-    { icono: FileSpreadsheet, texto: 'Preliquidación de Drivin consolidada en segundos' },
-    { icono: BarChart3, texto: 'Efectividad por cliente, ruta y auxiliar en tiempo real' },
-    { icono: ClipboardCheck, texto: 'Auditoría del protocolo de evidencias POD' },
+    { icono: Building2, texto: 'Empresas clientes y sus sedes en un solo registro' },
+    { icono: UsersRound, texto: 'Cada persona con su rol, su empresa y su sede' },
+    { icono: ShieldCheck, texto: 'Accesos que se activan y retiran al instante' },
 ];
 
 /** Foco visible sobre el azul marino: contorno blanco (15:1). */
@@ -28,9 +28,7 @@ export default function AuthSplitLayout({ children, title, description }: PropsW
                 <div className="from-brand-navy-deep/80 absolute inset-x-0 top-0 -z-10 h-36 bg-gradient-to-b to-transparent" aria-hidden="true" />
 
                 <Link href={route('home')} className={`flex w-fit items-center gap-3 rounded-2xl ${focoSobreAzul}`}>
-                    <span className="flex size-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20 backdrop-blur">
-                        <AppLogoIcon className="size-9 text-white" />
-                    </span>
+                    <LogoMarca className="size-16 rounded-2xl p-1.5" />
                     <span className="leading-tight">
                         <span className="block text-lg font-extrabold tracking-tight">Justo a Tiempo SP S.A.S</span>
                         <span className="block text-xs font-medium tracking-[0.16em] text-white/85 uppercase">Soluciones operativas integrales</span>
@@ -38,9 +36,9 @@ export default function AuthSplitLayout({ children, title, description }: PropsW
                 </Link>
 
                 <div className="max-w-lg">
-                    <p className="text-brand-coral-on-dark text-sm font-bold tracking-[0.16em] uppercase">Plataforma de operaciones</p>
+                    <p className="text-brand-coral-on-dark text-sm font-bold tracking-[0.16em] uppercase">Plataforma de gestión</p>
                     {/* Texto de marca, no encabezado: el h1 de la página es el del formulario */}
-                    <p className="mt-3 text-4xl leading-[1.1] font-extrabold tracking-tight xl:text-5xl">El informe diario de entregas, sin hojas de cálculo.</p>
+                    <p className="mt-3 text-4xl leading-[1.1] font-extrabold tracking-tight xl:text-5xl">Toda la operación de Justo a Tiempo, en un solo lugar.</p>
                     <ul role="list" className="mt-8 space-y-4">
                         {PUNTOS.map(({ icono: Icono, texto }) => (
                             <li key={texto} className="flex items-center gap-3 text-[0.95rem] text-white/90">
@@ -60,9 +58,7 @@ export default function AuthSplitLayout({ children, title, description }: PropsW
             <main id="contenido" tabIndex={-1} className="flex flex-col items-center justify-center p-6 outline-none sm:p-10">
                 <div className="w-full max-w-sm">
                     <Link href={route('home')} className="focus-visible:ring-ring mb-10 flex w-fit items-center gap-3 rounded-xl focus-visible:ring-2 focus-visible:outline-hidden lg:hidden">
-                        <span className="bg-brand-navy-deep flex size-11 items-center justify-center rounded-xl">
-                            <AppLogoIcon className="size-8 text-white" />
-                        </span>
+                        <LogoMarca className="size-14 rounded-2xl" />
                         <span className="text-lg font-extrabold tracking-tight">Justo a Tiempo SP</span>
                     </Link>
                     <div className="mb-8">

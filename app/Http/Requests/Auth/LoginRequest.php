@@ -49,6 +49,14 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (! Auth::user()->activo) {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Tu usuario está desactivado. Habla con el administrador para recuperar el acceso.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

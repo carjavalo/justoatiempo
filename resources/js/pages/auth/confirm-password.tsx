@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { LockKeyhole } from 'lucide-react';
+import { LockKeyhole } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';
@@ -38,6 +38,7 @@ export default function ConfirmPassword() {
                             name="password"
                             required
                             autoComplete="current-password"
+                            placeholder="Escribe tu contraseña"
                             value={data.password}
                             autoFocus
                             onChange={(e) => setData('password', e.target.value)}

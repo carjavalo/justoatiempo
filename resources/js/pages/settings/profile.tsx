@@ -1,6 +1,6 @@
 import { type SharedData } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';
@@ -29,7 +29,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={[{ title: 'Mi cuenta', href: route('profile.edit') }]}>
             <Head title="Perfil" />
 
             <SettingsLayout descripcion="Tu nombre y el correo con el que ingresas a la plataforma.">

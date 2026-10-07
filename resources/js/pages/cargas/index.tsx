@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CalendarClock, ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from 'lucide-react';
+import { CalendarClock, ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from '@/components/iconos';
 import { type DragEvent, useRef, useState } from 'react';
 
 interface FilaCarga {
@@ -117,7 +117,7 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                         onDrop={soltar}
                         className={cn(
                             'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors',
-                            'peer-focus-visible:ring-ring peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2',
+                            'peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
                             'hover:border-primary/50 hover:bg-secondary/40',
                             arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
                             processing && 'pointer-events-none',

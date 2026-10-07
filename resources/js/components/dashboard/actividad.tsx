@@ -1,6 +1,6 @@
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { Award, Clock3, FileSpreadsheet, MessageCircle, ShieldAlert } from 'lucide-react';
+import { Award, Clock3, FileSpreadsheet, MessageCircle, ShieldAlert } from '@/components/iconos';
 import { Panel, Vacio } from './piezas';
 import { type AccionReciente, type Pendientes } from './tipos';
 

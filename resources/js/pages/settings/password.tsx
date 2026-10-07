@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { Head, useForm } from '@inertiajs/react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 export default function Password() {
@@ -33,7 +33,7 @@ export default function Password() {
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={[{ title: 'Mi cuenta', href: route('profile.edit') }]}>
             <Head title="Contraseña" />
 
             <SettingsLayout descripcion="Usa una contraseña larga y difícil de adivinar. Al cambiarla, la usarás en tu próximo ingreso.">
@@ -47,6 +47,7 @@ export default function Password() {
                             required
                             className="h-11 rounded-lg"
                             autoComplete="current-password"
+                            placeholder="La que usas para ingresar"
                         />
                         <InputError id="current_password-error" message={errors.current_password} />
                     </div>
@@ -61,6 +62,7 @@ export default function Password() {
                                 required
                                 className="h-11 rounded-lg"
                                 autoComplete="new-password"
+                                placeholder="Escribe la nueva contraseña"
                             />
                             <p id="password-ayuda" className="text-muted-foreground text-xs">
                                 Mínimo 8 caracteres.
@@ -77,6 +79,7 @@ export default function Password() {
                                 required
                                 className="h-11 rounded-lg"
                                 autoComplete="new-password"
+                                placeholder="Repítela para confirmar"
                             />
                             <InputError id="password_confirmation-error" message={errors.password_confirmation} />
                         </div>

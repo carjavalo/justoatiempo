@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Mail } from 'lucide-react';
+import { Mail } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';

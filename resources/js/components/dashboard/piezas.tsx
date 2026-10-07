@@ -1,6 +1,6 @@
 import { fmt, type NivelEstado } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Minus, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, Minus, XCircle } from '@/components/iconos';
 import { type ReactNode } from 'react';
 
 /** Contenedor estándar de cada bloque del panel. */
@@ -117,8 +117,8 @@ export function Segmentado<T extends string | number>({
                         aria-pressed={activo}
                         onClick={() => onChange(o.valor)}
                         className={cn(
-                            'focus-visible:ring-ring focus-visible:ring-offset-muted min-h-8 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-hidden',
-                            activo ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                            'focus-visible:ring-ring min-h-8 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
+                            activo ? 'bg-accion text-accion-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                         )}
                     >
                         {o.texto}

@@ -1,7 +1,7 @@
 import { useInitials } from '@/hooks/use-initials';
 import { fmt, nivelFrenteAMeta } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { ArrowDown, ArrowUp, ArrowUpDown, Award, MessageCircle, Search, ShieldAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Award, MessageCircle, Search, ShieldAlert } from '@/components/iconos';
 import { useMemo, useState } from 'react';
 import { BarraProgreso, EstadoBadge, Panel, SinDato, Vacio } from './piezas';
 import { type FilaRanking } from './tipos';

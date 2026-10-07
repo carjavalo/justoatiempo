@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { Link, usePage } from '@inertiajs/react';
-import { KeyRound, UserRound } from 'lucide-react';
+import { KeyRound, UserRound } from '@/components/iconos';
 import { type ReactNode } from 'react';
 
 const SECCIONES = [

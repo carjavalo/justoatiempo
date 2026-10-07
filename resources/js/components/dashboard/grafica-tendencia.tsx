@@ -1,5 +1,5 @@
 import { fmt } from '@/lib/formato';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown } from '@/components/iconos';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Panel, Segmentado, Vacio } from './piezas';
@@ -87,7 +87,7 @@ function TablaDatos({ datos, meta }: { datos: PuntoTendencia[]; meta: number }) 
             <div
                 id="tabla-tendencia"
                 hidden={!abierta}
-                className="focus-visible:ring-ring relative mt-3 max-h-72 overflow-auto rounded-lg border focus-visible:ring-2 focus-visible:outline-hidden"
+                className="relative mt-3 max-h-72 overflow-auto rounded-lg border focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25"
                 tabIndex={0}
                 role="region"
                 aria-label="Datos de la gráfica, desplazable"

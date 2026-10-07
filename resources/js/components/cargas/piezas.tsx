@@ -1,7 +1,7 @@
 import { Panel } from '@/components/dashboard/piezas';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Ban, Check, CheckCircle2, Clock3, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Ban, Check, CheckCircle2, Clock3, type TipoIcono } from '@/components/iconos';
 import { type ReactNode, useState } from 'react';
 
 export interface ErrorFila {
@@ -20,7 +20,7 @@ export interface Advertencia {
 
 export type EstadoCarga = 'en_revision' | 'procesada' | 'con_errores' | 'anulada';
 
-const ESTADOS: Record<EstadoCarga, { icono: LucideIcon; clase: string }> = {
+const ESTADOS: Record<EstadoCarga, { icono: TipoIcono; clase: string }> = {
     en_revision: { icono: Clock3, clase: 'bg-warning-soft text-warning' },
     procesada: { icono: CheckCircle2, clase: 'bg-good-soft text-good' },
     con_errores: { icono: AlertTriangle, clase: 'bg-warning-soft text-warning' },
