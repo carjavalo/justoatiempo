@@ -158,7 +158,9 @@ class AdministracionTest extends TestCase
         $sede = Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
 
         $this->actingAs($this->admin)->post('/usuarios', [
-            'name' => 'Laura Gómez',
+            'nombres' => '  Laura  Sofía ',
+            'primer_apellido' => 'Gómez',
+            'segundo_apellido' => 'Ruiz',
             'email' => 'Laura@Example.com',
             'rol' => 'coordinador',
             'empresa_id' => $empresa->id,
@@ -168,6 +170,9 @@ class AdministracionTest extends TestCase
 
         $usuario = User::where('email', 'laura@example.com')->sole();
         $this->assertSame('laura@example.com', $usuario->email);
+        // El nombre completo se arma con las partes, sin espacios de más
+        $this->assertSame('Laura Sofía Gómez Ruiz', $usuario->name);
+        $this->assertSame('Ruiz', $usuario->segundo_apellido);
         $this->assertSame(Rol::Coordinador, $usuario->rol);
         $this->assertSame($sede->id, $usuario->sede_id);
         $this->assertNotNull($usuario->email_verified_at);
@@ -179,7 +184,7 @@ class AdministracionTest extends TestCase
         $empresa = Cliente::create(['nombre' => 'Bodegas']);
         $otra = Cliente::create(['nombre' => 'Logística Sur']);
         $sedeOtra = Sede::create(['cliente_id' => $otra->id, 'nombre' => 'Acopi', 'ciudad' => 'Yumbo']);
-        $base = ['name' => 'Ana', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'];
+        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'];
 
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id, 'sede_id' => $sedeOtra->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede no pertenece a la empresa elegida.']);
@@ -189,9 +194,12 @@ class AdministracionTest extends TestCase
 
     public function test_valida_correo_repetido_rol_y_contrasena(): void
     {
-        $this->actingAs($this->admin)->post('/usuarios', ['name' => 'X', 'email' => strtoupper($this->admin->email), 'rol' => 'jefe', 'password' => 'corta'])
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => strtoupper($this->admin->email), 'rol' => 'jefe', 'password' => 'corta'])
             ->assertSessionHasErrors(['email', 'rol', 'password']);
-        $this->actingAs($this->admin)->post('/usuarios', ['name' => 'X', 'email' => 'x@example.com', 'rol' => 'auxiliar'])
+        $this->actingAs($this->admin)->post('/usuarios', ['email' => 'z@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])
+            ->assertSessionHasErrors(['nombres', 'primer_apellido'])
+            ->assertSessionDoesntHaveErrors('segundo_apellido');
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => 'x@example.com', 'rol' => 'auxiliar'])
             ->assertSessionHasErrors('password');
     }
 
@@ -199,16 +207,16 @@ class AdministracionTest extends TestCase
     {
         $usuario = User::factory()->create(['password' => 'Original-123']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['name' => 'Nuevo nombre', 'email' => $usuario->email, 'rol' => 'auxiliar', 'password' => ''])
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Nuevo', 'primer_apellido' => 'Nombre', 'email' => $usuario->email, 'rol' => 'auxiliar', 'password' => ''])
             ->assertSessionHasNoErrors();
 
-        $this->assertSame('Nuevo nombre', $usuario->fresh()->name);
+        $this->assertSame('Nuevo Nombre', $usuario->fresh()->name);
         $this->assertTrue(Hash::check('Original-123', $usuario->fresh()->password));
     }
 
     public function test_el_administrador_no_se_quita_su_rol_ni_se_desactiva(): void
     {
-        $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", ['name' => $this->admin->name, 'email' => $this->admin->email, 'rol' => 'auxiliar'])
+        $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", ['nombres' => 'Admin', 'primer_apellido' => 'Prueba', 'email' => $this->admin->email, 'rol' => 'auxiliar'])
             ->assertSessionHasErrors('rol');
 
         $this->actingAs($this->admin)->patch("/usuarios/{$this->admin->id}/estado", ['activo' => false])->assertSessionHas('error');
@@ -240,10 +248,10 @@ class AdministracionTest extends TestCase
         DB::table('sessions')->insert(['id' => 'sesion-vieja', 'user_id' => $usuario->id, 'payload' => '', 'last_activity' => time()]);
 
         // Sin contraseña nueva, la sesión sigue
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['name' => 'Otro', 'email' => $usuario->email, 'rol' => 'coordinador']);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador']);
         $this->assertDatabaseHas('sessions', ['id' => 'sesion-vieja']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['name' => 'Otro', 'email' => $usuario->email, 'rol' => 'coordinador', 'password' => 'Nueva-clave-9']);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'password' => 'Nueva-clave-9']);
         $this->assertDatabaseMissing('sessions', ['id' => 'sesion-vieja']);
     }
 
@@ -278,7 +286,7 @@ class AdministracionTest extends TestCase
     {
         $inactivo = User::factory()->admin()->create(['activo' => false]);
 
-        $this->actingAs($inactivo)->patch('/settings/profile', ['name' => 'X', 'email' => $inactivo->email])
+        $this->actingAs($inactivo)->patch('/settings/profile', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => $inactivo->email])
             ->assertStatus(303)
             ->assertRedirect('/login');
     }
@@ -287,7 +295,7 @@ class AdministracionTest extends TestCase
     {
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => ['a', 'b']])->assertSessionHasErrors('nombre');
         $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'X', 'ciudad' => ['Cali']])->assertSessionHasErrors('ciudad');
-        $this->actingAs($this->admin)->post('/usuarios', ['name' => 'X', 'email' => ['a@b.co'], 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => ['a@b.co'], 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
     }
 
     public function test_filtra_usuarios_por_sede_desde_el_conteo(): void

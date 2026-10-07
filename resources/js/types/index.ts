@@ -30,7 +30,11 @@ export interface SharedData {
 
 export interface User {
     id: number;
+    /** Nombre completo (lo arma el servidor con las partes). */
     name: string;
+    nombres: string | null;
+    primer_apellido: string | null;
+    segundo_apellido: string | null;
     email: string;
     avatar?: string;
     rol: Rol;

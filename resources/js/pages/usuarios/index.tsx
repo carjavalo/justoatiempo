@@ -20,6 +20,9 @@ import { Selector } from '@/components/selector';
 interface FilaUsuario {
     id: number;
     nombre: string;
+    nombres: string | null;
+    primerApellido: string | null;
+    segundoApellido: string | null;
     email: string;
     rol: Rol;
     rolLabel: string;
@@ -48,8 +51,8 @@ interface Props {
     sedes: (Opcion & { ciudad: string; empresaId: number | null })[];
 }
 
-const VACIO = { name: '', email: '', rol: '', empresa_id: '', sede_id: '', password: '' };
-const ORDEN_CAMPOS = ['name', 'email', 'rol', 'empresa_id', 'sede_id', 'password'];
+const VACIO = { nombres: '', primer_apellido: '', segundo_apellido: '', email: '', rol: '', empresa_id: '', sede_id: '', password: '' };
+const ORDEN_CAMPOS = ['nombres', 'primer_apellido', 'segundo_apellido', 'email', 'rol', 'empresa_id', 'sede_id', 'password'];
 
 /** Contraseña aleatoria legible (sin 0/O ni 1/l/I) con mayúsculas, minúsculas, números y un símbolo. */
 function generarContrasena(): string {
@@ -84,7 +87,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         form.setData(
             usuario
                 ? {
-                      name: usuario.nombre,
+                      nombres: usuario.nombres ?? '',
+                      primer_apellido: usuario.primerApellido ?? '',
+                      segundo_apellido: usuario.segundoApellido ?? '',
                       email: usuario.email,
                       rol: usuario.rol,
                       empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
@@ -286,9 +291,39 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear usuario'}
                 focoAlCerrar={origen}
             >
-                <Campo id="name" etiqueta="Nombre completo" requerido error={form.errors.name}>
-                    <Input {...propsCampo('name', form.errors.name)} required autoComplete="off" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} className="h-10 rounded-lg" />
+                <Campo id="nombres" etiqueta="Nombres" requerido error={form.errors.nombres}>
+                    <Input
+                        {...propsCampo('nombres', form.errors.nombres)}
+                        required
+                        autoComplete="off"
+                        placeholder="Ej.: Ana María"
+                        value={form.data.nombres}
+                        onChange={(e) => form.setData('nombres', e.target.value)}
+                        className="h-10 rounded-lg"
+                    />
                 </Campo>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Campo id="primer_apellido" etiqueta="Primer apellido" requerido error={form.errors.primer_apellido}>
+                        <Input
+                            {...propsCampo('primer_apellido', form.errors.primer_apellido)}
+                            required
+                            autoComplete="off"
+                            value={form.data.primer_apellido}
+                            onChange={(e) => form.setData('primer_apellido', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                    <Campo id="segundo_apellido" etiqueta="Segundo apellido" error={form.errors.segundo_apellido}>
+                        <Input
+                            {...propsCampo('segundo_apellido', form.errors.segundo_apellido)}
+                            autoComplete="off"
+                            value={form.data.segundo_apellido}
+                            onChange={(e) => form.setData('segundo_apellido', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                </div>
 
                 <Campo id="email" etiqueta="Correo electrónico" requerido error={form.errors.email}>
                     <Input

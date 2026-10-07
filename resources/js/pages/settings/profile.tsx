@@ -16,11 +16,13 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
     const { auth } = usePage<SharedData>().props;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
-        name: auth.user.name,
+        nombres: auth.user.nombres ?? '',
+        primer_apellido: auth.user.primer_apellido ?? '',
+        segundo_apellido: auth.user.segundo_apellido ?? '',
         email: auth.user.email,
     });
 
-    useFocoPrimerError(errors, ['name', 'email']);
+    useFocoPrimerError(errors, ['nombres', 'primer_apellido', 'segundo_apellido', 'email']);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -32,19 +34,49 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
         <AppLayout breadcrumbs={[{ title: 'Mi cuenta', href: route('profile.edit') }]}>
             <Head title="Perfil" />
 
-            <SettingsLayout descripcion="Tu nombre y el correo con el que ingresas a la plataforma.">
+            <SettingsLayout descripcion="Tus nombres, apellidos y el correo con el que ingresas a la plataforma.">
                 <form onSubmit={submit} className="space-y-6" noValidate>
                     <div className="grid gap-2">
-                        <Label htmlFor="name">Nombre completo</Label>
+                        <Label htmlFor="nombres">
+                            Nombres <span aria-hidden="true">*</span>
+                        </Label>
                         <Input
-                            {...propsCampo('name', errors.name)}
+                            {...propsCampo('nombres', errors.nombres)}
                             className="h-11 rounded-lg"
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
+                            value={data.nombres}
+                            onChange={(e) => setData('nombres', e.target.value)}
                             required
-                            autoComplete="name"
+                            autoComplete="given-name"
                         />
-                        <InputError id="name-error" message={errors.name} />
+                        <InputError id="nombres-error" message={errors.nombres} />
+                    </div>
+
+                    <div className="grid gap-6 sm:grid-cols-2">
+                        <div className="grid content-start gap-2">
+                            <Label htmlFor="primer_apellido">
+                                Primer apellido <span aria-hidden="true">*</span>
+                            </Label>
+                            <Input
+                                {...propsCampo('primer_apellido', errors.primer_apellido)}
+                                className="h-11 rounded-lg"
+                                value={data.primer_apellido}
+                                onChange={(e) => setData('primer_apellido', e.target.value)}
+                                required
+                                autoComplete="family-name"
+                            />
+                            <InputError id="primer_apellido-error" message={errors.primer_apellido} />
+                        </div>
+                        <div className="grid content-start gap-2">
+                            <Label htmlFor="segundo_apellido">Segundo apellido</Label>
+                            <Input
+                                {...propsCampo('segundo_apellido', errors.segundo_apellido)}
+                                className="h-11 rounded-lg"
+                                value={data.segundo_apellido}
+                                onChange={(e) => setData('segundo_apellido', e.target.value)}
+                                autoComplete="off"
+                            />
+                            <InputError id="segundo_apellido-error" message={errors.segundo_apellido} />
+                        </div>
                     </div>
 
                     <div className="grid gap-2">
