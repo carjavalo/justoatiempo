@@ -1,11 +1,11 @@
-import { cn } from '@/lib/utils';
+import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Link } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, type TipoIcono } from '@/components/iconos';
 import { type ReactNode } from 'react';
 
 /** Contenedor común de las páginas de administración. */
-export const contenedorModulo = 'mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 p-4 pt-3 md:p-6 md:pt-3 lg:p-8 lg:pt-4';
+export const contenedorModulo = cn('mx-auto flex w-full flex-1 flex-col gap-6 p-4 pt-3 md:p-6 md:pt-3 lg:p-8 lg:pt-4', ANCHO_PLATAFORMA);
 
 export function EncabezadoModulo({ titulo, descripcion, accion }: { titulo: string; descripcion: string; accion?: ReactNode }) {
     return (

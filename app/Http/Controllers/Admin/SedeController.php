@@ -4,37 +4,35 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SedeRequest;
-use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Sede;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Sedes de las empresas clientes y sedes propias de Justo a Tiempo. */
+/** Sedes de cada empresa: los clientes que la empresa atiende (TuGo y Sodimac, de Ditranza). */
 class SedeController extends Controller
 {
     public function index(Request $request): Response
     {
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            // Id de una empresa, o "propias" para las sedes de Justo a Tiempo
-            'empresa' => ['nullable', 'regex:/^(propias|\d+)$/'],
+            'empresa' => ['nullable', 'integer'],
             'estado' => ['nullable', Rule::in(['activas', 'inactivas'])],
         ]);
 
         $sedes = Sede::query()
-            ->with('cliente:id,nombre')
-            ->withCount('usuarios')
+            ->with('empresa:id,nombre')
+            ->withCount(['sucursales', 'usuarios'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
-                $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('ciudad', 'like', $like)->orWhere('direccion', 'like', $like));
+                $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('codigo', 'like', $like));
             })
-            ->when($filtros['empresa'] ?? null, fn (Builder $q, string $empresa) => $empresa === 'propias'
-                ? $q->whereNull('cliente_id')
-                : $q->where('cliente_id', (int) $empresa))
+            ->when($filtros['empresa'] ?? null, fn (Builder $q, int|string $empresa) => $q->where('empresa_id', (int) $empresa))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activas'))
             ->orderByDesc('activo')
             ->orderBy('nombre')
@@ -43,34 +41,44 @@ class SedeController extends Controller
             ->through(fn (Sede $s) => [
                 'id' => $s->id,
                 'nombre' => $s->nombre,
-                'ciudad' => $s->ciudad,
-                'direccion' => $s->direccion,
-                'empresaId' => $s->cliente_id,
-                'empresa' => $s->cliente?->nombre,
+                'empresaId' => $s->empresa_id,
+                'empresa' => $s->empresa?->nombre,
+                'codigo' => $s->codigo,
+                'meta' => (float) $s->meta_efectividad,
                 'activo' => $s->activo,
+                'sucursales' => $s->sucursales_count,
                 'usuarios' => $s->usuarios_count,
             ]);
 
         return Inertia::render('sedes/index', [
             'sedes' => $sedes,
             'total' => Sede::count(),
-            'filtros' => ['q' => $filtros['q'] ?? '', 'empresa' => $filtros['empresa'] ?? '', 'estado' => $filtros['estado'] ?? ''],
-            'empresas' => Cliente::orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            'filtros' => ['q' => $filtros['q'] ?? '', 'empresa' => (string) ($filtros['empresa'] ?? ''), 'estado' => $filtros['estado'] ?? ''],
+            'empresas' => Empresa::orderBy('nombre')->get(['id', 'nombre', 'activo']),
         ]);
     }
 
     public function store(SedeRequest $request): RedirectResponse
     {
-        $sede = Sede::create([...$request->datos(), 'activo' => true]);
+        $sede = Sede::create([...$request->datos(), 'empresa_id' => $request->empresa()->id, 'activo' => true]);
 
-        return back()->with('success', "Sede creada: {$sede->nombre}.");
+        return back()->with('success', "Sede creada: {$sede->nombre}. Ya puedes registrar sus sucursales.");
     }
 
     public function update(SedeRequest $request, Sede $sede): RedirectResponse
     {
-        $sede->update($request->datos());
+        $empresa = $request->empresa();
+        $traslado = $empresa->id !== $sede->empresa_id;
 
-        return back()->with('success', "Cambios guardados en la sede {$sede->nombre}.");
+        DB::transaction(function () use ($request, $sede, $empresa) {
+            $sede->update($request->datos());
+            // Si cambia de empresa, su personal pasa con ella
+            $sede->trasladarA($empresa);
+        });
+
+        return back()->with('success', $traslado
+            ? "La sede {$sede->nombre} ahora es de {$empresa->nombre}, con sus sucursales y su personal."
+            : "Cambios guardados en la sede {$sede->nombre}.");
     }
 
     public function estado(Request $request, Sede $sede): RedirectResponse
@@ -80,6 +88,6 @@ class SedeController extends Controller
 
         return back()->with('success', $activo
             ? "La sede {$sede->nombre} está activa de nuevo."
-            : "La sede {$sede->nombre} quedó inactiva: no recibirá nuevos usuarios.");
+            : "La sede {$sede->nombre} quedó inactiva: no recibirá nuevas sucursales ni usuarios.");
     }
 }

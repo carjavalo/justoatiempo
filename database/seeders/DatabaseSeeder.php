@@ -3,8 +3,9 @@
 namespace Database\Seeders;
 
 use App\Enums\Rol;
-use App\Models\Cliente;
 use App\Models\Empleado;
+use App\Models\LineaServicio;
+use App\Models\Sede;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -21,8 +22,9 @@ class DatabaseSeeder extends Seeder
             OperacionSeeder::class,
         ]);
 
-        $tugo = Cliente::where('nombre', 'TuGo')->first();
-        $caliSur = $tugo?->sedes()->where('nombre', 'Cali Sur')->first();
+        $tugo = Sede::where('nombre', 'TuGo')->first();
+        $caliSur = $tugo?->sucursales()->where('nombre', 'Cali Sur')->first();
+        $logistica = LineaServicio::logistica();
 
         // Usuarios de desarrollo. Contraseña para todos: "password" (cambiar en producción).
         User::updateOrCreate(['email' => 'admin@justoatiempo.test'], [
@@ -39,8 +41,10 @@ class DatabaseSeeder extends Seeder
             'password' => 'password',
             'rol' => Rol::Coordinador,
             'empleado_id' => Empleado::where('cedula', '1000000006')->value('id'),
-            'cliente_id' => $tugo?->id,
-            'sede_id' => $caliSur?->id,
+            'linea_servicio_id' => $logistica->id,
+            'empresa_id' => $tugo?->empresa_id,
+            'sede_id' => $tugo?->id,
+            'sucursal_id' => $caliSur?->id,
             'email_verified_at' => now(),
         ]);
 
@@ -50,8 +54,10 @@ class DatabaseSeeder extends Seeder
             'password' => 'password',
             'rol' => Rol::Auxiliar,
             'empleado_id' => Empleado::where('cedula', '1000000002')->value('id'),
-            'cliente_id' => $tugo?->id,
-            'sede_id' => $caliSur?->id,
+            'linea_servicio_id' => $logistica->id,
+            'empresa_id' => $tugo?->empresa_id,
+            'sede_id' => $tugo?->id,
+            'sucursal_id' => $caliSur?->id,
             'email_verified_at' => now(),
         ]);
     }

@@ -27,7 +27,7 @@ export interface MotivoRechazo {
     total: number;
 }
 
-export interface EfectividadCliente {
+export interface EfectividadSede {
     id: number;
     nombre: string;
     color: string | null;
@@ -68,9 +68,9 @@ export interface Protocolo {
 export interface InformePendiente {
     id: number;
     fecha: string;
-    cliente: string | null;
-    color: string | null;
     sede: string | null;
+    color: string | null;
+    sucursal: string | null;
     estado: 'borrador' | 'seguimiento' | 'cerrado';
     estadoLabel: string;
     efectividad: number;
@@ -100,16 +100,17 @@ export interface AccionReciente {
 }
 
 export interface DashboardProps {
-    filtros: { desde: string; hasta: string; periodo: number | null; cliente: number | null };
+    filtros: { desde: string; hasta: string; periodo: number | null; sede: number | null };
     vista: 'gerencial' | 'auxiliar';
-    clientes: { id: number; nombre: string; color: string | null }[];
+    /** Sedes de las empresas que reciben la línea (TuGo, Sodimac…), con la empresa a la que pertenecen. */
+    sedes: { id: number; nombre: string; color: string | null; empresa: string | null }[];
     ultimaOperacion: string | null;
     meta: number;
     kpis: Kpis;
     kpisPrevios: Kpis;
     tendencia: PuntoTendencia[];
     motivos: MotivoRechazo[];
-    porCliente: EfectividadCliente[];
+    porSede: EfectividadSede[];
     ranking: FilaRanking[];
     protocolo: Protocolo;
     pendientes: Pendientes | null;

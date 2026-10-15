@@ -1,9 +1,9 @@
 import { EstadoCargaBadge, type EstadoCarga } from '@/components/cargas/piezas';
 import { Panel } from '@/components/dashboard/piezas';
-import AppLayout from '@/layouts/app-layout';
+import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { CalendarClock, ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from '@/components/iconos';
 import { type DragEvent, useRef, useState } from 'react';
 
@@ -75,16 +75,11 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
     };
 
     return (
-        <AppLayout>
-            <Head title="Cargas Drivin" />
-
-            <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
-                <div>
-                    <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">Cargas Drivin</h1>
-                    <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-                        Sube la preliquidación exportada de Drivin. El sistema la revisa contigo antes de importar y arma el informe diario de cada cliente y sede.
-                    </p>
-                </div>
+        <MarcoLinea slug={LINEA_LOGISTICA} titulo="Cargas Drivin" seccion="cargas" pestanas>
+                {/* El título lo da la pestaña activa ("Cargas Drivin") */}
+                <p className="text-muted-foreground -mt-2 max-w-2xl text-sm">
+                    Sube la preliquidación exportada de Drivin. El sistema la revisa contigo antes de importar y arma el informe diario de cada sede y sucursal.
+                </p>
 
                 {jornadaPendiente && (
                     <div className="bg-secondary text-secondary-foreground flex items-center gap-3 rounded-xl px-4 py-3 text-sm">
@@ -231,8 +226,7 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                         </>
                     )}
                 </Panel>
-            </div>
-        </AppLayout>
+        </MarcoLinea>
     );
 }
 

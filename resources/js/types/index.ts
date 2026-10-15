@@ -4,8 +4,9 @@ export interface Auth {
     user: User;
 }
 
-export interface BreadcrumbItem {
-    title: string;
+/** Destino del enlace "Volver" de una página: el nivel anterior. */
+export interface Volver {
+    texto: string;
     href: string;
 }
 
@@ -39,6 +40,10 @@ export interface User {
     avatar?: string;
     rol: Rol;
     rol_label: string;
+    /** Inicio de la persona: el panel (administrador) o la línea en la que trabaja. */
+    /** Primera página de quien ingresa (el panel o su línea) y el texto del enlace para volver a ella. */
+    inicio: { titulo: string; volver: string; url: string };
+    linea: { slug: string; nombre: string } | null;
     empleado_id: number | null;
     email_verified_at: string | null;
     created_at: string;

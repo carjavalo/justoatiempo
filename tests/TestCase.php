@@ -2,9 +2,25 @@
 
 namespace Tests;
 
+use App\Models\Empresa;
+use App\Models\LineaServicio;
+use App\Models\Sede;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
-    //
+    /** Empresa de prueba que recibe la línea logística (como Ditranza). */
+    protected function empresa(string $nombre = 'Ditranza', array $datos = []): Empresa
+    {
+        $empresa = Empresa::firstOrCreate(['nombre' => $nombre], $datos);
+        $empresa->lineas()->syncWithoutDetaching([LineaServicio::logistica()->id]);
+
+        return $empresa;
+    }
+
+    /** Sede (cliente de la empresa, como TuGo); por defecto, de Ditranza. */
+    protected function sede(string $nombre, array $datos = [], ?Empresa $empresa = null): Sede
+    {
+        return Sede::create(['nombre' => $nombre, 'meta_efectividad' => 95, ...$datos, 'empresa_id' => ($empresa ?? $this->empresa())->id]);
+    }
 }

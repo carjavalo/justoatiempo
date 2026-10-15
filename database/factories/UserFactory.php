@@ -3,12 +3,14 @@
 namespace Database\Factories;
 
 use App\Enums\Rol;
+use App\Models\LineaServicio;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
@@ -32,6 +34,10 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'rol' => Rol::Auxiliar,
             'activo' => true,
+            // El personal trabaja en una línea (por defecto la logística); el administrador las ve todas
+            'linea_servicio_id' => fn (array $a) => in_array($a['rol'], [Rol::Admin, Rol::Admin->value], true)
+                ? null
+                : LineaServicio::where('modulo', LineaServicio::LOGISTICA)->value('id'),
         ];
     }
 

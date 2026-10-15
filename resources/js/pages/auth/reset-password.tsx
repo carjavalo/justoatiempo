@@ -41,7 +41,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
     };
 
     return (
-        <AuthLayout title="Crea una nueva contraseña" description={`Para la cuenta ${email}.`}>
+        <AuthLayout title="Crea una nueva contraseña" description={`Para la cuenta ${email}.`} volver={{ texto: 'Volver a iniciar sesión', href: route('login') }}>
             <Head title="Nueva contraseña" />
 
             {/* Enlace vencido o inválido: se anuncia de inmediato y ofrece la salida */}

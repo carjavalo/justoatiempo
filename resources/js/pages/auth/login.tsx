@@ -42,7 +42,11 @@ export default function Login({ status, canResetPassword }: LoginProps) {
     };
 
     return (
-        <AuthLayout title="Inicia sesión" description="Ingresa con el correo y la contraseña que te asignó el administrador.">
+        <AuthLayout
+            title="Inicia sesión"
+            description="Ingresa con el correo y la contraseña que te asignó el administrador."
+            volver={{ texto: 'Volver al sitio web', href: route('home') }}
+        >
             <Head title="Iniciar sesión" />
 
             <MensajeEstado mensaje={status} />

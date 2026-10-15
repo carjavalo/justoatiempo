@@ -74,8 +74,8 @@ class ImportadorPreliquidacion
             }
 
             $informes = collect($a['ordenes'])
-                ->unique(fn ($o) => $o['fecha_operacion'].'|'.$o['cliente_id'].'|'.$o['sede_id'])
-                ->map(fn ($o) => $this->consolidador->consolidar($o['fecha_operacion'], $o['cliente_id'], $o['sede_id'])->id)
+                ->unique(fn ($o) => $o['fecha_operacion'].'|'.$o['sede_id'].'|'.$o['sucursal_id'])
+                ->map(fn ($o) => $this->consolidador->consolidar($o['fecha_operacion'], $o['sede_id'], $o['sucursal_id'])->id)
                 ->values()
                 ->all();
 
@@ -119,14 +119,15 @@ class ImportadorPreliquidacion
     public function anular(Carga $carga): void
     {
         $claves = $carga->ordenes()
-            ->select('fecha_operacion', 'cliente_id', 'sede_id')
+            ->select('fecha_operacion', 'sede_id', 'sucursal_id')
             ->distinct()
             ->get();
 
         $cerrado = $claves->first(fn ($k) => InformeDiario::query()
             ->whereDate('fecha_operacion', $k->fecha_operacion)
-            ->where('cliente_id', $k->cliente_id)
             ->where('sede_id', $k->sede_id)
+            // Sin sucursal el informe es de la sede completa (where = null nunca coincide)
+            ->when($k->sucursal_id, fn ($q) => $q->where('sucursal_id', $k->sucursal_id), fn ($q) => $q->whereNull('sucursal_id'))
             ->where('estado', 'cerrado')
             ->exists());
 
@@ -138,7 +139,7 @@ class ImportadorPreliquidacion
             $carga->ordenes()->delete();
 
             foreach ($claves as $k) {
-                $informe = $this->consolidador->consolidar($k->fecha_operacion, $k->cliente_id, $k->sede_id);
+                $informe = $this->consolidador->consolidar($k->fecha_operacion, $k->sede_id, $k->sucursal_id);
                 if ($informe->total_asignadas === 0) {
                     $informe->delete(); // la jornada quedó sin órdenes
                 }

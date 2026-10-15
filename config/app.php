@@ -16,6 +16,12 @@ return [
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
+    | Vista previa por un enlace temporal (túnel): quien entra desde afuera solo ve el sitio público.
+    | Ver App\Http\Middleware\VistaPreviaPublica.
+    */
+    'vista_previa' => (bool) env('VISTA_PREVIA', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------

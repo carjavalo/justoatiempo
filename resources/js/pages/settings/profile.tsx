@@ -31,7 +31,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Mi cuenta', href: route('profile.edit') }]}>
+        <AppLayout>
             <Head title="Perfil" />
 
             <SettingsLayout descripcion="Tus nombres, apellidos y el correo con el que ingresas a la plataforma.">

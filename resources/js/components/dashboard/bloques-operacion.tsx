@@ -2,7 +2,7 @@ import { fmt, nivelFrenteAMeta } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Info } from '@/components/iconos';
 import { BarraProgreso, EstadoBadge, Panel, Vacio } from './piezas';
-import { type EfectividadCliente, type MotivoRechazo, type Protocolo } from './tipos';
+import { type EfectividadSede, type MotivoRechazo, type Protocolo } from './tipos';
 
 const MAX_MOTIVOS = 6;
 
@@ -50,15 +50,15 @@ export function MotivosRechazo({ motivos }: { motivos: MotivoRechazo[] }) {
     );
 }
 
-/** Efectividad por cliente frente a su propia meta (hoja "Parámetros cliente"). */
-export function EfectividadPorCliente({ clientes }: { clientes: EfectividadCliente[] }) {
+/** Efectividad por sede (TuGo, Sodimac…) frente a su propia meta pactada. */
+export function EfectividadPorSede({ sedes }: { sedes: EfectividadSede[] }) {
     return (
-        <Panel titulo="Efectividad por cliente" descripcion="Cada barra frente a la meta pactada con el cliente">
-            {clientes.length === 0 ? (
+        <Panel titulo="Efectividad por sede" descripcion="Cada barra frente a la meta pactada con la sede">
+            {sedes.length === 0 ? (
                 <Vacio>Sin operación en el periodo.</Vacio>
             ) : (
                 <ul role="list" className="space-y-5">
-                    {clientes.map((c) => {
+                    {sedes.map((c) => {
                         const nivel = nivelFrenteAMeta(c.efectividad, c.meta)!;
                         return (
                             <li key={c.id}>

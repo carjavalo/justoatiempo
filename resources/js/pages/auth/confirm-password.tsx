@@ -25,7 +25,11 @@ export default function ConfirmPassword() {
     };
 
     return (
-        <AuthLayout title="Confirma tu contraseña" description="Esta es un área protegida. Ingresa tu contraseña para continuar.">
+        <AuthLayout
+            title="Confirma tu contraseña"
+            description="Esta es un área protegida. Ingresa tu contraseña para continuar."
+            volver={{ texto: 'Volver a la plataforma', href: route('panel') }}
+        >
             <Head title="Confirmar contraseña" />
 
             <form onSubmit={submit} className="grid gap-6" noValidate>

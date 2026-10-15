@@ -2,12 +2,14 @@
 
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\SedeController;
+use App\Http\Controllers\Admin\SucursalController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CargaController;
 use App\Http\Controllers\ContactoController;
-use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LineaController;
 use App\Http\Controllers\PanelController;
+use App\Models\LineaServicio;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -37,13 +39,17 @@ Route::middleware(['auth'])->group(function () {
         Route::post('sedes', [SedeController::class, 'store'])->name('sedes.store');
         Route::put('sedes/{sede}', [SedeController::class, 'update'])->name('sedes.update');
         Route::patch('sedes/{sede}/estado', [SedeController::class, 'estado'])->name('sedes.estado');
+
+        Route::get('sucursales', [SucursalController::class, 'index'])->name('sucursales.index');
+        Route::post('sucursales', [SucursalController::class, 'store'])->name('sucursales.store');
+        Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->name('sucursales.update');
+        Route::patch('sucursales/{sucursal}/estado', [SucursalController::class, 'estado'])->name('sucursales.estado');
     });
 
-    /*
-     * Módulos de la operación logística (Drivin, auditoría POD, indicadores). Por ahora no aparecen
-     * en el panel: se conservan para moverlos a la categoría "Servicios logísticos".
-     */
-    Route::get('indicadores', DashboardController::class)->middleware('personal')->name('indicadores');
+    // Cada línea de servicio: su tablero (logística) o su resumen de empresas y personal
+    Route::get('lineas/{linea}', [LineaController::class, 'show'])->name('lineas.show');
+    // Enlaces guardados del tablero anterior
+    Route::get('indicadores', fn () => redirect()->route('lineas.show', LineaServicio::logistica()));
 
     /*
      * Módulos en construcción: cada ruta ya existe con su control de acceso
@@ -59,8 +65,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('mis-entregas', $modulo('mis-entregas', 'Mis entregas', 'Historial de tus entregas, tu efectividad diaria y las evidencias cargadas.', ['RBAC']))
         ->middleware('rol:auxiliar')->name('mis-entregas');
 
-    Route::middleware(['rol:admin,coordinador', 'personal'])->group(function () use ($modulo) {
-        Route::get('informes', $modulo('informes', 'Informe diario', 'Cuadro consolidado por fecha, cliente, sede, ruta, placa y auxiliar, con efectividad, devoluciones, averías y faltantes.', ['RF-05', 'RF-06', 'RF-07', 'RF-08']))->name('informes.index');
+    // Herramientas de la línea de servicios logísticos (Drivin, auditoría POD): solo su personal propio
+    Route::middleware(['rol:admin,coordinador', 'personal', 'linea:logistica'])->group(function () use ($modulo) {
+        Route::get('informes', $modulo('informes', 'Informe diario', 'Cuadro consolidado por fecha, sede, sucursal, ruta, placa y auxiliar, con efectividad, devoluciones, averías y faltantes.', ['RF-05', 'RF-06', 'RF-07', 'RF-08']))->name('informes.index');
         // Módulo 2: preliquidación de Drivin (subir → revisar → confirmar)
         Route::get('cargas', [CargaController::class, 'index'])->name('cargas.index');
         Route::post('cargas', [CargaController::class, 'store'])->name('cargas.store');
@@ -81,7 +88,7 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('evidencias/{evidencia}', [AuditoriaController::class, 'eliminarEvidencia'])->name('evidencias.eliminar');
 
         Route::get('seguimiento', $modulo('seguimiento', 'Seguimiento y desempeño', 'Felicitaciones, retroalimentación y llamados de atención por auxiliar, y control de informes en seguimiento.', ['RF-11']))->name('seguimiento.index');
-        Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por cliente, sede y fecha.', ['RF-02']))->name('programacion.index');
+        Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por sede, sucursal y fecha.', ['RF-02']))->name('programacion.index');
     });
 
     Route::middleware(['rol:admin', 'personal'])->group(function () use ($modulo) {
@@ -93,3 +100,7 @@ Route::middleware(['auth'])->group(function () {
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
+
+// Direcciones que no existen: pasan por el grupo web para que la página de error sepa si hay sesión
+// (y ofrezca volver al inicio de quien navega en vez de al sitio público)
+Route::fallback(fn () => abort(404));

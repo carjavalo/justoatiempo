@@ -6,10 +6,10 @@ use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
-use App\Models\Cliente;
 use App\Models\Evidencia;
 use App\Models\InformeDiario;
 use App\Models\Orden;
+use App\Models\Sede;
 use App\Models\TipoNovedad;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
@@ -27,14 +27,14 @@ class AuditoriaPodTest extends TestCase
 
     private User $coordinador;
 
-    private Cliente $cliente;
+    private Sede $sede;
 
     protected function setUp(): void
     {
         parent::setUp();
         Storage::fake('local');
 
-        $this->cliente = Cliente::create(['nombre' => 'TuGo', 'meta_efectividad' => 95]);
+        $this->sede = $this->sede('TuGo');
         $this->coordinador = User::factory()->coordinador()->create();
         TipoNovedad::create(['nombre' => 'Buen protocolo de entrega']);
 
@@ -43,13 +43,13 @@ class AuditoriaPodTest extends TestCase
             Orden::create([
                 'carga_id' => $carga->id,
                 'fecha_operacion' => '2026-10-05',
-                'cliente_id' => $this->cliente->id,
+                'sede_id' => $this->sede->id,
                 'codigo_orden' => $codigo,
                 'auxiliar_nombre' => 'JUAN PLAZA',
                 'estado' => $i < 2 ? EstadoOrden::Aprobada : EstadoOrden::Rechazada,
             ]);
         }
-        app(ConsolidadorInforme::class)->consolidar('2026-10-05', $this->cliente->id, null);
+        app(ConsolidadorInforme::class)->consolidar('2026-10-05', $this->sede->id, null);
     }
 
     private function pdf(string $nombre, bool $completo = true): UploadedFile

@@ -21,7 +21,8 @@ export function InformesPendientes({ pendientes }: { pendientes: Pendientes }) {
                             </span>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold break-words">
-                                    {i.cliente} <span className="text-muted-foreground font-normal">· {i.sede}</span>
+                                    {i.sede}
+                                    {i.sucursal && <span className="text-muted-foreground font-normal"> · {i.sucursal}</span>}
                                 </p>
                                 <p className="text-muted-foreground text-xs">
                                     {fmt.fechaMedia(i.fecha)} · {i.estadoLabel}

@@ -5,9 +5,9 @@ namespace Tests\Feature;
 use App\Enums\EstadoOrden;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
-use App\Models\Cliente;
 use App\Models\Empleado;
 use App\Models\Orden;
+use App\Models\Sede;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +18,7 @@ class DashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    private Cliente $cliente;
+    private Sede $sede;
 
     private Empleado $juan;
 
@@ -28,7 +28,8 @@ class DashboardTest extends TestCase
     {
         parent::setUp();
 
-        $this->cliente = Cliente::create(['nombre' => 'TuGo', 'meta_efectividad' => 95]);
+        // TuGo es sede de Ditranza, que recibe la línea logística
+        $this->sede = $this->sede('TuGo');
         $this->juan = Empleado::create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'apellidos' => 'Plaza']);
         $this->andres = Empleado::create(['cedula' => '222', 'nombres' => 'Andrés', 'apellidos' => 'Moreno']);
 
@@ -38,7 +39,7 @@ class DashboardTest extends TestCase
             Orden::create([
                 'carga_id' => $carga->id,
                 'fecha_operacion' => '2026-10-02',
-                'cliente_id' => $this->cliente->id,
+                'sede_id' => $this->sede->id,
                 'ruta' => 'CALI SUR',
                 'placa' => 'SNX708',
                 'empleado_id' => $this->juan->id,
@@ -49,7 +50,7 @@ class DashboardTest extends TestCase
         Orden::create([
             'carga_id' => $carga->id,
             'fecha_operacion' => '2026-10-02',
-            'cliente_id' => $this->cliente->id,
+            'sede_id' => $this->sede->id,
             'empleado_id' => $this->andres->id,
             'codigo_orden' => 'PDVT99',
             'estado' => EstadoOrden::Aprobada,
@@ -58,23 +59,24 @@ class DashboardTest extends TestCase
 
     public function test_guests_are_redirected_to_the_login_page()
     {
-        $this->get('/indicadores')->assertRedirect('/login');
+        $this->get('/lineas/logisticos')->assertRedirect('/login');
     }
 
     public function test_coordinador_ve_el_panel_gerencial_con_los_kpis_del_periodo()
     {
         $this->actingAs(User::factory()->coordinador()->create());
 
-        $this->get('/indicadores')
+        $this->get('/lineas/logisticos')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('dashboard')
+                ->component('lineas/logistica')
+                ->where('puedeOperar', true)
                 ->where('vista', 'gerencial')
                 ->where('kpis.asignadas', 9)
                 ->where('kpis.aprobadas', 6)
                 ->where('kpis.devoluciones', 3)
                 ->has('ranking', 2)
-                ->has('porCliente', 1)
+                ->has('porSede', 1)
             );
     }
 
@@ -82,10 +84,11 @@ class DashboardTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['empleado_id' => $this->juan->id]));
 
-        $this->get('/indicadores')
+        $this->get('/lineas/logisticos')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('vista', 'auxiliar')
+                ->where('puedeOperar', false)
                 ->where('kpis.asignadas', 8)
                 ->where('kpis.efectividad', 62.5)
                 ->has('ranking', 1)
@@ -121,7 +124,7 @@ class DashboardTest extends TestCase
             'auditado_en' => now(),
         ]);
 
-        $informe = app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->cliente->id, null);
+        $informe = app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->sede->id, null);
         $linea = $informe->lineas->firstWhere('empleado_id', $this->juan->id);
 
         $this->assertSame(9, $informe->total_asignadas);

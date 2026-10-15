@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\Orden;
+use App\Models\User;
 use App\Support\Nit;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class EmpresaRequest extends FormRequest
 {
@@ -28,11 +31,11 @@ class EmpresaRequest extends FormRequest
 
     public function rules(): array
     {
-        /** @var Cliente|null $empresa */
+        /** @var Empresa|null $empresa */
         $empresa = $this->route('empresa');
 
         return [
-            'nombre' => ['required', 'string', 'max:120', Rule::unique('clientes', 'nombre')->ignore($empresa?->id)],
+            'nombre' => ['required', 'string', 'max:120', Rule::unique('empresas', 'nombre')->ignore($empresa?->id)],
             'nit' => ['nullable', 'string', 'max:25', function (string $atributo, mixed $valor, Closure $falla) use ($empresa) {
                 $partes = Nit::partes((string) $valor);
                 if (! $partes) {
@@ -47,7 +50,7 @@ class EmpresaRequest extends FormRequest
 
                     return;
                 }
-                $existe = Cliente::withTrashed()
+                $existe = Empresa::withTrashed()
                     ->where('nit', $numero.'-'.$esperado)
                     ->when($empresa, fn ($q) => $q->whereKeyNot($empresa->id))
                     ->exists();
@@ -58,7 +61,38 @@ class EmpresaRequest extends FormRequest
             'contacto_nombre' => ['nullable', 'string', 'max:120'],
             'contacto_email' => ['nullable', 'email', 'max:150'],
             'contacto_telefono' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\s-]{7,30}$/'],
+            'lineas' => ['nullable', 'array'],
+            'lineas.*' => ['integer', 'distinct', Rule::exists('lineas_servicio', 'id')],
         ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator) {
+            /** @var Empresa|null $empresa */
+            $empresa = $this->route('empresa');
+            if (! $empresa || $validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            // Una línea no se le quita a la empresa mientras tenga personal trabajando en ella ni, si tiene
+            // tablero, operación registrada (su historial dejaría de verse en el tablero de la línea)
+            $quitadas = $empresa->lineas()->whereNotIn('lineas_servicio.id', $this->lineas())->get(['lineas_servicio.id', 'nombre', 'modulo']);
+            foreach ($quitadas as $linea) {
+                $personas = User::where('empresa_id', $empresa->id)->where('linea_servicio_id', $linea->id)->count();
+                if ($personas > 0) {
+                    $validator->errors()->add('lineas', "No puedes quitar «{$linea->nombre}»: {$personas} ".($personas === 1 ? 'persona de esta empresa trabaja' : 'personas de esta empresa trabajan').' en esa línea.');
+                } elseif ($linea->modulo !== null && Orden::whereIn('sede_id', $empresa->sedes()->withTrashed()->select('id'))->exists()) {
+                    $validator->errors()->add('lineas', "No puedes quitar «{$linea->nombre}»: las sedes de esta empresa ya tienen operación registrada en esa línea.");
+                }
+            }
+        }];
+    }
+
+    /** @return list<int> */
+    public function lineas(): array
+    {
+        return array_map('intval', (array) $this->input('lineas', []));
     }
 
     public function messages(): array
@@ -77,13 +111,14 @@ class EmpresaRequest extends FormRequest
             'contacto_nombre' => 'el nombre del contacto',
             'contacto_email' => 'el correo del contacto',
             'contacto_telefono' => 'el teléfono del contacto',
+            'lineas' => 'las líneas de servicio',
         ];
     }
 
     /** @return array<string, mixed> Datos listos para guardar, con el NIT normalizado. */
     public function datos(): array
     {
-        $datos = $this->validated();
+        $datos = $this->safe()->except('lineas');
         $datos['nit'] = filled($datos['nit'] ?? null) ? Nit::normalizar($datos['nit']) : null;
 
         return $datos;

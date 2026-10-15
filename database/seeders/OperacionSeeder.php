@@ -3,8 +3,10 @@
 namespace Database\Seeders;
 
 use App\Enums\CargoEmpleado;
-use App\Models\Cliente;
 use App\Models\Empleado;
+use App\Models\Empresa;
+use App\Models\LineaServicio;
+use App\Models\Sede;
 use App\Models\Vehiculo;
 use Illuminate\Database\Seeder;
 
@@ -13,21 +15,30 @@ class OperacionSeeder extends Seeder
 {
     public function run(): void
     {
-        $tugo = Cliente::updateOrCreate(['nombre' => 'TuGo'], [
+        // Empresa > sede > sucursal: Ditranza atiende a TuGo y a Sodimac; cada una con sus sucursales
+        $ditranza = Empresa::updateOrCreate(['nombre' => 'Ditranza'], ['activo' => true]);
+        $ditranza->lineas()->syncWithoutDetaching([LineaServicio::logistica()->id]);
+
+        $tugo = Sede::updateOrCreate(['nombre' => 'TuGo'], [
+            'empresa_id' => $ditranza->id,
             'codigo' => 'TUGO',
             'meta_efectividad' => 95,
             'color' => '#E8705F',
         ]);
-        $tugo->sedes()->updateOrCreate(['nombre' => 'Cali Sur'], ['alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
-        $tugo->sedes()->updateOrCreate(['nombre' => 'Cali Norte'], ['alias_drivin' => 'CALI NORTE', 'ciudad' => 'Cali']);
-        $tugo->sedes()->updateOrCreate(['nombre' => 'Cañasgordas'], ['alias_drivin' => 'CANASGORDAS', 'ciudad' => 'Cali']);
+        // Si TuGo ya existía en otra empresa, pasa a Ditranza con su personal
+        $tugo->trasladarA($ditranza);
+        $tugo->sucursales()->updateOrCreate(['nombre' => 'Cali Sur'], ['alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
+        $tugo->sucursales()->updateOrCreate(['nombre' => 'Cali Norte'], ['alias_drivin' => 'CALI NORTE', 'ciudad' => 'Cali']);
+        $tugo->sucursales()->updateOrCreate(['nombre' => 'Cañasgordas'], ['alias_drivin' => 'CANASGORDAS', 'ciudad' => 'Cali']);
 
-        $sodimac = Cliente::updateOrCreate(['nombre' => 'Sodimac'], [
+        $sodimac = Sede::updateOrCreate(['nombre' => 'Sodimac'], [
+            'empresa_id' => $ditranza->id,
             'codigo' => 'SODIMAC',
             'meta_efectividad' => 95,
             'color' => '#1F3A68',
         ]);
-        $sodimac->sedes()->updateOrCreate(['nombre' => 'Cali'], ['alias_drivin' => 'SODIMAC CALI', 'ciudad' => 'Cali']);
+        $sodimac->trasladarA($ditranza);
+        $sodimac->sucursales()->updateOrCreate(['nombre' => 'Cali'], ['alias_drivin' => 'SODIMAC CALI', 'ciudad' => 'Cali']);
 
         Vehiculo::updateOrCreate(['placa' => 'SNX708'], ['tipo' => 'Furgón', 'descripcion' => 'Ruta urbana Cali Sur']);
         Vehiculo::updateOrCreate(['placa' => 'TTT768'], ['tipo' => 'Furgón']);

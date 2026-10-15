@@ -2,17 +2,17 @@ import { Cifra, EstadoCargaBadge, ListaAdvertencias, Pasos, TablaErrores, type A
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import AppLayout from '@/layouts/app-layout';
+import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { fmt } from '@/lib/formato';
-import { Head, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { Ban, FileSpreadsheet, Undo2 } from '@/components/iconos';
 import { useState } from 'react';
 
 interface Informe {
     id: number;
     fecha: string;
-    cliente: string | null;
     sede: string | null;
+    sucursal: string | null;
     estado: string;
     estadoLabel: string;
     asignadas: number;
@@ -51,19 +51,16 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
     const [anulando, setAnulando] = useState(false);
 
     return (
-        <AppLayout>
-            <Head title={carga.archivo} />
-
-            <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+        <MarcoLinea slug={LINEA_LOGISTICA} titulo={carga.archivo} seccion="cargas" paginaDeLaPestana={false} pestanas>
                 <header className="flex flex-col gap-3">
                     {!anulada && <Pasos actual={4} />}
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="min-w-0">
                             <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">{anulada ? 'Carga anulada' : 'Carga importada'}</p>
-                            <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
+                            <h2 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
                                 <FileSpreadsheet className="text-primary size-6 shrink-0" aria-hidden="true" />
                                 {carga.archivo}
-                            </h1>
+                            </h2>
                             <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
                                 <EstadoCargaBadge estado={carga.estado} texto={carga.estadoLabel} />
                                 {carga.procesada && (
@@ -142,7 +139,7 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                                     <thead className="text-muted-foreground border-y text-[0.72rem] tracking-wide uppercase">
                                         <tr>
                                             <th scope="col" className="py-2.5 pl-5 font-semibold">
-                                                Cliente · sede
+                                                Sede · sucursal
                                             </th>
                                             <th scope="col" className="px-3 py-2.5 font-semibold">
                                                 Fecha
@@ -162,7 +159,7 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                                         {informes.map((i) => (
                                             <tr key={i.id}>
                                                 <td className="py-3 pl-5 font-semibold">
-                                                    {i.cliente} <span className="text-muted-foreground font-normal">· {i.sede ?? 'Sin sede'}</span>
+                                                    {i.sede} <span className="text-muted-foreground font-normal">· {i.sucursal ?? 'Sin sucursal'}</span>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">{fmt.fechaMedia(i.fecha)}</td>
                                                 <td className="tabular px-3 py-3 text-right">
@@ -171,7 +168,7 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                                                 </td>
                                                 <td className="px-3 py-3">
                                                     <div className="flex items-center gap-2">
-                                                        <BarraProgreso valor={i.efectividad} etiqueta={`Efectividad ${i.cliente} ${i.sede ?? ''}`} className="h-1.5 flex-1" />
+                                                        <BarraProgreso valor={i.efectividad} etiqueta={`Efectividad ${i.sede} ${i.sucursal ?? ''}`} className="h-1.5 flex-1" />
                                                         <span className="tabular w-14 text-right text-xs font-bold">{fmt.pct(i.efectividad)}</span>
                                                     </div>
                                                 </td>
@@ -187,7 +184,6 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
 
                 <TablaErrores errores={errores} total={errores.length} titulo="Filas que no se importaron" />
                 {!anulada && <ListaAdvertencias advertencias={advertencias} />}
-            </div>
-        </AppLayout>
+        </MarcoLinea>
     );
 }

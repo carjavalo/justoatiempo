@@ -13,7 +13,7 @@ class Orden extends Model
     protected $table = 'ordenes';
 
     protected $fillable = [
-        'carga_id', 'informe_id', 'fecha_operacion', 'cliente_id', 'sede_id', 'ruta',
+        'carga_id', 'informe_id', 'fecha_operacion', 'sede_id', 'sucursal_id', 'ruta',
         'vehiculo_id', 'placa', 'empleado_id', 'auxiliar_nombre',
         'codigo_orden', 'codigo_direccion', 'destinatario', 'direccion', 'ciudad', 'unidades',
         'estado', 'motivo_rechazo_id', 'motivo_texto', 'comentario_pod', 'hora_entrega',
@@ -51,14 +51,14 @@ class Orden extends Model
         return $this->belongsTo(InformeDiario::class, 'informe_id');
     }
 
-    public function cliente(): BelongsTo
-    {
-        return $this->belongsTo(Cliente::class);
-    }
-
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
     }
 
     public function vehiculo(): BelongsTo

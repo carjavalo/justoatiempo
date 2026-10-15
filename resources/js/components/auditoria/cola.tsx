@@ -25,7 +25,7 @@ export function EstadoAuditoriaBadge({ estado, className }: { estado: EstadoAudi
 /** Parámetros de la URL que conservan los filtros al cambiar de orden. */
 export function consultaFiltros(f: FiltrosAuditoria): Record<string, string> {
     const q: Record<string, string> = { estado: f.estado };
-    if (f.cliente) q.cliente = String(f.cliente);
+    if (f.sede) q.sede = String(f.sede);
     if (f.q) q.q = f.q;
     return q;
 }

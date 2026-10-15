@@ -24,7 +24,7 @@ class MapeoColumnas
         'auxiliar' => ['Asistente del conductor (auxiliar)', true, ['asistente del conductor', 'asistente de conductor', 'asistente', 'asistentes', 'auxiliar', 'auxiliar de reparto', 'ayudante', 'acompanante']],
         'ruta' => ['Ruta / nombre del plan', false, ['nombre plan', 'nombre del plan', 'plan', 'nombre ruta', 'ruta', 'operacion']],
         'codigo_direccion' => ['Código de dirección', false, ['codigo de direccion', 'codigo direccion', 'cod direccion']],
-        'cliente' => ['Cliente corporativo', false, ['cliente', 'nombre cliente', 'cuenta', 'empresa', 'razon social']],
+        'cliente' => ['Cliente corporativo (sede)', false, ['cliente corporativo', 'cliente', 'nombre cliente', 'cuenta']],
         'destinatario' => ['Destinatario', false, ['nombre de contacto', 'nombre contacto', 'contacto', 'destinatario', 'nombre destinatario', 'cliente final']],
         'direccion' => ['Dirección de entrega', false, ['direccion', 'direccion de entrega', 'direccion entrega']],
         'ciudad' => ['Ciudad', false, ['ciudad', 'municipio', 'comuna']],
@@ -90,6 +90,7 @@ class MapeoColumnas
                         if ($coincide) {
                             $mapeo[$campo] = $i;
                             $usadas[$i] = true;
+
                             continue 3;
                         }
                     }

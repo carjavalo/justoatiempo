@@ -82,7 +82,11 @@ class ContactoTest extends TestCase
             $this->from('/')->post('/contacto', $this->datos(['email' => "laura{$i}@example.com"]))->assertRedirect('/');
         }
 
-        $this->from('/')->post('/contacto', $this->datos())->assertStatus(429);
+        // El sexto vuelve al sitio con un aviso en usted (no a la pantalla de error del navegador)
+        $this->from('/')->post('/contacto', $this->datos())
+            ->assertStatus(303)
+            ->assertRedirect('/')
+            ->assertSessionHas('error', 'Ha hecho demasiados intentos seguidos. Espere un minuto e intente de nuevo.');
         $this->assertDatabaseCount('solicitudes_contacto', 5);
     }
 }

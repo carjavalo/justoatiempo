@@ -28,8 +28,10 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
-        'cliente_id',
+        'empresa_id',
         'sede_id',
+        'sucursal_id',
+        'linea_servicio_id',
         'empleado_id',
         'activo',
         'ultimo_acceso_en',
@@ -84,15 +86,63 @@ class User extends Authenticatable
         return $this->belongsTo(Empleado::class);
     }
 
-    /** Empresa cliente donde trabaja; sin empresa es personal propio de Justo a Tiempo. */
+    /** Empresa donde trabaja; sin empresa es personal propio de Justo a Tiempo. */
     public function empresa(): BelongsTo
     {
-        return $this->belongsTo(Cliente::class, 'cliente_id');
+        return $this->belongsTo(Empresa::class);
     }
 
+    /** Sede de la empresa (p. ej. TuGo, de Ditranza). */
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    /** Sucursal donde trabaja (de su sede o, sin empresa, una propia de Justo a Tiempo). */
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
+    }
+
+    /** Línea de servicio en la que trabaja (los administradores no tienen: ven todas). */
+    public function linea(): BelongsTo
+    {
+        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
+    }
+
+    public function puedeVerLinea(LineaServicio $linea): bool
+    {
+        return $this->esAdmin() || $this->linea_servicio_id === $linea->id;
+    }
+
+    /**
+     * Límites de lo que ve quien no es administrador: si está asignado a una empresa solo ve esa
+     * empresa, y dentro de ella su sede y su sucursal si las tiene.
+     */
+    public function empresaFija(): ?int
+    {
+        return $this->esAdmin() ? null : $this->empresa_id;
+    }
+
+    /** Sede y sucursal solo limitan dentro de una empresa: la sucursal propia del personal de JaT es su ubicación. */
+    public function sedeFija(): ?int
+    {
+        return $this->empresaFija() === null ? null : $this->sede_id;
+    }
+
+    public function sucursalFija(): ?int
+    {
+        return $this->empresaFija() === null ? null : $this->sucursal_id;
+    }
+
+    /** Página de inicio: el panel para el administrador; para los demás, su línea. */
+    public function inicio(): array
+    {
+        if (! $this->esAdmin() && $this->linea) {
+            return ['titulo' => $this->linea->nombre, 'volver' => "Volver a {$this->linea->nombre}", 'url' => route('lineas.show', $this->linea, false)];
+        }
+
+        return ['titulo' => 'Panel', 'volver' => 'Volver al panel', 'url' => route('panel', [], false)];
     }
 
     public function tieneRol(Rol ...$roles): bool

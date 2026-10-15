@@ -33,7 +33,7 @@ export default function Password() {
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Mi cuenta', href: route('profile.edit') }]}>
+        <AppLayout>
             <Head title="Contraseña" />
 
             <SettingsLayout descripcion="Usa una contraseña larga y difícil de adivinar. Al cambiarla, la usarás en tu próximo ingreso.">

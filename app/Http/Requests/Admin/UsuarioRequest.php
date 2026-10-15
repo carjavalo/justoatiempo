@@ -3,8 +3,9 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\Rol;
-use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\Sede;
+use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -29,6 +30,8 @@ class UsuarioRequest extends FormRequest
             'email' => is_string($e = $this->texto('email')) ? mb_strtolower($e) : $e,
             'empresa_id' => $this->input('empresa_id') ?: null,
             'sede_id' => $this->input('sede_id') ?: null,
+            'sucursal_id' => $this->input('sucursal_id') ?: null,
+            'linea_id' => $this->input('linea_id') ?: null,
             'password' => $this->input('password') ?: null,
         ]);
     }
@@ -44,8 +47,10 @@ class UsuarioRequest extends FormRequest
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
             'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol' => ['required', Rule::enum(Rol::class)],
-            'empresa_id' => ['nullable', 'integer', Rule::exists('clientes', 'id')->whereNull('deleted_at')],
+            'empresa_id' => ['nullable', 'integer', Rule::exists('empresas', 'id')->whereNull('deleted_at')],
             'sede_id' => ['nullable', 'integer', Rule::exists('sedes', 'id')->whereNull('deleted_at')],
+            'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')->whereNull('deleted_at')],
+            'linea_id' => ['nullable', 'integer', Rule::exists('lineas_servicio', 'id')],
             // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
             'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
         ];
@@ -62,24 +67,56 @@ class UsuarioRequest extends FormRequest
             $usuario = $this->route('usuario');
             $empresaId = $this->integer('empresa_id') ?: null;
             $sedeId = $this->integer('sede_id') ?: null;
+            $sucursalId = $this->integer('sucursal_id') ?: null;
+            $lineaId = $this->integer('linea_id') ?: null;
+            $esAdmin = $this->input('rol') === Rol::Admin->value;
+
+            // Cada coordinador o auxiliar trabaja en una sola línea (el administrador ve todas)
+            if (! $esAdmin && ! $lineaId) {
+                $validator->errors()->add('linea_id', 'Elige la línea de servicio en la que trabaja.');
+            }
+            if (! $esAdmin && $lineaId && $empresaId && ! Empresa::whereKey($empresaId)->whereHas('lineas', fn ($q) => $q->whereKey($lineaId))->exists()) {
+                $validator->errors()->add('empresa_id', 'Esta empresa no recibe la línea de servicio elegida.');
+            }
 
             // Nadie se quita a sí mismo el rol de administrador: la plataforma podría quedar sin quien la gestione
             if ($usuario?->is($this->user()) && $this->input('rol') !== Rol::Admin->value) {
                 $validator->errors()->add('rol', 'No puedes quitarte el rol de administrador. Pídeselo a otro administrador.');
             }
 
-            if ($empresaId && $empresaId !== $usuario?->cliente_id && ! Cliente::whereKey($empresaId)->value('activo')) {
+            // El administrador no lleva lugar de trabajo (se guarda vacío): lo que sigue no aplica
+            if ($esAdmin) {
+                return;
+            }
+
+            if ($empresaId && $empresaId !== $usuario?->empresa_id && ! Empresa::whereKey($empresaId)->value('activo')) {
                 $validator->errors()->add('empresa_id', 'Esta empresa está inactiva: actívala antes de asignarle usuarios.');
             }
 
+            // Cascada: la sede debe ser de la empresa elegida y la sucursal, de la sede elegida
             if ($sedeId) {
-                $sede = Sede::find($sedeId, ['id', 'cliente_id', 'activo']);
-                if ($sede->cliente_id !== $empresaId) {
+                $sede = Sede::find($sedeId, ['id', 'empresa_id', 'activo']);
+                if ($sede->empresa_id !== $empresaId) {
                     $validator->errors()->add('sede_id', $empresaId
                         ? 'Esta sede no pertenece a la empresa elegida.'
-                        : 'Esta sede es de una empresa cliente: elige primero esa empresa.');
+                        : 'Esta sede es de una empresa: elige primero esa empresa.');
                 } elseif (! $sede->activo && $sedeId !== $usuario?->sede_id) {
                     $validator->errors()->add('sede_id', 'Esta sede está inactiva: actívala antes de asignarle usuarios.');
+                }
+            }
+
+            if ($sucursalId) {
+                $sucursal = Sucursal::find($sucursalId, ['id', 'sede_id', 'activo']);
+                if ($sucursal->sede_id !== $sedeId) {
+                    $validator->errors()->add('sucursal_id', match (true) {
+                        $sedeId !== null => 'Esta sucursal no pertenece a la sede elegida.',
+                        $sucursal->sede_id !== null => 'Esta sucursal es de una sede: elige primero esa sede.',
+                        default => 'Esta sucursal es propia de Justo a Tiempo: quita la sede para asignarla.',
+                    });
+                } elseif ($sucursal->sede_id === null && $empresaId) {
+                    $validator->errors()->add('sucursal_id', 'Esta sucursal es propia de Justo a Tiempo: no se asigna a personal de una empresa.');
+                } elseif (! $sucursal->activo && $sucursalId !== $usuario?->sucursal_id) {
+                    $validator->errors()->add('sucursal_id', 'Esta sucursal está inactiva: actívala antes de asignarle usuarios.');
                 }
             }
         }];
@@ -94,13 +131,14 @@ class UsuarioRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'password' => 'la contraseña'];
+        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
     public function datos(): array
     {
         $datos = $this->validated();
+        $esAdmin = $datos['rol'] === Rol::Admin->value;
 
         $guardar = [
             'nombres' => $datos['nombres'],
@@ -108,8 +146,11 @@ class UsuarioRequest extends FormRequest
             'segundo_apellido' => $datos['segundo_apellido'] ?? null,
             'email' => $datos['email'],
             'rol' => $datos['rol'],
-            'cliente_id' => $datos['empresa_id'] ?? null,
-            'sede_id' => $datos['sede_id'] ?? null,
+            // El administrador ve todo: no se le asigna línea ni lugar de trabajo
+            'empresa_id' => $esAdmin ? null : ($datos['empresa_id'] ?? null),
+            'sede_id' => $esAdmin ? null : ($datos['sede_id'] ?? null),
+            'sucursal_id' => $esAdmin ? null : ($datos['sucursal_id'] ?? null),
+            'linea_servicio_id' => $esAdmin ? null : ($datos['linea_id'] ?? null),
         ];
 
         if (filled($datos['password'] ?? null)) {

@@ -2,7 +2,20 @@ import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
-import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
+import {
+    claseTd,
+    claseTh,
+    contenedorModulo,
+    ConteoEnlace,
+    EncabezadoModulo,
+    EstadoBadge,
+    EstadoVacio,
+    Paginacion,
+    SinResultados,
+    Tabla,
+} from '@/components/admin/piezas';
+import { Plus, Store } from '@/components/iconos';
+import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -10,18 +23,17 @@ import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { MapPin, MapPinned, Plus } from '@/components/iconos';
 import { useState } from 'react';
-import { Selector } from '@/components/selector';
 
 interface FilaSede {
     id: number;
     nombre: string;
-    ciudad: string;
-    direccion: string | null;
-    empresaId: number | null;
+    empresaId: number;
     empresa: string | null;
+    codigo: string | null;
+    meta: number;
     activo: boolean;
+    sucursales: number;
     usuarios: number;
 }
 
@@ -38,15 +50,15 @@ interface Props {
     empresas: Empresa[];
 }
 
-const VACIO = { nombre: '', empresa_id: '', ciudad: '', direccion: '' };
+const VACIO = { nombre: '', codigo: '', empresa_id: '', meta_efectividad: '95' };
 const ORDEN_CAMPOS = Object.keys(VACIO);
 
-/** Sugerencias para el campo Ciudad; se puede escribir cualquier otra. */
-const CIUDADES = [
-    'Cali', 'Yumbo', 'Jamundí', 'Palmira', 'Candelaria', 'Buga', 'Tuluá', 'Cartago', 'Buenaventura', 'Bogotá', 'Medellín', 'Barranquilla',
-    'Cartagena', 'Bucaramanga', 'Pereira', 'Manizales', 'Armenia', 'Ibagué', 'Neiva', 'Pasto', 'Popayán', 'Cúcuta', 'Santa Marta', 'Villavicencio',
-];
+const formatoMeta = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
 
+/**
+ * Sedes: los clientes que atiende cada empresa (TuGo y Sodimac, de Ditranza). Cada una tiene su meta de
+ * efectividad pactada y sus sucursales.
+ */
 export default function Sedes({ sedes, total, filtros, empresas }: Props) {
     const { valores, cambiar, limpiar, activos } = useFiltros(route('sedes.index'), filtros);
     const [abierto, setAbierto] = useState(false);
@@ -62,7 +74,12 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
         form.clearErrors();
         form.setData(
             sede
-                ? { nombre: sede.nombre, empresa_id: sede.empresaId ? String(sede.empresaId) : '', ciudad: sede.ciudad, direccion: sede.direccion ?? '' }
+                ? {
+                      nombre: sede.nombre,
+                      codigo: sede.codigo ?? '',
+                      empresa_id: String(sede.empresaId),
+                      meta_efectividad: formatoMeta.format(sede.meta),
+                  }
                 : // Si la lista está filtrada por una empresa, la sede nueva nace en esa empresa
                   { ...VACIO, empresa_id: /^\d+$/.test(valores.empresa) ? valores.empresa : '' },
         );
@@ -86,29 +103,41 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sedes', href: route('sedes.index') }]}>
+        <AppLayout>
             <Head title="Sedes" />
 
             <div className={contenedorModulo}>
-                <EncabezadoModulo titulo="Sedes" descripcion="Los lugares donde se presta el servicio: sedes de las empresas clientes y sedes propias de Justo a Tiempo." accion={total > 0 && botonNueva('Nueva sede')} />
+                <EncabezadoModulo
+                    titulo="Sedes"
+                    descripcion="Las sedes de cada empresa (por ejemplo, TuGo y Sodimac, de Ditranza), con su meta de efectividad."
+                    accion={total > 0 && botonNueva('Nueva sede')}
+                />
 
                 {total === 0 ? (
                     <EstadoVacio
-                        icono={MapPinned}
+                        icono={Store}
                         titulo="Aún no hay sedes registradas"
-                        texto="Crea las sedes de cada empresa cliente (por ejemplo, «Planta Yumbo») o las sedes propias de Justo a Tiempo."
+                        texto="Registra la primera sede; después podrás crear sus sucursales."
                         accion={botonNueva('Registrar la primera sede')}
                     />
                 ) : (
                     <>
                         <BarraFiltros
-                            resumen={sedes.total ? `${sedes.total} ${sedes.total === 1 ? 'sede' : 'sedes'}` : 'Ninguna sede coincide con los filtros.'}
+                            resumen={
+                                sedes.total ? `${sedes.total} ${sedes.total === 1 ? 'sede' : 'sedes'}` : 'Ninguna sede coincide con los filtros.'
+                            }
                             soloAnunciar={sedes.total === 0}
                             activos={activos}
                             onLimpiar={limpiar}
                             idBusqueda="buscar-sedes"
                         >
-                            <CampoBusqueda id="buscar-sedes" etiqueta="Buscar sedes" placeholder="Buscar por nombre, ciudad o dirección" valor={valores.q} onCambio={(v) => cambiar('q', v, { inmediato: false })} />
+                            <CampoBusqueda
+                                id="buscar-sedes"
+                                etiqueta="Buscar sedes"
+                                placeholder="Buscar por nombre o código en Drivin"
+                                valor={valores.q}
+                                onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                            />
                             <FiltroLista
                                 id="filtro-empresa"
                                 etiqueta="Empresa"
@@ -117,7 +146,6 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                 className="sm:w-60"
                                 opciones={[
                                     { valor: '', texto: 'Todas las empresas' },
-                                    { valor: 'propias', texto: 'Sedes propias' },
                                     ...empresas.map((e) => ({ valor: String(e.id), texto: e.activo ? e.nombre : `${e.nombre} (inactiva)` })),
                                 ]}
                             />
@@ -147,6 +175,9 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                             Empresa
                                         </th>
                                         <th scope="col" className={claseTh}>
+                                            Sucursales
+                                        </th>
+                                        <th scope="col" className={claseTh}>
                                             Usuarios
                                         </th>
                                         <th scope="col" className={claseTh}>
@@ -162,20 +193,42 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                         <tr key={s.id} className={cn('hover:bg-muted/40 transition-colors', !s.activo && 'text-muted-foreground')}>
                                             <th scope="row" className={cn(claseTd, 'font-normal')}>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
-                                                        <MapPin className="size-4" />
+                                                    <span
+                                                        className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-xl"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <Store className="size-4" />
                                                     </span>
                                                     <div className="min-w-0">
                                                         <p className="text-foreground truncate font-semibold">{s.nombre}</p>
-                                                        <p className="text-muted-foreground truncate text-xs">{[s.ciudad, s.direccion].filter(Boolean).join(' · ')}</p>
+                                                        <p className="text-muted-foreground truncate text-xs">
+                                                            {[s.codigo && `Drivin: ${s.codigo}`, `Meta ${formatoMeta.format(s.meta)} %`]
+                                                                .filter(Boolean)
+                                                                .join(' · ')}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </th>
+                                            <td className={claseTd}>{s.empresa}</td>
                                             <td className={claseTd}>
-                                                {s.empresa ?? <span className="bg-brand-coral-soft text-brand-coral-ink rounded-full px-2.5 py-0.5 text-xs font-semibold">Propia</span>}
+                                                <ConteoEnlace
+                                                    n={s.sucursales}
+                                                    uno="sucursal"
+                                                    varios="sucursales"
+                                                    ninguno="Ninguna"
+                                                    de={`la sede ${s.nombre}`}
+                                                    href={route('sucursales.index', { sede: s.id })}
+                                                />
                                             </td>
                                             <td className={claseTd}>
-                                                <ConteoEnlace n={s.usuarios} uno="usuario" varios="usuarios" ninguno="Ninguno" de={`la sede ${s.nombre}`} href={route('usuarios.index', { sede: s.id })} />
+                                                <ConteoEnlace
+                                                    n={s.usuarios}
+                                                    uno="usuario"
+                                                    varios="usuarios"
+                                                    ninguno="Ninguno"
+                                                    de={`la sede ${s.nombre}`}
+                                                    href={route('usuarios.index', { sede: s.id })}
+                                                />
                                             </td>
                                             <td className={claseTd}>
                                                 <EstadoBadge activo={s.activo} femenino />
@@ -186,7 +239,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                     activo={s.activo}
                                                     urlEstado={route('sedes.estado', s.id)}
                                                     onEditar={(boton) => abrir(s, boton)}
-                                                    consecuencia={`No se le podrán asignar nuevos usuarios; ${s.usuarios === 1 ? 'el usuario que tiene se conserva' : s.usuarios > 1 ? `los ${s.usuarios} usuarios que tiene se conservan` : 'no tiene usuarios asignados'}. Puedes volver a activarla cuando quieras.`}
+                                                    consecuencia={`No se le podrán asignar nuevas sucursales ni usuarios; ${s.sucursales === 1 ? 'su sucursal se conserva' : s.sucursales > 1 ? `sus ${s.sucursales} sucursales se conservan` : 'no tiene sucursales'}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>
                                         </tr>
@@ -204,41 +257,86 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                 abierto={abierto}
                 onCambio={setAbierto}
                 titulo={editando ? 'Editar sede' : 'Nueva sede'}
-                descripcion={editando ? `Actualiza los datos de la sede ${editando.nombre}.` : 'Registra un lugar donde se presta el servicio.'}
+                descripcion={editando ? `Actualiza los datos de la sede ${editando.nombre}.` : 'Registra una sede de una empresa.'}
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear sede'}
                 focoAlCerrar={origen}
             >
-                <Campo id="nombre" etiqueta="Nombre de la sede" requerido error={form.errors.nombre}>
-                    <Input {...propsCampo('nombre', form.errors.nombre)} required autoComplete="off" placeholder="Ej.: Planta Yumbo" value={form.data.nombre} onChange={(e) => form.setData('nombre', e.target.value)} className="h-10 rounded-lg" />
-                </Campo>
-
-                <Campo id="empresa_id" etiqueta="Empresa" error={form.errors.empresa_id}>
-                    <Selector
-                        {...propsCampo('empresa_id', form.errors.empresa_id)}
-                        valor={form.data.empresa_id}
-                        onCambio={(v) => form.setData('empresa_id', v)}
-                        opciones={[
-                            { valor: '', texto: 'Ninguna · sede propia de Justo a Tiempo' },
-                            ...empresasFormulario.map((e) => ({ valor: String(e.id), texto: e.activo ? e.nombre : `${e.nombre} (inactiva)` })),
-                        ]}
+                <Campo
+                    id="nombre"
+                    etiqueta="Nombre de la sede"
+                    requerido
+                    ayuda="Drivin la reconoce por este nombre o por su código, en la columna «Cliente corporativo»."
+                    error={form.errors.nombre}
+                >
+                    <Input
+                        {...propsCampo('nombre', form.errors.nombre, 'nombre-ayuda')}
+                        required
+                        autoComplete="off"
+                        placeholder="Ej.: TuGo"
+                        value={form.data.nombre}
+                        onChange={(e) => form.setData('nombre', e.target.value)}
+                        className="h-10 rounded-lg"
                     />
                 </Campo>
 
-                <div className="grid gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                    <Campo id="ciudad" etiqueta="Ciudad" requerido error={form.errors.ciudad}>
-                        <Input {...propsCampo('ciudad', form.errors.ciudad)} required list="ciudades" autoComplete="off" placeholder="Ej.: Cali" value={form.data.ciudad} onChange={(e) => form.setData('ciudad', e.target.value)} className="h-10 rounded-lg" />
-                        <datalist id="ciudades">
-                            {CIUDADES.map((c) => (
-                                <option key={c} value={c} />
-                            ))}
-                        </datalist>
-                    </Campo>
-                    <Campo id="direccion" etiqueta="Dirección" error={form.errors.direccion}>
-                        <Input {...propsCampo('direccion', form.errors.direccion)} autoComplete="off" placeholder="Ej.: Calle 15 # 32-40" value={form.data.direccion} onChange={(e) => form.setData('direccion', e.target.value)} className="h-10 rounded-lg" />
-                    </Campo>
-                </div>
+                <Campo
+                    id="codigo"
+                    etiqueta="Código en Drivin"
+                    ayuda="Opcional: como la escribe Drivin si es distinto del nombre (p. ej. TUGO)."
+                    error={form.errors.codigo}
+                >
+                    <Input
+                        {...propsCampo('codigo', form.errors.codigo, 'codigo-ayuda')}
+                        autoComplete="off"
+                        value={form.data.codigo}
+                        onChange={(e) => form.setData('codigo', e.target.value)}
+                        className="h-10 w-48 rounded-lg uppercase"
+                    />
+                </Campo>
+
+                <Campo
+                    id="empresa_id"
+                    etiqueta="Empresa"
+                    requerido
+                    ayuda={editando ? 'Si la cambias, la sede pasa a la otra empresa con sus sucursales, su operación y su personal.' : undefined}
+                    error={form.errors.empresa_id}
+                >
+                    <Selector
+                        {...propsCampo('empresa_id', form.errors.empresa_id, editando ? 'empresa_id-ayuda' : undefined)}
+                        valor={form.data.empresa_id}
+                        onCambio={(v) => form.setData('empresa_id', v)}
+                        placeholder="Elige la empresa a la que pertenece esta sede"
+                        opciones={empresasFormulario.map((e) => ({ valor: String(e.id), texto: e.activo ? e.nombre : `${e.nombre} (inactiva)` }))}
+                    />
+                </Campo>
+
+                <Campo
+                    id="meta_efectividad"
+                    etiqueta="Meta de efectividad"
+                    requerido
+                    ayuda="Porcentaje de entregas aprobadas pactado con la sede."
+                    error={form.errors.meta_efectividad}
+                >
+                    <div className="relative w-36">
+                        <Input
+                            {...propsCampo('meta_efectividad', form.errors.meta_efectividad, 'meta_efectividad-ayuda')}
+                            required
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={form.data.meta_efectividad}
+                            onChange={(e) => form.setData('meta_efectividad', e.target.value)}
+                            className="h-10 rounded-lg pr-9 tabular-nums"
+                        />
+                        <span
+                            className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm"
+                            aria-hidden="true"
+                        >
+                            %
+                        </span>
+                    </div>
+                </Campo>
             </FormularioLateral>
         </AppLayout>
     );

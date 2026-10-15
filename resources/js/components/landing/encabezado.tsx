@@ -1,9 +1,9 @@
+import { LogIn, Menu } from '@/components/iconos';
 import LogoMarca from '@/components/logo-marca';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LogIn, Menu } from '@/components/iconos';
 import { useEffect, useState } from 'react';
 
 export const SECCIONES = [
@@ -48,7 +48,8 @@ export function Encabezado() {
         return () => window.removeEventListener('scroll', alDesplazar);
     }, []);
 
-    const acceso = auth.user ? { href: route('panel'), texto: 'Ir al panel' } : { href: route('login'), texto: 'Acceso colaboradores' };
+    // Con sesión, directo al inicio de quien entra (el panel o su línea de servicio)
+    const acceso = auth.user ? { href: auth.user.inicio.url, texto: 'Ir a la plataforma' } : { href: route('login'), texto: 'Acceso colaboradores' };
 
     return (
         <header
@@ -58,11 +59,21 @@ export function Encabezado() {
             )}
         >
             <div className="mx-auto flex h-[4.75rem] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-                <a href="#inicio" className="focus-visible:ring-ring flex items-center gap-2.5 rounded-xl focus-visible:ring-2 focus-visible:outline-hidden">
+                <a
+                    href="#inicio"
+                    className="focus-visible:ring-ring flex items-center gap-2.5 rounded-xl focus-visible:ring-2 focus-visible:outline-hidden"
+                >
                     <LogoMarca className="size-14 rounded-2xl" />
                     <span className="leading-tight">
                         <span className="block text-[0.95rem] font-extrabold tracking-tight">Justo a Tiempo SP</span>
-                        <span className={cn('block text-[0.68rem] font-semibold tracking-[0.14em] uppercase', desplazado ? 'text-muted-foreground' : 'text-white/75')}>S.A.S</span>
+                        <span
+                            className={cn(
+                                'block text-[0.68rem] font-semibold tracking-[0.14em] uppercase',
+                                desplazado ? 'text-muted-foreground' : 'text-white/75',
+                            )}
+                        >
+                            S.A.S
+                        </span>
                     </span>
                 </a>
 

@@ -2,10 +2,10 @@ import { Cifra, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type E
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import AppLayout from '@/layouts/app-layout';
+import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { fmt } from '@/lib/formato';
-import { cn } from '@/lib/utils';
-import { Head, router } from '@inertiajs/react';
+import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
 import { AlertTriangle, ChevronDown, FileSpreadsheet, LoaderCircle, Trash2, XCircle } from '@/components/iconos';
 import { useEffect, useId, useState } from 'react';
 import { Selector } from '@/components/selector';
@@ -25,8 +25,8 @@ interface Campo {
 
 interface Grupo {
     fecha: string;
-    cliente: string;
-    sede: string | null;
+    sede: string;
+    sucursal: string | null;
     ruta: string | null;
     placa: string | null;
     vehiculoRegistrado: boolean;
@@ -54,15 +54,16 @@ interface Analisis {
 }
 
 interface Props {
-    carga: { id: number; archivo: string; usuario: string | null; creada: string; opciones?: { cliente_id: number | null; sede_id: number | null } };
+    carga: { id: number; archivo: string; usuario: string | null; creada: string; opciones?: { sede_id: number | null; sucursal_id: number | null } };
     errorLectura?: string;
     lectura?: { hojas: { nombre: string; puntaje: number; filas: number }[]; hoja: string; filaEncabezados: number; columnas: Columna[] };
     campos?: Campo[];
     analisis?: Analisis;
-    clientes?: { id: number; nombre: string; sedes: { id: number; nombre: string }[] }[];
+    /** Sedes (TuGo, Sodimac…) con su empresa y sus sucursales, para la sede por defecto. */
+    sedes?: { id: number; nombre: string; empresa: string | null; sucursales: { id: number; nombre: string }[] }[];
 }
 
-export default function Revision({ carga, errorLectura, lectura, campos, analisis, clientes }: Props) {
+export default function Revision({ carga, errorLectura, lectura, campos, analisis, sedes }: Props) {
     const [guardando, setGuardando] = useState(false);
 
     useEffect(() => {
@@ -77,18 +78,15 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
     const ajustar = (datos: Record<string, unknown>) => router.patch(`/cargas/${carga.id}`, datos as never, { preserveScroll: true, preserveState: true });
 
     return (
-        <AppLayout>
-            <Head title={`Revisión · ${carga.archivo}`} />
-
-            <div className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-6 p-4 pb-32 md:p-6 md:pb-32 lg:p-8 lg:pb-32">
+        <MarcoLinea slug={LINEA_LOGISTICA} titulo={`Revisión · ${carga.archivo}`} seccion="cargas" paginaDeLaPestana={false} pestanas className="pb-32 md:pb-32 lg:pb-32">
                 <header className="flex flex-col gap-3">
                     <Pasos actual={2} />
                     <div>
                         <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">Revisión de la preliquidación</p>
-                        <h1 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
+                        <h2 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
                             <FileSpreadsheet className="text-primary size-6 shrink-0" aria-hidden="true" />
                             {carga.archivo}
-                        </h1>
+                        </h2>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Nada se ha guardado todavía. Revisa lo que el sistema entendió del archivo y confirma la importación.
                         </p>
@@ -125,11 +123,11 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
 
                         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
                             <MapeoColumnas lectura={lectura} campos={campos} faltantes={analisis.columnasFaltantes} disabled={guardando} onCambio={(mapeo) => ajustar({ mapeo })} onHoja={(hoja) => ajustar({ hoja })} />
-                            <ClientePorDefecto
-                                clientes={clientes ?? []}
-                                opciones={carga.opciones ?? { cliente_id: null, sede_id: null }}
+                            <SedePorDefecto
+                                sedes={sedes ?? []}
+                                opciones={carga.opciones ?? { sede_id: null, sucursal_id: null }}
                                 disabled={guardando}
-                                onCambio={(cliente_id, sede_id) => ajustar({ cliente_id, sede_id })}
+                                onCambio={(sede_id, sucursal_id) => ajustar({ sede_id, sucursal_id })}
                             />
                         </div>
 
@@ -138,10 +136,9 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                         <ListaAdvertencias advertencias={analisis.advertencias} />
                     </div>
                 )}
-            </div>
-
+            {/* Barra fija al pie de la pantalla */}
             <BarraAcciones cargaId={carga.id} analisis={analisis} guardando={guardando} />
-        </AppLayout>
+        </MarcoLinea>
     );
 }
 
@@ -261,35 +258,24 @@ function MapeoColumnas({
     );
 }
 
-function ClientePorDefecto({
-    clientes,
+function SedePorDefecto({
+    sedes,
     opciones,
     disabled,
     onCambio,
 }: {
-    clientes: NonNullable<Props['clientes']>;
-    opciones: { cliente_id: number | null; sede_id: number | null };
+    sedes: NonNullable<Props['sedes']>;
+    opciones: { sede_id: number | null; sucursal_id: number | null };
     disabled: boolean;
-    onCambio: (clienteId: number | null, sedeId: number | null) => void;
+    onCambio: (sedeId: number | null, sucursalId: number | null) => void;
 }) {
-    const sedes = clientes.find((c) => c.id === opciones.cliente_id)?.sedes ?? [];
+    const sucursales = sedes.find((s) => s.id === opciones.sede_id)?.sucursales ?? [];
+    // Si hay sedes de varias empresas, cada opción dice de cuál es
+    const variasEmpresas = new Set(sedes.map((s) => s.empresa)).size > 1;
 
     return (
-        <Panel titulo="Cliente por defecto" descripcion="Se usa solo para las órdenes cuyo plan o cliente no se reconoce. Las demás se asignan por el nombre del plan.">
+        <Panel titulo="Sede por defecto" descripcion="Se usa solo para las órdenes cuyo plan o cliente corporativo no se reconoce. Las demás se asignan por el nombre del plan o por el cliente corporativo (la sede).">
             <div className="grid gap-4">
-                <div className="grid gap-1.5">
-                    <label htmlFor="cliente-defecto" className="text-sm font-semibold">
-                        Cliente
-                    </label>
-                    <Selector
-                        id="cliente-defecto"
-                        valor={opciones.cliente_id ? String(opciones.cliente_id) : ''}
-                        disabled={disabled}
-                        onCambio={(v) => onCambio(v ? Number(v) : null, null)}
-                        className="h-9"
-                        opciones={[{ valor: '', texto: 'Ninguno (marcar como error)' }, ...clientes.map((c) => ({ valor: String(c.id), texto: c.nombre }))]}
-                    />
-                </div>
                 <div className="grid gap-1.5">
                     <label htmlFor="sede-defecto" className="text-sm font-semibold">
                         Sede
@@ -297,10 +283,26 @@ function ClientePorDefecto({
                     <Selector
                         id="sede-defecto"
                         valor={opciones.sede_id ? String(opciones.sede_id) : ''}
-                        disabled={disabled || !opciones.cliente_id}
-                        onCambio={(v) => onCambio(opciones.cliente_id, v ? Number(v) : null)}
+                        disabled={disabled}
+                        onCambio={(v) => onCambio(v ? Number(v) : null, null)}
                         className="h-9"
-                        opciones={[{ valor: '', texto: 'Sin sede' }, ...sedes.map((s) => ({ valor: String(s.id), texto: s.nombre }))]}
+                        opciones={[
+                            { valor: '', texto: 'Ninguna (marcar como error)' },
+                            ...sedes.map((s) => ({ valor: String(s.id), texto: variasEmpresas && s.empresa ? `${s.nombre} (${s.empresa})` : s.nombre })),
+                        ]}
+                    />
+                </div>
+                <div className="grid gap-1.5">
+                    <label htmlFor="sucursal-defecto" className="text-sm font-semibold">
+                        Sucursal
+                    </label>
+                    <Selector
+                        id="sucursal-defecto"
+                        valor={opciones.sucursal_id ? String(opciones.sucursal_id) : ''}
+                        disabled={disabled || !opciones.sede_id}
+                        onCambio={(v) => onCambio(opciones.sede_id, v ? Number(v) : null)}
+                        className="h-9"
+                        opciones={[{ valor: '', texto: 'Sin sucursal' }, ...sucursales.map((s) => ({ valor: String(s.id), texto: s.nombre }))]}
                     />
                 </div>
             </div>
@@ -318,7 +320,7 @@ function Marca({ ok, texto }: { ok: boolean; texto: string }) {
     );
 }
 
-/** Así quedará el informe diario: fecha > cliente > sede > ruta > placa > auxiliar (RF-05). */
+/** Así quedará el informe diario: fecha > sede > sucursal > ruta > placa > auxiliar (RF-05). */
 function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['totales'] }) {
     return (
         <Panel titulo="Vista previa del informe" descripcion="Así quedará el informe diario con las órdenes válidas del archivo." cuerpoClassName="px-0 pb-2">
@@ -327,11 +329,11 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
             ) : (
                 <div className="focus-visible:ring-ring relative overflow-x-auto focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset" tabIndex={0} role="region" aria-label="Vista previa del informe, desplazable">
                     <table className="w-full min-w-[1040px] text-left text-sm">
-                        <caption className="sr-only">Vista previa del informe diario por cliente, sede, ruta, placa y auxiliar</caption>
+                        <caption className="sr-only">Vista previa del informe diario por sede, sucursal, ruta, placa y auxiliar</caption>
                         <thead className="text-muted-foreground border-y text-[0.72rem] tracking-wide uppercase">
                             <tr>
                                 <th scope="col" className="py-2.5 pl-5 font-semibold">
-                                    Cliente · sede
+                                    Sede · sucursal
                                 </th>
                                 <th scope="col" className="px-3 py-2.5 font-semibold">
                                     Ruta
@@ -366,9 +368,9 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
                             {grupos.map((g, i) => (
                                 <tr key={i}>
                                     <td className="py-3 pl-5 whitespace-nowrap">
-                                        <p className="font-semibold">{g.cliente}</p>
+                                        <p className="font-semibold">{g.sede}</p>
                                         <p className="text-muted-foreground text-xs">
-                                            {g.sede ?? 'Sin sede'} · {fmt.fechaCorta(g.fecha)}
+                                            {g.sucursal ?? 'Sin sucursal'} · {fmt.fechaCorta(g.fecha)}
                                         </p>
                                     </td>
                                     <td className="max-w-48 truncate px-3 py-3 text-xs" title={g.ruta ?? undefined}>
@@ -430,7 +432,7 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
 
     return (
         <div className="bg-card/95 sticky bottom-0 z-10 mt-auto border-t px-4 py-3 backdrop-blur-md md:rounded-b-xl md:px-8">
-            <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3">
+            <div className={cn('mx-auto flex flex-wrap items-center justify-between gap-3', ANCHO_PLATAFORMA)}>
                 <p className="text-muted-foreground text-sm" aria-live="polite">
                     {analisis ? (
                         <>

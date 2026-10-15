@@ -258,9 +258,23 @@
         }
     }
 
-    /* La cabecera es fija (56 px): el foco al navegar hacia atrás no debe quedar debajo de ella (WCAG 2.4.11) */
+    /*
+     * La cabecera es fija (56 px): el foco al navegar hacia atrás no debe quedar debajo de ella (WCAG 2.4.11).
+     * El espacio de la barra de desplazamiento queda siempre reservado: así la barra superior y el contenido no
+     * se corren al pasar entre páginas largas (con barra) y cortas (sin ella).
+     */
     html {
         scroll-padding-top: 5rem;
+        scrollbar-gutter: stable;
+    }
+
+    /*
+     * Los paneles y menús de Radix bloquean el desplazamiento y suman al body un margen del ancho de la barra para
+     * compensar su desaparición. Con el espacio ya reservado, ese margen correría la página: se anula.
+     */
+    html body[data-scroll-locked] {
+        --removed-body-scroll-bar-size: 0px !important;
+        margin-right: 0 !important;
     }
 
     /* Edge agrega su propio ojo a los campos de contraseña: ya hay un botón accesible para eso */

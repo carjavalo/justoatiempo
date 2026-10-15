@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\Rol;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
-use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\LineaServicio;
 use App\Models\Sede;
+use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -26,18 +28,22 @@ class UsuarioController extends Controller
             'estado' => ['nullable', Rule::in(['activos', 'inactivos'])],
             'empresa' => ['nullable', 'integer'],
             'sede' => ['nullable', 'integer'],
+            'sucursal' => ['nullable', 'integer'],
+            'linea' => ['nullable', 'integer'],
         ]);
 
         $usuarios = User::query()
-            ->with(['empresa:id,nombre', 'sede:id,nombre'])
+            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like));
             })
             ->when($filtros['rol'] ?? null, fn (Builder $q, string $rol) => $q->where('rol', $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
-            ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->where('cliente_id', $id))
+            ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
             ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->where('sede_id', $id))
+            ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->where('sucursal_id', $id))
+            ->when($filtros['linea'] ?? null, fn (Builder $q, int $id) => $q->where('linea_servicio_id', $id))
             ->orderByDesc('activo')
             ->orderBy('primer_apellido')
             ->orderBy('segundo_apellido')
@@ -53,10 +59,14 @@ class UsuarioController extends Controller
                 'email' => $u->email,
                 'rol' => $u->rol->value,
                 'rolLabel' => $u->rol->label(),
-                'empresaId' => $u->cliente_id,
+                'empresaId' => $u->empresa_id,
                 'empresa' => $u->empresa?->nombre,
                 'sedeId' => $u->sede_id,
                 'sede' => $u->sede?->nombre,
+                'sucursalId' => $u->sucursal_id,
+                'sucursal' => $u->sucursal?->nombre,
+                'lineaId' => $u->linea_servicio_id,
+                'linea' => $u->linea?->nombre,
                 'activo' => $u->activo,
                 'ultimoAcceso' => $u->ultimo_acceso_en?->toIso8601String(),
                 'esUsted' => $u->is($request->user()),
@@ -71,19 +81,37 @@ class UsuarioController extends Controller
                 'estado' => $filtros['estado'] ?? '',
                 'empresa' => (string) ($filtros['empresa'] ?? ''),
                 'sede' => (string) ($filtros['sede'] ?? ''),
+                'sucursal' => (string) ($filtros['sucursal'] ?? ''),
+                'linea' => (string) ($filtros['linea'] ?? ''),
             ],
-            // Empresa y sede llegan desde los conteos de Empresas y Sedes: se muestran como filtro quitable
+            // Empresa, sede y sucursal llegan desde los conteos de sus páginas: se muestran como filtro quitable
             'contexto' => [
-                'empresa' => isset($filtros['empresa']) ? Cliente::withTrashed()->whereKey($filtros['empresa'])->value('nombre') : null,
+                'empresa' => isset($filtros['empresa']) ? Empresa::withTrashed()->whereKey($filtros['empresa'])->value('nombre') : null,
                 'sede' => isset($filtros['sede']) ? Sede::withTrashed()->whereKey($filtros['sede'])->value('nombre') : null,
+                'sucursal' => isset($filtros['sucursal']) ? Sucursal::withTrashed()->whereKey($filtros['sucursal'])->value('nombre') : null,
+                'linea' => isset($filtros['linea']) ? LineaServicio::whereKey($filtros['linea'])->value('nombre') : null,
             ],
             'roles' => array_map(fn (Rol $r) => ['valor' => $r->value, 'label' => $r->label(), 'descripcion' => $r->descripcion()], Rol::cases()),
-            'empresas' => Cliente::orderBy('nombre')->get(['id', 'nombre', 'activo']),
-            'sedes' => Sede::orderBy('nombre')->get(['id', 'nombre', 'ciudad', 'cliente_id', 'activo'])->map(fn (Sede $s) => [
+            // Cada empresa con las líneas que recibe: el formulario solo ofrece las de la línea elegida
+            'empresas' => Empresa::with('lineas:id')->orderBy('nombre')->get(['id', 'nombre', 'activo'])->map(fn (Empresa $c) => [
+                'id' => $c->id,
+                'nombre' => $c->nombre,
+                'activo' => $c->activo,
+                'lineas' => $c->lineas->pluck('id'),
+            ]),
+            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre']),
+            'sedes' => Sede::orderBy('nombre')->get(['id', 'nombre', 'empresa_id', 'activo'])->map(fn (Sede $s) => [
+                'id' => $s->id,
+                'nombre' => $s->nombre,
+                'empresaId' => $s->empresa_id,
+                'activo' => $s->activo,
+            ]),
+            // Sin sede son las sucursales propias de Justo a Tiempo
+            'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre', 'ciudad', 'sede_id', 'activo'])->map(fn (Sucursal $s) => [
                 'id' => $s->id,
                 'nombre' => $s->nombre,
                 'ciudad' => $s->ciudad,
-                'empresaId' => $s->cliente_id,
+                'sedeId' => $s->sede_id,
                 'activo' => $s->activo,
             ]),
         ]);

@@ -12,7 +12,7 @@ class InformeDiario extends Model
     protected $table = 'informes_diarios';
 
     protected $fillable = [
-        'fecha_operacion', 'cliente_id', 'sede_id', 'estado',
+        'fecha_operacion', 'sede_id', 'sucursal_id', 'estado',
         'total_asignadas', 'total_aprobadas', 'total_rechazadas', 'total_devoluciones',
         'total_averias', 'total_faltantes', 'efectividad', 'observaciones',
         'cerrado_por', 'cerrado_en',
@@ -33,14 +33,14 @@ class InformeDiario extends Model
         return $this->estado === EstadoInforme::Cerrado;
     }
 
-    public function cliente(): BelongsTo
-    {
-        return $this->belongsTo(Cliente::class);
-    }
-
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
     }
 
     public function ordenes(): HasMany

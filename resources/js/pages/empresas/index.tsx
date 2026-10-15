@@ -4,10 +4,13 @@ import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/componen
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Iniciales, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { digitoVerificacion, formatearNit, partesNit } from '@/lib/nit';
+import { SERVICIOS } from '@/lib/portafolio';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -24,15 +27,23 @@ interface FilaEmpresa {
     activo: boolean;
     sedes: number;
     usuarios: number;
+    lineas: number[];
+}
+
+interface LineaCatalogo {
+    id: number;
+    slug: string;
+    nombre: string;
 }
 
 interface Props {
     empresas: Paginado<FilaEmpresa>;
     total: number;
     filtros: { q: string; estado: string };
+    lineas: LineaCatalogo[];
 }
 
-const VACIO = { nombre: '', nit: '', contacto_nombre: '', contacto_email: '', contacto_telefono: '' };
+const VACIO = { nombre: '', nit: '', lineas: [] as number[], contacto_nombre: '', contacto_email: '', contacto_telefono: '' };
 const ORDEN_CAMPOS = Object.keys(VACIO);
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
@@ -44,7 +55,7 @@ function seConserva(n: number, uno: string, varios: string): string {
     return n === 1 ? `su ${uno} se conserva` : `sus ${n} ${varios} se conservan`;
 }
 
-export default function Empresas({ empresas, total, filtros }: Props) {
+export default function Empresas({ empresas, total, filtros, lineas }: Props) {
     const { valores, cambiar, limpiar, activos } = useFiltros(route('empresas.index'), filtros);
     const [abierto, setAbierto] = useState(false);
     const [editando, setEditando] = useState<FilaEmpresa | null>(null);
@@ -62,6 +73,7 @@ export default function Empresas({ empresas, total, filtros }: Props) {
                 ? {
                       nombre: empresa.nombre,
                       nit: formatearNit(empresa.nit),
+                      lineas: empresa.lineas,
                       contacto_nombre: empresa.contactoNombre ?? '',
                       contacto_email: empresa.contactoEmail ?? '',
                       contacto_telefono: empresa.contactoTelefono ?? '',
@@ -70,6 +82,11 @@ export default function Empresas({ empresas, total, filtros }: Props) {
         );
         setAbierto(true);
     };
+
+    const alternarLinea = (id: number, marcada: boolean) =>
+        form.setData('lineas', marcada ? [...form.data.lineas, id] : form.data.lineas.filter((l) => l !== id));
+
+    const nombresLineas = (ids: number[]) => lineas.filter((l) => ids.includes(l.id)).map((l) => l.nombre);
 
     const guardar = () => {
         const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
@@ -85,12 +102,12 @@ export default function Empresas({ empresas, total, filtros }: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Empresas', href: route('empresas.index') }]}>
+        <AppLayout>
             <Head title="Empresas" />
 
             <div className={contenedorModulo}>
                 {/* Sin empresas, la acción vive en el estado vacío: un solo botón para crear */}
-                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes a las que Justo a Tiempo les presta sus servicios." accion={total > 0 && botonNueva('Nueva empresa')} />
+                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditranza), con su contacto y las líneas de servicio que reciben." accion={total > 0 && botonNueva('Nueva empresa')} />
 
                 {total === 0 ? (
                     <EstadoVacio
@@ -132,6 +149,9 @@ export default function Empresas({ empresas, total, filtros }: Props) {
                                             Empresa
                                         </th>
                                         <th scope="col" className={claseTh}>
+                                            Líneas de servicio
+                                        </th>
+                                        <th scope="col" className={claseTh}>
                                             Contacto
                                         </th>
                                         <th scope="col" className={claseTh}>
@@ -160,6 +180,19 @@ export default function Empresas({ empresas, total, filtros }: Props) {
                                                     </div>
                                                 </div>
                                             </th>
+                                            <td className={cn(claseTd, 'max-w-56 text-xs leading-relaxed')}>
+                                                {e.lineas.length === 0 ? (
+                                                    <span className="text-muted-foreground">Ninguna</span>
+                                                ) : (
+                                                    <ul role="list">
+                                                        {nombresLineas(e.lineas).map((n) => (
+                                                            <li key={n} className="truncate">
+                                                                {n}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </td>
                                             <td className={claseTd}>
                                                 {e.contactoNombre || e.contactoEmail || e.contactoTelefono ? (
                                                     <div className="min-w-0 text-xs leading-relaxed">
@@ -229,6 +262,37 @@ export default function Empresas({ empresas, total, filtros }: Props) {
                         className="h-10 rounded-lg"
                     />
                 </Campo>
+
+                <fieldset className="grid gap-2" aria-describedby={form.errors.lineas ? 'lineas-error' : 'lineas-ayuda'}>
+                    <legend className="mb-2 text-sm leading-none font-medium">Líneas de servicio que recibe</legend>
+                    <p id="lineas-ayuda" className="text-muted-foreground mb-1 text-xs">
+                        En cada línea marcada, la empresa aparece en su tablero y puede tener personal asignado.
+                    </p>
+                    <ul role="list" className="grid gap-1.5">
+                        {lineas.map((l, i) => {
+                            const Icono = SERVICIOS.find((s) => s.id === l.slug)?.icono;
+                            // La primera casilla lleva el id "lineas" para recibir el foco si el campo tiene error
+                            const id = i === 0 ? 'lineas' : `linea-${l.id}`;
+                            const marcada = form.data.lineas.includes(l.id);
+                            return (
+                                <li
+                                    key={l.id}
+                                    className={cn(
+                                        'flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
+                                        marcada ? 'border-primary/40 bg-secondary/60' : 'hover:bg-muted/50',
+                                    )}
+                                >
+                                    <Checkbox id={id} checked={marcada} onCheckedChange={(v) => alternarLinea(l.id, v === true)} aria-invalid={form.errors.lineas ? true : undefined} />
+                                    {Icono && <Icono className="text-primary size-4" aria-hidden="true" />}
+                                    <label htmlFor={id} className="flex-1 cursor-pointer text-sm">
+                                        {l.nombre}
+                                    </label>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <InputError id="lineas-error" message={form.errors.lineas} />
+                </fieldset>
 
                 <fieldset className="grid gap-4 rounded-xl border p-4">
                     <legend className="px-1 text-sm font-semibold">Contacto principal</legend>

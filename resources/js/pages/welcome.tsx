@@ -1,15 +1,20 @@
+import { AvisoFlash } from '@/components/aviso-flash';
 import { Contacto } from '@/components/landing/contacto';
 import { Encabezado } from '@/components/landing/encabezado';
 import { Nosotros } from '@/components/landing/nosotros';
 import { Pie } from '@/components/landing/pie';
 import { Portada } from '@/components/landing/portada';
-import { PorQueElegirnos, SeguridadCobertura, Sectores } from '@/components/landing/secciones';
+import { PorQueElegirnos, Sectores, SeguridadCobertura } from '@/components/landing/secciones';
 import { Servicios } from '@/components/landing/servicios';
+import { useCodigoVigente } from '@/hooks/use-codigo-vigente';
 import { EMPRESA } from '@/lib/portafolio';
 import { Head } from '@inertiajs/react';
 
 /** Página principal: presentación de la empresa a partir de su portafolio de servicios. */
 export default function Welcome({ servicios }: { servicios: string[] }) {
+    // El formulario de contacto no debe fallar si la página llevaba horas abierta
+    useCodigoVigente();
+
     return (
         <>
             <Head title="Servicios operativos, logísticos y de aseo">
@@ -25,7 +30,7 @@ export default function Welcome({ servicios }: { servicios: string[] }) {
 
             <a
                 href="#contenido"
-                className="bg-card text-foreground sr-only z-50 rounded-lg px-4 py-2 text-sm font-semibold shadow-lg focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus-visible:ring-2 focus-visible:ring-ring"
+                className="bg-card text-foreground focus-visible:ring-ring sr-only z-50 rounded-lg px-4 py-2 text-sm font-semibold shadow-lg focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus-visible:ring-2"
             >
                 Saltar al contenido
             </a>
@@ -41,6 +46,8 @@ export default function Welcome({ servicios }: { servicios: string[] }) {
                     <SeguridadCobertura />
                     <Contacto servicios={servicios} />
                 </main>
+                {/* Avisos del servidor (p. ej. demasiados envíos seguidos del formulario de contacto) */}
+                <AvisoFlash />
                 <Pie />
             </div>
         </>

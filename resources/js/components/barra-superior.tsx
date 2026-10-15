@@ -3,6 +3,7 @@ import LogoMarca from '@/components/logo-marca';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
+import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
 import { ChevronDown } from '@/components/iconos';
@@ -16,7 +17,7 @@ export function BarraSuperior() {
 
     return (
         <header className="bg-card/85 sticky top-0 z-30 border-b backdrop-blur-md">
-            <div className="mx-auto flex h-16 w-full max-w-[1200px] items-center justify-between gap-4 px-4 md:px-6 lg:px-8">
+            <div className={cn('mx-auto flex h-16 w-full items-center justify-between gap-4 px-4 md:px-6 lg:px-8', ANCHO_PLATAFORMA)}>
                 <div className="flex min-w-0 items-center gap-3">
                     <LogoMarca className="size-11 rounded-xl" />
                     <div className="min-w-0 leading-tight">

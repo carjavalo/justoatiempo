@@ -13,7 +13,7 @@ use RuntimeException;
 
 /**
  * Módulo 3: agrupa las órdenes de una jornada y genera el informe diario
- * (fecha > cliente > sede > ruta > placa > auxiliar) con sus KPIs.
+ * (fecha > sede > sucursal > ruta > placa > auxiliar) con sus KPIs.
  */
 class ConsolidadorInforme
 {
@@ -24,7 +24,7 @@ class ConsolidadorInforme
     }
 
     /**
-     * Consolida todas las combinaciones cliente/sede presentes en las órdenes de la fecha.
+     * Consolida todas las combinaciones sede/sucursal presentes en las órdenes de la fecha.
      *
      * @return Collection<int, InformeDiario>
      */
@@ -34,22 +34,22 @@ class ConsolidadorInforme
 
         return Orden::query()
             ->whereDate('fecha_operacion', $fecha)
-            ->whereNotNull('cliente_id')
-            ->select('cliente_id', 'sede_id')
+            ->whereNotNull('sede_id')
+            ->select('sede_id', 'sucursal_id')
             ->distinct()
             ->get()
-            ->map(fn ($g) => $this->consolidar($fecha, $g->cliente_id, $g->sede_id));
+            ->map(fn ($g) => $this->consolidar($fecha, $g->sede_id, $g->sucursal_id));
     }
 
-    public function consolidar(Carbon|string $fecha, int $clienteId, ?int $sedeId): InformeDiario
+    public function consolidar(Carbon|string $fecha, int $sedeId, ?int $sucursalId): InformeDiario
     {
         $fecha = Carbon::parse($fecha)->toDateString();
 
-        return DB::transaction(function () use ($fecha, $clienteId, $sedeId) {
+        return DB::transaction(function () use ($fecha, $sedeId, $sucursalId) {
             $informe = InformeDiario::firstOrNew([
                 'fecha_operacion' => $fecha,
-                'cliente_id' => $clienteId,
                 'sede_id' => $sedeId,
+                'sucursal_id' => $sucursalId,
             ]);
 
             if ($informe->exists && $informe->estaCerrado()) {
@@ -62,8 +62,8 @@ class ConsolidadorInforme
             $ordenes = Orden::query()
                 ->with('auditoria')
                 ->whereDate('fecha_operacion', $fecha)
-                ->where('cliente_id', $clienteId)
-                ->when($sedeId, fn ($q) => $q->where('sede_id', $sedeId), fn ($q) => $q->whereNull('sede_id'))
+                ->where('sede_id', $sedeId)
+                ->when($sucursalId, fn ($q) => $q->where('sucursal_id', $sucursalId), fn ($q) => $q->whereNull('sucursal_id'))
                 ->get();
 
             Orden::whereIn('id', $ordenes->pluck('id'))->update(['informe_id' => $informe->id]);

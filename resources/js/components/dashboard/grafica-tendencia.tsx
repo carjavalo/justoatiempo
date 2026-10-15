@@ -192,7 +192,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                     >
                         <ResponsiveContainer width="100%" height="100%">
                             {vista === 'efectividad' ? (
-                                <LineChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: -12 }} title="Efectividad diaria frente a la meta" desc={resumen}>
+                                <LineChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} title="Efectividad diaria frente a la meta" desc={resumen}>
                                     <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                                     <XAxis dataKey="fecha" tickFormatter={fmt.fechaCorta} {...ejes} minTickGap={24} />
                                     <YAxis domain={[minimo, 100]} tickFormatter={(v) => `${v}%`} {...ejes} axisLine={false} width={48} />
@@ -222,7 +222,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                             ) : (
                                 <BarChart
                                     data={datos}
-                                    margin={{ top: 8, right: 8, bottom: 0, left: -12 }}
+                                    margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
                                     barCategoryGap={muchos ? 2 : '20%'}
                                     title="Entregas aprobadas y rechazadas por jornada"
                                     desc={resumen}

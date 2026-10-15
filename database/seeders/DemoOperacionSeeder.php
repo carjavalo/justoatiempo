@@ -10,10 +10,10 @@ use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
-use App\Models\Cliente;
 use App\Models\Empleado;
 use App\Models\MotivoRechazo;
 use App\Models\Programacion;
+use App\Models\Sede;
 use App\Models\TipoNovedad;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -51,7 +51,7 @@ class DemoOperacionSeeder extends Seeder
             'rigor' => mt_rand(55, 97) / 100,
         ]]);
 
-        $sedes = Cliente::with('sedes')->get()->flatMap(fn ($c) => $c->sedes->map(fn ($s) => [$c, $s]));
+        $sucursales = Sede::with('sucursales')->get()->flatMap(fn ($s) => $s->sucursales->map(fn ($u) => [$s, $u]));
 
         $pesosMotivo = [
             'Cliente reprograma fecha de entrega' => 34,
@@ -96,14 +96,14 @@ class DemoOperacionSeeder extends Seeder
             $filas = [];
             $auditorias = [];
 
-            foreach ($sedes as [$cliente, $sede]) {
+            foreach ($sucursales as [$sede, $sucursal]) {
                 $rutas = mt_rand(1, 2);
-                if ($sede->nombre === 'Cañasgordas' && mt_rand(0, 1)) {
-                    continue; // no se opera todos los días en esta sede
+                if ($sucursal->nombre === 'Cañasgordas' && mt_rand(0, 1)) {
+                    continue; // no se opera todos los días en esta sucursal
                 }
 
                 Programacion::updateOrCreate(
-                    ['fecha' => $fecha->toDateString(), 'cliente_id' => $cliente->id, 'sede_id' => $sede->id],
+                    ['fecha' => $fecha->toDateString(), 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id],
                     ['auxiliares_requeridos' => $rutas + mt_rand(0, 1), 'vehiculos_requeridos' => $rutas],
                 );
 
@@ -111,7 +111,7 @@ class DemoOperacionSeeder extends Seeder
                     $aux = $disponibles[$iAux];
                     $veh = $flota[$iAux % $flota->count()];
                     $p = $perfil[$aux->id];
-                    $ruta = strtoupper($sede->alias_drivin ?? $sede->nombre).' '.$fecha->format('j-n-Y');
+                    $ruta = strtoupper($sucursal->alias_drivin ?? $sucursal->nombre).' '.$fecha->format('j-n-Y');
                     // Los sábados la jornada es más corta
                     $tareas = $fecha->isSaturday() ? mt_rand(4, 10) : mt_rand(7, 20);
 
@@ -123,8 +123,8 @@ class DemoOperacionSeeder extends Seeder
                         $filas[] = [
                             'carga_id' => $carga->id,
                             'fecha_operacion' => $fecha->toDateString(),
-                            'cliente_id' => $cliente->id,
                             'sede_id' => $sede->id,
+                            'sucursal_id' => $sucursal->id,
                             'ruta' => $ruta,
                             'vehiculo_id' => $veh->id,
                             'placa' => $veh->placa,
@@ -134,7 +134,7 @@ class DemoOperacionSeeder extends Seeder
                             'codigo_direccion' => $codigo,
                             'destinatario' => $faker->name(),
                             'direccion' => $faker->streetAddress(),
-                            'ciudad' => $sede->ciudad,
+                            'ciudad' => $sucursal->ciudad,
                             'unidades' => mt_rand(1, 4),
                             'estado' => ($aprobada ? EstadoOrden::Aprobada : EstadoOrden::Rechazada)->value,
                             'motivo_rechazo_id' => $motivo ? $motivos[$motivo] : null,

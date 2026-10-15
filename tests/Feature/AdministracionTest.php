@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\Rol;
-use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\LineaServicio;
 use App\Models\Sede;
+use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -35,31 +37,38 @@ class AdministracionTest extends TestCase
         $this->assertNotNull($user->fresh()->ultimo_acceso_en);
     }
 
-    public function test_el_panel_del_administrador_muestra_las_tres_opciones_con_sus_conteos(): void
+    public function test_el_panel_del_administrador_muestra_las_cuatro_opciones_con_sus_conteos(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas del Valle']);
-        Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
-        Sede::create(['cliente_id' => null, 'nombre' => 'Oficina Cali', 'ciudad' => 'Cali']);
+        $sede = $this->sede('TuGo');
+        $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        Sucursal::create(['sede_id' => null, 'nombre' => 'Oficina Cali', 'ciudad' => 'Cali']);
 
         $this->actingAs($this->admin)->get('/panel')
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p->component('panel')
                 ->where('resumen.empresas.total', 1)
-                ->where('resumen.sedes.total', 2)
-                ->where('resumen.sedes.propias', 1)
+                ->where('resumen.sedes.total', 1)
+                ->where('resumen.sucursales.total', 2)
+                ->where('resumen.sucursales.propias', 1)
                 ->where('resumen.usuarios.activos', 1));
     }
 
     public function test_quien_no_es_administrador_ve_su_asignacion_y_no_entra_a_los_modulos(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas del Valle']);
-        $sede = Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
-        $coordinador = User::factory()->coordinador()->create(['cliente_id' => $empresa->id, 'sede_id' => $sede->id]);
+        $sede = $this->sede('TuGo');
+        $sucursal = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        // Sin línea asignada se queda en el panel, que le explica su asignación
+        $coordinador = User::factory()->coordinador()->create([
+            'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id, 'linea_servicio_id' => null,
+        ]);
 
         $this->actingAs($coordinador)->get('/panel')
-            ->assertInertia(fn (Assert $p) => $p->missing('resumen')->where('asignacion.empresa', 'Bodegas del Valle')->where('asignacion.sede', 'Yumbo'));
+            ->assertInertia(fn (Assert $p) => $p->missing('resumen')
+                ->where('asignacion.empresa', 'Ditranza')
+                ->where('asignacion.sede', 'TuGo')
+                ->where('asignacion.sucursal', 'Cali Sur'));
 
-        foreach (['/usuarios', '/empresas', '/sedes'] as $url) {
+        foreach (['/usuarios', '/empresas', '/sedes', '/sucursales'] as $url) {
             $this->actingAs($coordinador)->get($url)->assertForbidden();
         }
         $this->actingAs($coordinador)->post('/empresas', ['nombre' => 'X'])->assertForbidden();
@@ -75,14 +84,14 @@ class AdministracionTest extends TestCase
     public function test_crea_una_empresa_y_calcula_el_digito_de_verificacion_del_nit(): void
     {
         $this->actingAs($this->admin)->from('/empresas')->post('/empresas', [
-            'nombre' => 'Bodegas del Valle S.A.S',
+            'nombre' => 'Ditranza S.A.S',
             'nit' => '900.123.456',
-            'contacto_email' => 'Compras@Bodegas.com',
+            'contacto_email' => 'Compras@Ditranza.com',
         ])->assertRedirect('/empresas')->assertSessionHas('success');
 
-        $empresa = Cliente::sole();
+        $empresa = Empresa::sole();
         $this->assertSame('900123456-8', $empresa->nit);
-        $this->assertSame('compras@bodegas.com', $empresa->contacto_email);
+        $this->assertSame('compras@ditranza.com', $empresa->contacto_email);
         $this->assertTrue($empresa->activo);
     }
 
@@ -91,7 +100,7 @@ class AdministracionTest extends TestCase
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => 'A', 'nit' => '900123456-3'])
             ->assertSessionHasErrors(['nit' => 'El dígito de verificación no corresponde: para 900123456 es 8.']);
 
-        Cliente::create(['nombre' => 'Existente', 'nit' => '900123456-8']);
+        Empresa::create(['nombre' => 'Existente', 'nit' => '900123456-8']);
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => 'Otra', 'nit' => '900123456-8'])
             ->assertSessionHasErrors(['nit' => 'Ya hay una empresa registrada con este NIT.']);
 
@@ -100,62 +109,172 @@ class AdministracionTest extends TestCase
 
     public function test_edita_y_desactiva_una_empresa(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas', 'nit' => '900123456-8']);
+        $empresa = Empresa::create(['nombre' => 'Ditranza', 'nit' => '900123456-8']);
 
         // Conservar su propio NIT no cuenta como repetido
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Bodegas del Valle', 'nit' => '900123456-8'])->assertSessionHasNoErrors();
-        $this->assertSame('Bodegas del Valle', $empresa->fresh()->nombre);
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza S.A.S', 'nit' => '900123456-8'])->assertSessionHasNoErrors();
+        $this->assertSame('Ditranza S.A.S', $empresa->fresh()->nombre);
 
         $this->actingAs($this->admin)->patch("/empresas/{$empresa->id}/estado", ['activo' => false]);
         $this->assertFalse($empresa->fresh()->activo);
     }
 
-    // --- Sedes -------------------------------------------------------------------------
-
-    public function test_crea_sedes_propias_y_de_empresa_sin_repetir_nombres(): void
+    public function test_la_lista_de_empresas_cuenta_sus_sedes(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        $otra = Cliente::create(['nombre' => 'Logística Sur']);
+        $this->sede('TuGo');
+        $this->sede('Sodimac');
 
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Principal', 'ciudad' => 'Cali'])->assertSessionHasNoErrors();
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'empresa_id' => $empresa->id])->assertSessionHasNoErrors();
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Principal', 'ciudad' => 'Yumbo', 'empresa_id' => $otra->id])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->get('/empresas')
+            ->assertInertia(fn (Assert $p) => $p->has('empresas.data', 1)->where('empresas.data.0.nombre', 'Ditranza')->where('empresas.data.0.sedes', 2));
+    }
 
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Principal', 'ciudad' => 'Cali'])
-            ->assertSessionHasErrors(['nombre' => 'Ya hay una sede propia con ese nombre.']);
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'empresa_id' => $empresa->id])
-            ->assertSessionHasErrors(['nombre' => 'Esta empresa ya tiene una sede con ese nombre.']);
+    // --- Sedes (los clientes de cada empresa) ------------------------------------------
 
-        $this->assertSame(1, Sede::whereNull('cliente_id')->count());
-        $this->assertSame(3, Sede::count());
+    public function test_crea_sedes_de_una_empresa_con_su_meta(): void
+    {
+        $empresa = $this->empresa();
+
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'TuGo', 'empresa_id' => $empresa->id, 'meta_efectividad' => '92,5'])->assertSessionHasNoErrors();
+        $sede = Sede::sole();
+        $this->assertSame($empresa->id, $sede->empresa_id);
+        $this->assertEquals(92.5, $sede->meta_efectividad);
+
+        // Drivin la reconoce por su nombre: no se repite
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'TuGo', 'empresa_id' => $empresa->id, 'meta_efectividad' => 95])
+            ->assertSessionHasErrors(['nombre' => 'Ya hay una sede con ese nombre.']);
+        // Toda sede es de una empresa, y la meta es un porcentaje
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Sodimac', 'meta_efectividad' => 95])->assertSessionHasErrors('empresa_id');
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Sodimac', 'empresa_id' => $empresa->id, 'meta_efectividad' => 120])
+            ->assertSessionHasErrors(['meta_efectividad' => 'La meta de efectividad va de 1 % a 100 %.']);
     }
 
     public function test_una_empresa_inactiva_no_recibe_sedes_nuevas(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas', 'activo' => false]);
+        $empresa = Empresa::create(['nombre' => 'Ditranza', 'activo' => false]);
 
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Yumbo', 'ciudad' => 'Yumbo', 'empresa_id' => $empresa->id])
-            ->assertSessionHasErrors('empresa_id');
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'TuGo', 'empresa_id' => $empresa->id, 'meta_efectividad' => 95])
+            ->assertSessionHasErrors(['empresa_id' => 'Esta empresa está inactiva: actívala antes de asignarle sedes.']);
     }
 
-    public function test_filtra_sedes_propias_o_por_empresa(): void
+    public function test_una_sede_se_traslada_de_empresa_con_su_personal(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
-        Sede::create(['cliente_id' => null, 'nombre' => 'Oficina', 'ciudad' => 'Cali']);
+        // Como quedan los datos de la versión anterior: TuGo era su propia empresa
+        $empresaVieja = $this->empresa('TuGo');
+        $sede = $this->sede('TuGo', [], $empresaVieja);
+        $persona = User::factory()->create(['empresa_id' => $empresaVieja->id, 'sede_id' => $sede->id]);
+        $ditranza = $this->empresa();
 
-        $this->actingAs($this->admin)->get('/sedes?empresa=propias')
-            ->assertInertia(fn (Assert $p) => $p->has('sedes.data', 1)->where('sedes.data.0.nombre', 'Oficina'));
-        $this->actingAs($this->admin)->get("/sedes?empresa={$empresa->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('sedes.data', 1)->where('sedes.data.0.empresa', 'Bodegas'));
+        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'TuGo', 'empresa_id' => $ditranza->id, 'meta_efectividad' => 95])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'La sede TuGo ahora es de Ditranza, con sus sucursales y su personal.');
+        $this->assertSame($ditranza->id, $sede->fresh()->empresa_id);
+        // Su personal pasa con ella: nadie queda en una sede de otra empresa
+        $this->assertSame($ditranza->id, $persona->fresh()->empresa_id);
+    }
+
+    public function test_no_se_traslada_una_sede_a_una_empresa_que_no_recibe_la_linea_de_su_personal(): void
+    {
+        $sede = $this->sede('TuGo');
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id]);
+        $sinLogistica = Empresa::create(['nombre' => 'Aseos del Valle']);
+
+        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'TuGo', 'empresa_id' => $sinLogistica->id, 'meta_efectividad' => 95])
+            ->assertSessionHasErrors(['empresa_id' => 'El personal de esta sede trabaja en «'.LineaServicio::logistica()->nombre.'», que esa empresa no recibe: márcala primero en la empresa.']);
+        $this->assertNotSame($sinLogistica->id, $sede->fresh()->empresa_id);
+    }
+
+    public function test_la_sede_guarda_su_codigo_de_drivin_sin_repetirlo(): void
+    {
+        $empresa = $this->empresa();
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'TuGo', 'codigo' => 'tugo', 'empresa_id' => $empresa->id, 'meta_efectividad' => 95])->assertSessionHasNoErrors();
+        $this->assertSame('TUGO', Sede::sole()->codigo);
+
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'Otra', 'codigo' => 'TUGO', 'empresa_id' => $empresa->id, 'meta_efectividad' => 95])
+            ->assertSessionHasErrors(['codigo' => 'Ya hay una sede con ese código.']);
+    }
+
+    public function test_filtra_sedes_por_empresa(): void
+    {
+        $this->sede('TuGo');
+        $this->sede('Falabella', [], $this->empresa('Logística Sur'));
+        $ditranza = Empresa::firstWhere('nombre', 'Ditranza');
+
+        $this->actingAs($this->admin)->get("/sedes?empresa={$ditranza->id}")
+            ->assertInertia(fn (Assert $p) => $p->component('sedes/index')->has('sedes.data', 1)->where('sedes.data.0.nombre', 'TuGo')->where('sedes.data.0.empresa', 'Ditranza'));
+    }
+
+    // --- Sucursales --------------------------------------------------------------------
+
+    public function test_crea_sucursales_propias_y_de_sede_sin_repetir_nombres(): void
+    {
+        $tugo = $this->sede('TuGo');
+        $sodimac = $this->sede('Sodimac');
+
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali'])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => $tugo->id])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Yumbo', 'sede_id' => $sodimac->id])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali'])
+            ->assertSessionHasErrors(['nombre' => 'Ya hay una sucursal propia con ese nombre.']);
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => $tugo->id])
+            ->assertSessionHasErrors(['nombre' => 'Esta sede ya tiene una sucursal con ese nombre.']);
+
+        $this->assertSame(1, Sucursal::whereNull('sede_id')->count());
+        $this->assertSame(3, Sucursal::count());
+    }
+
+    public function test_la_sucursal_guarda_el_nombre_de_su_plan_en_drivin_sin_repetirlo(): void
+    {
+        $sede = $this->sede('TuGo');
+
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Cali Sur', 'ciudad' => 'Cali', 'sede_id' => $sede->id, 'alias_drivin' => ' cali sur cross '])->assertSessionHasNoErrors();
+        $this->assertSame('CALI SUR CROSS', Sucursal::sole()->alias_drivin);
+
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Cali Sur 2', 'ciudad' => 'Cali', 'sede_id' => $sede->id, 'alias_drivin' => 'CALI SUR CROSS'])
+            ->assertSessionHasErrors(['alias_drivin' => 'Otra sucursal ya usa ese nombre de plan en Drivin.']);
+    }
+
+    public function test_una_sede_inactiva_no_recibe_sucursales_nuevas(): void
+    {
+        $sede = $this->sede('TuGo', ['activo' => false]);
+
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Cali Sur', 'ciudad' => 'Cali', 'sede_id' => $sede->id])
+            ->assertSessionHasErrors(['sede_id' => 'Esta sede está inactiva: actívala antes de asignarle sucursales.']);
+    }
+
+    public function test_filtra_sucursales_propias_o_por_sede(): void
+    {
+        $sede = $this->sede('TuGo');
+        $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        Sucursal::create(['sede_id' => null, 'nombre' => 'Oficina', 'ciudad' => 'Cali']);
+
+        $this->actingAs($this->admin)->get('/sucursales?sede=propias')
+            ->assertInertia(fn (Assert $p) => $p->component('sucursales/index')->has('sucursales.data', 1)->where('sucursales.data.0.nombre', 'Oficina'));
+        $this->actingAs($this->admin)->get("/sucursales?sede={$sede->id}")
+            ->assertInertia(fn (Assert $p) => $p->has('sucursales.data', 1)->where('sucursales.data.0.sede', 'TuGo')->where('sucursales.data.0.empresa', 'Ditranza'));
+    }
+
+    public function test_una_sucursal_con_usuarios_no_cambia_de_sede(): void
+    {
+        $tugo = $this->sede('TuGo');
+        $sodimac = $this->sede('Sodimac');
+        $sucursal = $tugo->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        User::factory()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id, 'sucursal_id' => $sucursal->id]);
+
+        $this->actingAs($this->admin)->put("/sucursales/{$sucursal->id}", ['nombre' => 'Cali Sur', 'ciudad' => 'Cali', 'sede_id' => $sodimac->id])
+            ->assertSessionHasErrors('sede_id');
+        $this->actingAs($this->admin)->put("/sucursales/{$sucursal->id}", ['nombre' => 'Cali Sur Cross', 'ciudad' => 'Cali', 'sede_id' => $tugo->id])
+            ->assertSessionHasNoErrors();
+        $this->assertSame($tugo->id, $sucursal->fresh()->sede_id);
     }
 
     // --- Usuarios ----------------------------------------------------------------------
 
-    public function test_crea_un_usuario_con_rol_empresa_y_sede(): void
+    public function test_crea_un_usuario_con_rol_y_donde_trabaja(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        $sede = Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
+        $sede = $this->sede('TuGo');
+        $sucursal = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        $linea = LineaServicio::logistica();
 
         $this->actingAs($this->admin)->post('/usuarios', [
             'nombres' => '  Laura  Sofía ',
@@ -163,8 +282,10 @@ class AdministracionTest extends TestCase
             'segundo_apellido' => 'Ruiz',
             'email' => 'Laura@Example.com',
             'rol' => 'coordinador',
-            'empresa_id' => $empresa->id,
+            'linea_id' => $linea->id,
+            'empresa_id' => $sede->empresa_id,
             'sede_id' => $sede->id,
+            'sucursal_id' => $sucursal->id,
             'password' => 'Clave-segura-1',
         ])->assertSessionHasNoErrors();
 
@@ -174,22 +295,52 @@ class AdministracionTest extends TestCase
         $this->assertSame('Laura Sofía Gómez Ruiz', $usuario->name);
         $this->assertSame('Ruiz', $usuario->segundo_apellido);
         $this->assertSame(Rol::Coordinador, $usuario->rol);
-        $this->assertSame($sede->id, $usuario->sede_id);
+        $this->assertSame([$sede->empresa_id, $sede->id, $sucursal->id], [$usuario->empresa_id, $usuario->sede_id, $usuario->sucursal_id]);
+        $this->assertSame($linea->id, $usuario->linea_servicio_id);
         $this->assertNotNull($usuario->email_verified_at);
         $this->assertTrue(Hash::check('Clave-segura-1', $usuario->password));
     }
 
-    public function test_la_sede_del_usuario_debe_ser_de_su_empresa(): void
+    public function test_empresa_sede_y_sucursal_del_usuario_son_coherentes(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        $otra = Cliente::create(['nombre' => 'Logística Sur']);
-        $sedeOtra = Sede::create(['cliente_id' => $otra->id, 'nombre' => 'Acopi', 'ciudad' => 'Yumbo']);
-        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'];
+        $tugo = $this->sede('TuGo');
+        $caliSur = $tugo->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        $otraEmpresa = $this->empresa('Logística Sur');
+        $falabella = $this->sede('Falabella', [], $otraEmpresa);
+        $acopi = $falabella->sucursales()->create(['nombre' => 'Acopi', 'ciudad' => 'Yumbo']);
+        $oficina = Sucursal::create(['sede_id' => null, 'nombre' => 'Oficina', 'ciudad' => 'Cali']);
+        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1'];
+        $ditranza = $tugo->empresa_id;
 
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id, 'sede_id' => $sedeOtra->id])
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $falabella->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede no pertenece a la empresa elegida.']);
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sede_id' => $sedeOtra->id])
-            ->assertSessionHasErrors(['sede_id' => 'Esta sede es de una empresa cliente: elige primero esa empresa.']);
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sede_id' => $tugo->id])
+            ->assertSessionHasErrors(['sede_id' => 'Esta sede es de una empresa: elige primero esa empresa.']);
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $tugo->id, 'sucursal_id' => $acopi->id])
+            ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal no pertenece a la sede elegida.']);
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sucursal_id' => $caliSur->id])
+            ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es de una sede: elige primero esa sede.']);
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sucursal_id' => $oficina->id])
+            ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es propia de Justo a Tiempo: no se asigna a personal de una empresa.']);
+
+        // El personal propio va en una sucursal propia
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sucursal_id' => $oficina->id])->assertSessionHasNoErrors();
+        $this->assertSame($oficina->id, User::where('email', 'ana@example.com')->value('sucursal_id'));
+    }
+
+    public function test_el_administrador_no_queda_asignado_a_una_empresa(): void
+    {
+        $sede = $this->sede('TuGo');
+
+        $this->actingAs($this->admin)->post('/usuarios', [
+            'nombres' => 'Otra', 'primer_apellido' => 'Admin', 'email' => 'otra@example.com', 'rol' => 'admin',
+            'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'password' => 'Clave-segura-1',
+        ])->assertSessionHasNoErrors();
+
+        $otra = User::where('email', 'otra@example.com')->sole();
+        $this->assertSame([null, null, null], [$otra->empresa_id, $otra->sede_id, $otra->sucursal_id]);
+        // Sigue entrando a las herramientas de la operación
+        $this->actingAs($otra)->get('/cargas')->assertOk();
     }
 
     public function test_valida_correo_repetido_rol_y_contrasena(): void
@@ -207,7 +358,7 @@ class AdministracionTest extends TestCase
     {
         $usuario = User::factory()->create(['password' => 'Original-123']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Nuevo', 'primer_apellido' => 'Nombre', 'email' => $usuario->email, 'rol' => 'auxiliar', 'password' => ''])
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Nuevo', 'primer_apellido' => 'Nombre', 'email' => $usuario->email, 'rol' => 'auxiliar', 'linea_id' => $usuario->linea_servicio_id, 'password' => ''])
             ->assertSessionHasNoErrors();
 
         $this->assertSame('Nuevo Nombre', $usuario->fresh()->name);
@@ -248,38 +399,29 @@ class AdministracionTest extends TestCase
         DB::table('sessions')->insert(['id' => 'sesion-vieja', 'user_id' => $usuario->id, 'payload' => '', 'last_activity' => time()]);
 
         // Sin contraseña nueva, la sesión sigue
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador']);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'linea_id' => $usuario->linea_servicio_id]);
         $this->assertDatabaseHas('sessions', ['id' => 'sesion-vieja']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'password' => 'Nueva-clave-9']);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'linea_id' => $usuario->linea_servicio_id, 'password' => 'Nueva-clave-9']);
         $this->assertDatabaseMissing('sessions', ['id' => 'sesion-vieja']);
     }
 
-    public function test_una_sede_con_usuarios_no_cambia_de_empresa(): void
+    public function test_el_personal_de_una_empresa_no_entra_a_los_modulos_de_operacion(): void
     {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        $otra = Cliente::create(['nombre' => 'Logística Sur']);
-        $sede = Sede::create(['cliente_id' => $empresa->id, 'nombre' => 'Yumbo', 'ciudad' => 'Yumbo']);
-        User::factory()->create(['cliente_id' => $empresa->id, 'sede_id' => $sede->id]);
-
-        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'Yumbo', 'ciudad' => 'Yumbo', 'empresa_id' => $otra->id])
-            ->assertSessionHasErrors('empresa_id');
-        // Editar sus otros datos sí se puede
-        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'Yumbo Norte', 'ciudad' => 'Yumbo', 'empresa_id' => $empresa->id])
-            ->assertSessionHasNoErrors();
-        $this->assertSame($empresa->id, $sede->fresh()->cliente_id);
-    }
-
-    public function test_el_personal_de_una_empresa_cliente_no_entra_a_los_modulos_de_operacion(): void
-    {
-        $empresa = Cliente::create(['nombre' => 'Bodegas']);
-        $deEmpresa = User::factory()->coordinador()->create(['cliente_id' => $empresa->id]);
+        $sede = $this->sede('TuGo');
+        $deEmpresa = User::factory()->coordinador()->create(['empresa_id' => $sede->empresa_id]);
         $propio = User::factory()->coordinador()->create();
 
-        foreach (['/indicadores', '/cargas', '/auditoria'] as $url) {
+        foreach (['/cargas', '/auditoria'] as $url) {
             $this->actingAs($deEmpresa)->get($url)->assertForbidden();
             $this->actingAs($propio)->get($url)->assertOk();
         }
+
+        // El tablero de la línea sí lo ve, pero solo con su empresa y sin las herramientas
+        $this->actingAs($deEmpresa)->get('/lineas/logisticos')
+            ->assertInertia(fn (Assert $p) => $p->where('puedeOperar', false)->where('alcanceFijo', 'Ditranza'));
+        $this->actingAs($propio)->get('/lineas/logisticos')
+            ->assertInertia(fn (Assert $p) => $p->where('puedeOperar', true)->where('alcanceFijo', null));
     }
 
     public function test_un_inactivo_que_envia_un_patch_es_redirigido_con_303(): void
@@ -294,17 +436,22 @@ class AdministracionTest extends TestCase
     public function test_un_campo_enviado_como_arreglo_es_un_error_de_validacion(): void
     {
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => ['a', 'b']])->assertSessionHasErrors('nombre');
-        $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'X', 'ciudad' => ['Cali']])->assertSessionHasErrors('ciudad');
+        $this->actingAs($this->admin)->post('/sedes', ['nombre' => ['a'], 'meta_efectividad' => 95])->assertSessionHasErrors('nombre');
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'X', 'ciudad' => ['Cali']])->assertSessionHasErrors('ciudad');
         $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => ['a@b.co'], 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
     }
 
-    public function test_filtra_usuarios_por_sede_desde_el_conteo(): void
+    public function test_filtra_usuarios_por_sede_y_por_sucursal_desde_los_conteos(): void
     {
-        $sede = Sede::create(['cliente_id' => null, 'nombre' => 'Oficina', 'ciudad' => 'Cali']);
-        User::factory()->create(['sede_id' => $sede->id, 'name' => 'En la sede']);
-        User::factory()->create(['name' => 'Fuera de la sede']);
+        $sede = $this->sede('TuGo');
+        $sucursal = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id, 'name' => 'En Cali Sur']);
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'name' => 'En TuGo']);
+        User::factory()->create(['name' => 'Propio']);
 
         $this->actingAs($this->admin)->get("/usuarios?sede={$sede->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 1)->where('usuarios.data.0.nombre', 'En la sede')->where('contexto.sede', 'Oficina'));
+            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 2)->where('contexto.sede', 'TuGo'));
+        $this->actingAs($this->admin)->get("/usuarios?sucursal={$sucursal->id}")
+            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 1)->where('usuarios.data.0.nombre', 'En Cali Sur')->where('contexto.sucursal', 'Cali Sur'));
     }
 }

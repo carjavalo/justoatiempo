@@ -2,7 +2,7 @@ import { type Checklist, type EstadoAuditoria, type Evaluacion, type TipoEvidenc
 
 export interface FiltrosAuditoria {
     fecha: string;
-    cliente: number | null;
+    sede: number | null;
     estado: 'pendientes' | 'no_cumplen' | 'sin_evidencia' | 'auditadas' | 'todas';
     q: string | null;
 }
@@ -28,8 +28,8 @@ export interface OrdenCola {
     codigo: string;
     destinatario: string | null;
     ciudad: string | null;
-    cliente: string | null;
     sede: string | null;
+    sucursal: string | null;
     auxiliar: string | null;
     placa: string | null;
     evidencias: number;
@@ -50,8 +50,8 @@ export interface OrdenDetalle {
     id: number;
     codigo: string;
     fecha: string;
-    cliente: string | null;
     sede: string | null;
+    sucursal: string | null;
     ruta: string | null;
     placa: string | null;
     auxiliar: string | null;

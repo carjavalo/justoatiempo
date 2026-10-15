@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Enums\EstadoCarga;
 use App\Models\Bitacora;
 use App\Models\Carga;
-use App\Models\Cliente;
 use App\Models\InformeDiario;
+use App\Models\LineaServicio;
 use App\Models\Orden;
+use App\Models\Sede;
 use App\Services\Drivin\ImportadorPreliquidacion;
 use App\Services\Drivin\MapeoColumnas;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -116,15 +118,15 @@ class CargaController extends Controller
 
         $resumen = $carga->resumen ?? [];
         $informes = InformeDiario::query()
-            ->with('cliente:id,nombre', 'sede:id,nombre')
+            ->with('sede:id,nombre', 'sucursal:id,nombre')
             ->whereIn('id', $resumen['informes'] ?? [])
             ->orderBy('fecha_operacion')
             ->get()
             ->map(fn (InformeDiario $i) => [
                 'id' => $i->id,
                 'fecha' => $i->fecha_operacion->toDateString(),
-                'cliente' => $i->cliente?->nombre,
                 'sede' => $i->sede?->nombre,
+                'sucursal' => $i->sucursal?->nombre,
                 'estado' => $i->estado->value,
                 'estadoLabel' => $i->estado->label(),
                 'asignadas' => $i->total_asignadas,
@@ -154,7 +156,7 @@ class CargaController extends Controller
         ]);
     }
 
-    /** Ajustes de la revisión: hoja, mapeo de columnas y cliente/sede por defecto. */
+    /** Ajustes de la revisión: hoja, mapeo de columnas y sede/sucursal por defecto. */
     public function update(Request $request, Carga $carga): RedirectResponse
     {
         abort_unless($carga->enRevision(), 409, 'La carga ya fue procesada.');
@@ -163,17 +165,18 @@ class CargaController extends Controller
             'hoja' => ['nullable', 'string', 'max:120'],
             'mapeo' => ['nullable', 'array'],
             'mapeo.*' => ['nullable', 'integer', 'min:0', 'max:500'],
-            'cliente_id' => ['nullable', 'integer', 'exists:clientes,id'],
-            'sede_id' => ['nullable', 'integer', Rule::exists('sedes', 'id')->where('cliente_id', $request->integer('cliente_id'))],
+            'sede_id' => ['nullable', 'integer', Rule::in($this->sedesPorDefecto()->modelKeys())],
+            'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')->where('sede_id', $request->integer('sede_id'))->where('activo', true)->whereNull('deleted_at')],
         ], [
-            'sede_id.exists' => 'La sede no pertenece al cliente elegido.',
+            'sede_id.in' => 'Elige una sede activa de una empresa que reciba servicios logísticos.',
+            'sucursal_id.exists' => 'Elige una sucursal activa de la sede elegida.',
         ]);
 
         // Cada ajuste llega por separado desde la revisión: solo se toca lo que viene en la petición
         $cambios = [];
 
-        if ($request->has('cliente_id')) {
-            $cambios['opciones'] = ['cliente_id' => $datos['cliente_id'] ?? null, 'sede_id' => $datos['sede_id'] ?? null];
+        if ($request->has('sede_id')) {
+            $cambios['opciones'] = ['sede_id' => $datos['sede_id'] ?? null, 'sucursal_id' => $datos['sucursal_id'] ?? null];
         }
 
         if ($request->filled('hoja') && $datos['hoja'] !== $carga->hoja) {
@@ -253,7 +256,7 @@ class CargaController extends Controller
         unset($analisis['ordenes']);
 
         return Inertia::render('cargas/revision', [
-            'carga' => [...$base, 'opciones' => $carga->opciones ?? ['cliente_id' => null, 'sede_id' => null]],
+            'carga' => [...$base, 'opciones' => $carga->opciones ?? ['sede_id' => null, 'sucursal_id' => null]],
             'lectura' => [
                 'hojas' => $lectura['hojas'],
                 'hoja' => $lectura['hoja'],
@@ -271,8 +274,9 @@ class CargaController extends Controller
                 'columna' => $mapeo[$clave] ?? null,
             ])->values(),
             'analisis' => $analisis,
-            'clientes' => Cliente::with('sedes:id,cliente_id,nombre')->orderBy('nombre')->get(['id', 'nombre'])
-                ->map(fn ($c) => ['id' => $c->id, 'nombre' => $c->nombre, 'sedes' => $c->sedes->map->only(['id', 'nombre'])]),
+            // Sede por defecto para las órdenes sin plan ni cliente corporativo reconocible
+            'sedes' => $this->sedesPorDefecto()
+                ->map(fn (Sede $s) => ['id' => $s->id, 'nombre' => $s->nombre, 'empresa' => $s->empresa?->nombre, 'sucursales' => $s->sucursales->map->only(['id', 'nombre'])]),
         ]);
     }
 
@@ -290,5 +294,22 @@ class CargaController extends Controller
         $cargada = Orden::whereDate('fecha_operacion', $esperada)->exists();
 
         return $cargada ? null : $esperada->toDateString();
+    }
+
+    /**
+     * Sedes que se pueden elegir como destino por defecto de una preliquidación: activas, de empresas activas
+     * que reciben servicios logísticos (las demás quedarían por fuera del tablero de la línea), con sus
+     * sucursales activas.
+     *
+     * @return Collection<int, Sede>
+     */
+    private function sedesPorDefecto(): Collection
+    {
+        return Sede::query()
+            ->where('activo', true)
+            ->whereHas('empresa', fn ($q) => $q->where('activo', true)->whereHas('lineas', fn ($l) => $l->where('modulo', LineaServicio::LOGISTICA)))
+            ->with(['empresa:id,nombre', 'sucursales' => fn ($q) => $q->where('activo', true)->orderBy('nombre')->select('id', 'sede_id', 'nombre')])
+            ->orderBy('nombre')
+            ->get(['id', 'empresa_id', 'nombre']);
     }
 }

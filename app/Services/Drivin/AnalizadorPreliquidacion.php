@@ -4,12 +4,12 @@ namespace App\Services\Drivin;
 
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
-use App\Models\Cliente;
 use App\Models\Empleado;
 use App\Models\InformeDiario;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
 use App\Models\Sede;
+use App\Models\Sucursal;
 use App\Models\Vehiculo;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Support\Carbon;
@@ -24,7 +24,8 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as FechaExcel;
  * - Orden con todos sus productos entregados = aprobada; ninguno = rechazada (RF-07: genera devolución);
  *   mezcla = aprobada con faltante (entrega parcial, p. ej. llegó el sofá pero no la mesa).
  * - Avería solo si el motivo reporta daño físico (RF-08).
- * - Cliente y sede salen del nombre del plan (alias Drivin de la sede), de la columna cliente o del valor por defecto.
+ * - Sede y sucursal salen del nombre del plan (alias Drivin de la sucursal), de la columna "Cliente corporativo"
+ *   (la sede: TuGo, Sodimac…) o de la sede por defecto elegida en la revisión.
  */
 class AnalizadorPreliquidacion
 {
@@ -44,11 +45,11 @@ class AnalizadorPreliquidacion
     /** @var array<string, string> alias normalizado => estado */
     private array $estados = [];
 
-    /** @var Collection<int, array{id: int, cliente_id: int, alias: string}> */
-    private Collection $sedesPorAlias;
+    /** @var Collection<int, array{id: int, sede_id: int, alias: string}> */
+    private Collection $sucursalesPorAlias;
 
-    /** @var Collection<int, Cliente> */
-    private Collection $clientes;
+    /** @var Collection<int, Sede> */
+    private Collection $sedes;
 
     /** @var array<string, int> */
     private array $vehiculos = [];
@@ -71,7 +72,7 @@ class AnalizadorPreliquidacion
     /**
      * @param  array{encabezados: array<int, string>, filas: list<array{fila: int, valores: array<int, mixed>}>}  $lectura
      * @param  array<string, int|null>  $mapeo
-     * @param  array{cliente_id?: int|null, sede_id?: int|null}  $opciones
+     * @param  array{sede_id?: int|null, sucursal_id?: int|null}  $opciones
      */
     public function analizar(array $lectura, array $mapeo, array $opciones = []): array
     {
@@ -99,7 +100,7 @@ class AnalizadorPreliquidacion
 
         $errores = [];
         $filasConError = [];
-        $avisos = ['vehiculos' => [], 'auxiliares' => [], 'motivos' => [], 'sinAuxiliar' => 0, 'sinPlaca' => 0, 'clientePorDefecto' => 0];
+        $avisos = ['vehiculos' => [], 'auxiliares' => [], 'motivos' => [], 'sinAuxiliar' => 0, 'sinPlaca' => 0, 'sedePorDefecto' => 0];
         $ordenes = [];
 
         $valor = function (array $valores, string $campo) use ($mapeo) {
@@ -140,9 +141,9 @@ class AnalizadorPreliquidacion
             }
 
             $ruta = $valor($valores, 'ruta');
-            [$clienteId, $sedeId, $porDefecto] = $this->resolverClienteSede($ruta, $valor($valores, 'cliente'), $valor($valores, 'ciudad'), $opciones);
-            if (! $clienteId) {
-                $error($fila, 'cliente', 'No se pudo identificar el cliente ni la sede. Elige un cliente por defecto en la revisión.', $ruta ?? $valor($valores, 'cliente'));
+            [$sedeId, $sucursalId, $porDefecto] = $this->resolverSedeSucursal($ruta, $valor($valores, 'cliente'), $valor($valores, 'ciudad'), $opciones);
+            if (! $sedeId) {
+                $error($fila, 'cliente', 'No se pudo identificar la sede ni la sucursal. Elige una sede por defecto en la revisión.', $ruta ?? $valor($valores, 'cliente'));
 
                 continue;
             }
@@ -159,9 +160,9 @@ class AnalizadorPreliquidacion
                 $ordenes[$clave] = [
                     'fila' => $fila,
                     'fecha_operacion' => $fecha,
-                    'cliente_id' => $clienteId,
                     'sede_id' => $sedeId,
-                    'cliente_por_defecto' => $porDefecto,
+                    'sucursal_id' => $sucursalId,
+                    'sede_por_defecto' => $porDefecto,
                     'ruta' => $ruta ? mb_substr((string) $ruta, 0, 150) : null,
                     'placa' => Vehiculo::normalizarPlaca($placaCruda ? (string) $placaCruda : null),
                     'auxiliar_nombre' => $auxiliarCrudo ? mb_substr(trim((string) $auxiliarCrudo), 0, 150) : null,
@@ -205,7 +206,7 @@ class AnalizadorPreliquidacion
 
                 continue;
             }
-            if (isset($cerrados[$o['fecha_operacion'].'|'.$o['cliente_id'].'|'.($o['sede_id'] ?? '')])) {
+            if (isset($cerrados[$o['fecha_operacion'].'|'.$o['sede_id'].'|'.($o['sucursal_id'] ?? '')])) {
                 $error($o['fila'], 'fecha', 'El informe de esa jornada ya está cerrado y no admite nuevas órdenes.', $o['fecha_operacion']);
 
                 continue;
@@ -222,7 +223,7 @@ class AnalizadorPreliquidacion
             'filasConError' => count($filasConError),
             'advertencias' => $this->formatearAvisos($avisos),
             'totalAdvertencias' => count($avisos['vehiculos']) + count($avisos['auxiliares']) + count($avisos['motivos'])
-                + ($avisos['sinAuxiliar'] ? 1 : 0) + ($avisos['sinPlaca'] ? 1 : 0) + ($avisos['clientePorDefecto'] ? 1 : 0),
+                + ($avisos['sinAuxiliar'] ? 1 : 0) + ($avisos['sinPlaca'] ? 1 : 0) + ($avisos['sedePorDefecto'] ? 1 : 0),
             'fechas' => collect($finales)->countBy('fecha_operacion')->sortKeys()->all(),
             'grupos' => $this->grupos($finales),
             'totales' => $this->totales($finales),
@@ -271,15 +272,15 @@ class AnalizadorPreliquidacion
             }
         }
 
-        if ($o['cliente_por_defecto']) {
-            $avisos['clientePorDefecto']++;
+        if ($o['sede_por_defecto']) {
+            $avisos['sedePorDefecto']++;
         }
 
         return [
             'fila' => $o['fila'],
             'fecha_operacion' => $o['fecha_operacion'],
-            'cliente_id' => $o['cliente_id'],
             'sede_id' => $o['sede_id'],
+            'sucursal_id' => $o['sucursal_id'],
             'ruta' => $o['ruta'],
             'vehiculo_id' => $vehiculoId,
             'placa' => $o['placa'] ? mb_substr($o['placa'], 0, 10) : null,
@@ -310,16 +311,16 @@ class AnalizadorPreliquidacion
 
     private function cargarMaestros(): void
     {
-        $this->sedesPorAlias = Sede::query()
+        $this->sucursalesPorAlias = Sucursal::query()
             ->whereNotNull('alias_drivin')
-            ->whereNotNull('cliente_id')
-            ->get(['id', 'cliente_id', 'alias_drivin'])
-            ->map(fn (Sede $s) => ['id' => $s->id, 'cliente_id' => $s->cliente_id, 'alias' => MapeoColumnas::normalizar($s->alias_drivin)])
+            ->whereNotNull('sede_id')
+            ->get(['id', 'sede_id', 'alias_drivin'])
+            ->map(fn (Sucursal $s) => ['id' => $s->id, 'sede_id' => $s->sede_id, 'alias' => MapeoColumnas::normalizar($s->alias_drivin)])
             ->filter(fn ($s) => $s['alias'] !== '')
             ->sortByDesc(fn ($s) => strlen($s['alias'])) // el alias más específico gana
             ->values();
 
-        $this->clientes = Cliente::with('sedes:id,cliente_id,nombre,ciudad,activo')->get();
+        $this->sedes = Sede::with('sucursales:id,sede_id,nombre,ciudad,activo')->get();
 
         foreach (Vehiculo::get(['id', 'placa', 'codigo_interno']) as $v) {
             $this->vehiculos[$v->placa] = $v->id;
@@ -339,33 +340,36 @@ class AnalizadorPreliquidacion
         }
     }
 
-    /** @return array{0: int|null, 1: int|null, 2: bool} cliente, sede y si se usó el valor por defecto */
-    private function resolverClienteSede(mixed $ruta, mixed $cliente, mixed $ciudad, array $opciones): array
+    /**
+     * @param  mixed  $clienteCorporativo  columna "Cliente corporativo" de Drivin: la sede (TuGo, Sodimac…)
+     * @return array{0: int|null, 1: int|null, 2: bool} sede, sucursal y si se usó la sede por defecto
+     */
+    private function resolverSedeSucursal(mixed $ruta, mixed $clienteCorporativo, mixed $ciudad, array $opciones): array
     {
         $rutaNorm = MapeoColumnas::normalizar((string) $ruta);
         if ($rutaNorm !== '') {
-            foreach ($this->sedesPorAlias as $s) {
+            foreach ($this->sucursalesPorAlias as $s) {
                 if ($rutaNorm === $s['alias'] || str_starts_with($rutaNorm, $s['alias'].' ')) {
-                    return [$s['cliente_id'], $s['id'], false];
+                    return [$s['sede_id'], $s['id'], false];
                 }
             }
         }
 
-        $clienteNorm = MapeoColumnas::normalizar((string) $cliente);
-        if ($clienteNorm !== '') {
-            $c = $this->clientes->first(fn (Cliente $c) => in_array($clienteNorm, [MapeoColumnas::normalizar($c->nombre), MapeoColumnas::normalizar($c->codigo)], true));
-            if ($c) {
-                $activas = $c->sedes->where('activo', true);
+        $sedeNorm = MapeoColumnas::normalizar((string) $clienteCorporativo);
+        if ($sedeNorm !== '') {
+            $sede = $this->sedes->first(fn (Sede $s) => in_array($sedeNorm, [MapeoColumnas::normalizar($s->nombre), MapeoColumnas::normalizar($s->codigo)], true));
+            if ($sede) {
+                $activas = $sede->sucursales->where('activo', true);
                 $ciudadNorm = MapeoColumnas::normalizar((string) $ciudad);
                 $porCiudad = $activas->filter(fn ($s) => $ciudadNorm !== '' && MapeoColumnas::normalizar($s->ciudad) === $ciudadNorm);
-                $sede = $activas->count() === 1 ? $activas->first() : ($porCiudad->count() === 1 ? $porCiudad->first() : null);
+                $sucursal = $activas->count() === 1 ? $activas->first() : ($porCiudad->count() === 1 ? $porCiudad->first() : null);
 
-                return [$c->id, $sede?->id, false];
+                return [$sede->id, $sucursal?->id, false];
             }
         }
 
-        if (! empty($opciones['cliente_id'])) {
-            return [(int) $opciones['cliente_id'], ! empty($opciones['sede_id']) ? (int) $opciones['sede_id'] : null, true];
+        if (! empty($opciones['sede_id'])) {
+            return [(int) $opciones['sede_id'], ! empty($opciones['sucursal_id']) ? (int) $opciones['sucursal_id'] : null, true];
         }
 
         return [null, null, false];
@@ -491,8 +495,8 @@ class AnalizadorPreliquidacion
         return InformeDiario::query()
             ->where('estado', EstadoInforme::Cerrado)
             ->whereIn('fecha_operacion', $fechas)
-            ->get(['fecha_operacion', 'cliente_id', 'sede_id'])
-            ->mapWithKeys(fn ($i) => [$i->fecha_operacion->toDateString().'|'.$i->cliente_id.'|'.($i->sede_id ?? '') => true])
+            ->get(['fecha_operacion', 'sede_id', 'sucursal_id'])
+            ->mapWithKeys(fn ($i) => [$i->fecha_operacion->toDateString().'|'.$i->sede_id.'|'.($i->sucursal_id ?? '') => true])
             ->all();
     }
 
@@ -511,34 +515,36 @@ class AnalizadorPreliquidacion
             $lista[] = ['tipo' => 'motivos', 'titulo' => 'Motivos de rechazo fuera del catálogo', 'detalle' => 'Se guardan como texto libre.', 'items' => $top($a['motivos'])];
         }
         if ($a['sinAuxiliar']) {
-            $lista[] = ['tipo' => 'sin_auxiliar', 'titulo' => 'Órdenes sin auxiliar', 'detalle' => "{$a['sinAuxiliar']} órdenes no indican el asistente del conductor.", 'items' => []];
+            $lista[] = ['tipo' => 'sin_auxiliar', 'titulo' => 'Órdenes sin auxiliar', 'detalle' => $a['sinAuxiliar'] === 1 ? '1 orden no indica el asistente del conductor.' : "{$a['sinAuxiliar']} órdenes no indican el asistente del conductor.", 'items' => []];
         }
         if ($a['sinPlaca']) {
-            $lista[] = ['tipo' => 'sin_placa', 'titulo' => 'Órdenes sin vehículo', 'detalle' => "{$a['sinPlaca']} órdenes no indican la placa.", 'items' => []];
+            $lista[] = ['tipo' => 'sin_placa', 'titulo' => 'Órdenes sin vehículo', 'detalle' => $a['sinPlaca'] === 1 ? '1 orden no indica la placa.' : "{$a['sinPlaca']} órdenes no indican la placa.", 'items' => []];
         }
-        if ($a['clientePorDefecto']) {
-            $lista[] = ['tipo' => 'cliente_defecto', 'titulo' => 'Cliente asignado por defecto', 'detalle' => "{$a['clientePorDefecto']} órdenes no traían un plan o cliente reconocible y se asignaron al cliente por defecto elegido.", 'items' => []];
+        if ($a['sedePorDefecto']) {
+            $lista[] = ['tipo' => 'sede_defecto', 'titulo' => 'Sede asignada por defecto', 'detalle' => $a['sedePorDefecto'] === 1
+                ? '1 orden no traía un plan o un cliente corporativo reconocible y se asignó a la sede por defecto elegida.'
+                : "{$a['sedePorDefecto']} órdenes no traían un plan o un cliente corporativo reconocible y se asignaron a la sede por defecto elegida.", 'items' => []];
         }
 
         return $lista;
     }
 
-    /** Vista previa del informe: fecha > cliente > sede > ruta > placa > auxiliar (RF-05). */
+    /** Vista previa del informe: fecha > sede > sucursal > ruta > placa > auxiliar (RF-05). */
     private function grupos(array $ordenes): array
     {
-        $nombresClientes = $this->clientes->pluck('nombre', 'id');
-        $nombresSedes = $this->clientes->flatMap->sedes->pluck('nombre', 'id');
+        $nombresSedes = $this->sedes->pluck('nombre', 'id');
+        $nombresSucursales = $this->sedes->flatMap->sucursales->pluck('nombre', 'id');
 
         return collect($ordenes)
-            ->groupBy(fn ($o) => implode('|', [$o['fecha_operacion'], $o['cliente_id'], $o['sede_id'], $o['ruta'], $o['placa'], $o['auxiliar_nombre']]))
-            ->map(function (Collection $g) use ($nombresClientes, $nombresSedes) {
+            ->groupBy(fn ($o) => implode('|', [$o['fecha_operacion'], $o['sede_id'], $o['sucursal_id'], $o['ruta'], $o['placa'], $o['auxiliar_nombre']]))
+            ->map(function (Collection $g) use ($nombresSedes, $nombresSucursales) {
                 $p = $g->first();
                 $aprobadas = $g->where('estado', 'aprobada')->count();
 
                 return [
                     'fecha' => $p['fecha_operacion'],
-                    'cliente' => $nombresClientes[$p['cliente_id']] ?? '—',
-                    'sede' => $p['sede_id'] ? ($nombresSedes[$p['sede_id']] ?? null) : null,
+                    'sede' => $nombresSedes[$p['sede_id']] ?? '—',
+                    'sucursal' => $p['sucursal_id'] ? ($nombresSucursales[$p['sucursal_id']] ?? null) : null,
                     'ruta' => $p['ruta'],
                     'placa' => $p['placa'],
                     'vehiculoRegistrado' => $p['vehiculo_id'] !== null,
@@ -552,7 +558,7 @@ class AnalizadorPreliquidacion
                     'efectividad' => ConsolidadorInforme::efectividad($aprobadas, $g->count()),
                 ];
             })
-            ->sortBy([['fecha', 'asc'], ['cliente', 'asc'], ['sede', 'asc'], ['auxiliar', 'asc']])
+            ->sortBy([['fecha', 'asc'], ['sede', 'asc'], ['sucursal', 'asc'], ['auxiliar', 'asc']])
             ->values()
             ->all();
     }

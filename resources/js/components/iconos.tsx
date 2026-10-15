@@ -10,6 +10,7 @@ import {
     ArrowCounterClockwiseIcon,
     ArrowDownIcon,
     ArrowDownRightIcon,
+    ArrowLeftIcon,
     ArrowRightIcon,
     ArrowsDownUpIcon,
     ArrowsOutIcon,
@@ -223,6 +224,7 @@ export const XCircle = icono(XCircleIcon, 'estado', 'XCircle');
 // --- Controles (trazo grueso) ---
 export const ArrowDown = icono(ArrowDownIcon, 'control', 'ArrowDown');
 export const ArrowDownRight = icono(ArrowDownRightIcon, 'control', 'ArrowDownRight');
+export const ArrowLeft = icono(ArrowLeftIcon, 'control', 'ArrowLeft');
 export const ArrowRight = icono(ArrowRightIcon, 'control', 'ArrowRight');
 export const ArrowUp = icono(ArrowUpIcon, 'control', 'ArrowUp');
 export const ArrowUpDown = icono(ArrowsDownUpIcon, 'control', 'ArrowUpDown');

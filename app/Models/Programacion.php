@@ -11,7 +11,7 @@ class Programacion extends Model
     protected $table = 'programaciones';
 
     protected $fillable = [
-        'fecha', 'cliente_id', 'sede_id', 'auxiliares_requeridos',
+        'fecha', 'sede_id', 'sucursal_id', 'auxiliares_requeridos',
         'vehiculos_requeridos', 'observaciones', 'creado_por',
     ];
 
@@ -20,14 +20,14 @@ class Programacion extends Model
         return ['fecha' => 'date'];
     }
 
-    public function cliente(): BelongsTo
-    {
-        return $this->belongsTo(Cliente::class);
-    }
-
     public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);
+    }
+
+    public function sucursal(): BelongsTo
+    {
+        return $this->belongsTo(Sucursal::class);
     }
 
     public function asignaciones(): HasMany

@@ -7,9 +7,9 @@ use App\Enums\EstadoOrden;
 use App\Enums\TipoEvidencia;
 use App\Models\AuditoriaPod;
 use App\Models\Bitacora;
-use App\Models\Cliente;
 use App\Models\Evidencia;
 use App\Models\Orden;
+use App\Models\Sede;
 use App\Models\TipoNovedad;
 use App\Services\ConsolidadorInforme;
 use App\Services\Pod\AlmacenEvidencias;
@@ -92,8 +92,8 @@ class AuditoriaController extends Controller
             ]);
 
             // El informe del día refleja el cumplimiento del protocolo y las novedades (RF-05)
-            if ($orden->cliente_id) {
-                $this->consolidador->consolidar($orden->fecha_operacion, $orden->cliente_id, $orden->sede_id);
+            if ($orden->sede_id) {
+                $this->consolidador->consolidar($orden->fecha_operacion, $orden->sede_id, $orden->sucursal_id);
             }
 
             Bitacora::registrar('auditada', $orden, ['cumple' => $auditoria->cumple_protocolo]);
@@ -220,7 +220,7 @@ class AuditoriaController extends Controller
     {
         $jornadas = $this->jornadas();
         $estado = in_array($request->input('estado'), self::ESTADOS, true) ? $request->input('estado') : 'pendientes';
-        $clienteId = $request->integer('cliente') ?: null;
+        $sedeId = $request->integer('sede') ?: null;
         $busqueda = trim((string) $request->input('q'));
 
         // Jornada: la de la orden abierta, la pedida, o la más reciente con pendientes
@@ -233,10 +233,10 @@ class AuditoriaController extends Controller
         $base = Orden::query()
             ->where('ordenes.estado', EstadoOrden::Aprobada)
             ->whereDate('ordenes.fecha_operacion', $fecha)
-            ->when($clienteId, fn (Builder $q) => $q->where('ordenes.cliente_id', $clienteId));
+            ->when($sedeId, fn (Builder $q) => $q->where('ordenes.sede_id', $sedeId));
 
         $lista = $base->clone()
-            ->with(['auditoria:id,orden_id,cumple_protocolo,sin_evidencia', 'cliente:id,nombre', 'sede:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado'])
+            ->with(['auditoria:id,orden_id,cumple_protocolo,sin_evidencia', 'sede:id,nombre', 'sucursal:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado'])
             ->withCount('evidencias')
             ->when($busqueda !== '', fn (Builder $q) => $q->where(fn ($w) => $w
                 ->where('codigo_orden', 'like', "%{$busqueda}%")
@@ -268,17 +268,17 @@ class AuditoriaController extends Controller
             ?? ($pos !== false ? $lista->get($pos + 1) : null);
 
         return Inertia::render('auditoria/index', [
-            'filtros' => ['fecha' => $fecha, 'cliente' => $clienteId, 'estado' => $estado, 'q' => $busqueda ?: null],
+            'filtros' => ['fecha' => $fecha, 'sede' => $sedeId, 'estado' => $estado, 'q' => $busqueda ?: null],
             'jornadas' => $jornadas,
-            'clientes' => Cliente::orderBy('nombre')->get(['id', 'nombre']),
+            'sedes' => Sede::orderBy('nombre')->get(['id', 'nombre']),
             'resumen' => $this->resumen($base),
             'ordenes' => $lista->map(fn (Orden $o) => [
                 'id' => $o->id,
                 'codigo' => $o->codigo_orden,
                 'destinatario' => $o->destinatario,
                 'ciudad' => $o->ciudad,
-                'cliente' => $o->cliente?->nombre,
                 'sede' => $o->sede?->nombre,
+                'sucursal' => $o->sucursal?->nombre,
                 'auxiliar' => $o->empleado?->nombre_completo ?? $o->auxiliar_nombre,
                 'placa' => $o->placa,
                 'evidencias' => (int) $o->evidencias_count,
@@ -292,7 +292,7 @@ class AuditoriaController extends Controller
 
     private function detalle(Orden $orden): array
     {
-        $orden->loadMissing(['auditoria.auditor:id,name', 'evidencias', 'cliente:id,nombre', 'sede:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado']);
+        $orden->loadMissing(['auditoria.auditor:id,name', 'evidencias', 'sede:id,nombre', 'sucursal:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado']);
         $evidencias = $orden->evidencias->sortBy('id')->values();
         $a = $orden->auditoria;
 
@@ -314,8 +314,8 @@ class AuditoriaController extends Controller
             'id' => $orden->id,
             'codigo' => $orden->codigo_orden,
             'fecha' => $orden->fecha_operacion->toDateString(),
-            'cliente' => $orden->cliente?->nombre,
             'sede' => $orden->sede?->nombre,
+            'sucursal' => $orden->sucursal?->nombre,
             'ruta' => $orden->ruta,
             'placa' => $orden->placa,
             'auxiliar' => $orden->empleado?->nombre_completo ?? $orden->auxiliar_nombre,
@@ -408,7 +408,7 @@ class AuditoriaController extends Controller
 
     private function filtrosDe(Request $request): array
     {
-        return array_filter($request->only(['estado', 'cliente', 'q']), fn ($v) => $v !== null && $v !== '');
+        return array_filter($request->only(['estado', 'sede', 'q']), fn ($v) => $v !== null && $v !== '');
     }
 
     private function mensajesArchivos(): array

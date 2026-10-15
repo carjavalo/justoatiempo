@@ -4,7 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EmpresaRequest;
-use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\LineaServicio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Empresas clientes: a quienes Justo a Tiempo les presta los servicios. */
+/** Empresas clientes (p. ej. Ditranza): el contrato, con su NIT, su contacto y las líneas que reciben. */
 class EmpresaController extends Controller
 {
     public function index(Request $request): Response
@@ -22,7 +23,8 @@ class EmpresaController extends Controller
             'estado' => ['nullable', Rule::in(['activas', 'inactivas'])],
         ]);
 
-        $empresas = Cliente::query()
+        $empresas = Empresa::query()
+            ->with('lineas:id')
             ->withCount(['sedes', 'usuarios'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
@@ -39,7 +41,7 @@ class EmpresaController extends Controller
             ->orderBy('nombre')
             ->paginate(15)
             ->withQueryString()
-            ->through(fn (Cliente $c) => [
+            ->through(fn (Empresa $c) => [
                 'id' => $c->id,
                 'nombre' => $c->nombre,
                 'nit' => $c->nit,
@@ -49,30 +51,34 @@ class EmpresaController extends Controller
                 'activo' => $c->activo,
                 'sedes' => $c->sedes_count,
                 'usuarios' => $c->usuarios_count,
+                'lineas' => $c->lineas->pluck('id'),
             ]);
 
         return Inertia::render('empresas/index', [
             'empresas' => $empresas,
-            'total' => Cliente::count(),
+            'total' => Empresa::count(),
             'filtros' => ['q' => $filtros['q'] ?? '', 'estado' => $filtros['estado'] ?? ''],
+            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre']),
         ]);
     }
 
     public function store(EmpresaRequest $request): RedirectResponse
     {
-        $empresa = Cliente::create([...$request->datos(), 'activo' => true]);
+        $empresa = Empresa::create([...$request->datos(), 'activo' => true]);
+        $empresa->lineas()->sync($request->lineas());
 
         return back()->with('success', "Empresa creada: {$empresa->nombre}. Ya puedes registrar sus sedes.");
     }
 
-    public function update(EmpresaRequest $request, Cliente $empresa): RedirectResponse
+    public function update(EmpresaRequest $request, Empresa $empresa): RedirectResponse
     {
         $empresa->update($request->datos());
+        $empresa->lineas()->sync($request->lineas());
 
         return back()->with('success', "Cambios guardados en {$empresa->nombre}.");
     }
 
-    public function estado(Request $request, Cliente $empresa): RedirectResponse
+    public function estado(Request $request, Empresa $empresa): RedirectResponse
     {
         $activo = $request->validate(['activo' => ['required', 'boolean']])['activo'];
         $empresa->update(['activo' => $activo]);

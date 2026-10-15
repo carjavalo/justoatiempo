@@ -1,15 +1,21 @@
 import { AvisoFlash } from '@/components/aviso-flash';
 import { BarraSuperior } from '@/components/barra-superior';
-import { Breadcrumbs } from '@/components/breadcrumbs';
-import { type BreadcrumbItem } from '@/types';
+import { EnlaceVolver } from '@/components/enlace-volver';
+import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
+import { type SharedData, type Volver } from '@/types';
 import { usePage } from '@inertiajs/react';
 
 /**
- * Plantilla de la plataforma: barra superior y, fuera del panel, la ruta de navegación.
- * Sin menú lateral: el panel es el menú, así ninguna opción aparece repetida.
+ * Plantilla de la plataforma: barra superior y, fuera del inicio, el enlace para volver al nivel
+ * anterior. Sin menú lateral: el panel es el menú, así ninguna opción aparece repetida.
  */
-export default function AppHeaderLayout({ children, breadcrumbs = [] }: { children: React.ReactNode; breadcrumbs?: BreadcrumbItem[] }) {
-    const enPanel = usePage().component === 'panel';
+export default function AppHeaderLayout({ children, volver }: { children: React.ReactNode; volver?: Volver | false }) {
+    const pagina = usePage<SharedData>();
+    const { inicio } = pagina.props.auth.user;
+    const ruta = pagina.url.split('?')[0];
+
+    // Sin destino explícito se vuelve al inicio de quien navega, salvo si ya está en él
+    const destino = volver === false ? null : (volver ?? (ruta === inicio.url ? null : { texto: inicio.volver, href: inicio.url }));
 
     return (
         <div className="bg-background flex min-h-svh flex-col">
@@ -21,13 +27,13 @@ export default function AppHeaderLayout({ children, breadcrumbs = [] }: { childr
                 Saltar al contenido
             </a>
             <BarraSuperior />
-            {!enPanel && (
-                <div className="mx-auto w-full max-w-[1200px] px-4 pt-5 md:px-6 lg:px-8">
-                    <Breadcrumbs breadcrumbs={breadcrumbs} />
-                </div>
-            )}
-            {/* Destino del enlace de salto y del foco al cambiar de página */}
+            {/* Destino del enlace de salto y del foco al cambiar de página: lo primero que se alcanza es "Volver" */}
             <main id="contenido" tabIndex={-1} className="flex min-w-0 flex-1 flex-col outline-none">
+                {destino && (
+                    <div className={cn('mx-auto w-full px-4 pt-4 md:px-6 lg:px-8', ANCHO_PLATAFORMA)}>
+                        <EnlaceVolver {...destino} />
+                    </div>
+                )}
                 {children}
             </main>
             <AvisoFlash />

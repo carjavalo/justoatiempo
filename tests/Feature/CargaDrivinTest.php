@@ -5,11 +5,11 @@ namespace Tests\Feature;
 use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
 use App\Models\Carga;
-use App\Models\Cliente;
 use App\Models\Empleado;
 use App\Models\InformeDiario;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
+use App\Models\Sede;
 use App\Models\User;
 use App\Models\Vehiculo;
 use App\Services\Drivin\GeneradorPreliquidacion;
@@ -30,10 +30,11 @@ class CargaDrivinTest extends TestCase
         parent::setUp();
         Storage::fake('local');
 
-        $tugo = Cliente::create(['nombre' => 'TuGo', 'codigo' => 'TUGO', 'meta_efectividad' => 95]);
-        $tugo->sedes()->create(['nombre' => 'Cali Sur', 'alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
-        $sodimac = Cliente::create(['nombre' => 'Sodimac', 'codigo' => 'SODIMAC', 'meta_efectividad' => 95]);
-        $sodimac->sedes()->create(['nombre' => 'Cali', 'ciudad' => 'Cali']);
+        // Ditranza atiende a TuGo y a Sodimac (sedes), cada una con su sucursal
+        $tugo = $this->sede('TuGo', ['codigo' => 'TUGO']);
+        $tugo->sucursales()->create(['nombre' => 'Cali Sur', 'alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
+        $sodimac = $this->sede('Sodimac', ['codigo' => 'SODIMAC']);
+        $sodimac->sucursales()->create(['nombre' => 'Cali', 'ciudad' => 'Cali']);
 
         Vehiculo::create(['placa' => 'SNX 708']);
         Empleado::create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'apellidos' => 'Plaza']);
@@ -101,8 +102,8 @@ class CargaDrivinTest extends TestCase
                 ->where('analisis.totales.ordenes', 2)
                 ->where('analisis.totales.aprobadas', 1)
                 ->where('analisis.totalErrores', 0)
-                ->where('analisis.grupos.0.cliente', 'TuGo')
-                ->where('analisis.grupos.0.sede', 'Cali Sur')
+                ->where('analisis.grupos.0.sede', 'TuGo')
+                ->where('analisis.grupos.0.sucursal', 'Cali Sur')
                 ->where('analisis.grupos.0.auxiliarReconocido', true)
                 ->where('analisis.grupos.0.vehiculoRegistrado', true)
                 ->where('analisis.grupos.0.efectividad', 50)
@@ -175,8 +176,8 @@ class CargaDrivinTest extends TestCase
 
     public function test_un_informe_cerrado_no_admite_nuevas_ordenes()
     {
-        $tugo = Cliente::firstWhere('nombre', 'TuGo');
-        InformeDiario::create(['fecha_operacion' => '2026-10-02', 'cliente_id' => $tugo->id, 'sede_id' => $tugo->sedes->first()->id, 'estado' => EstadoInforme::Cerrado]);
+        $tugo = Sede::firstWhere('nombre', 'TuGo');
+        InformeDiario::create(['fecha_operacion' => '2026-10-02', 'sede_id' => $tugo->id, 'sucursal_id' => $tugo->sucursales->first()->id, 'estado' => EstadoInforme::Cerrado]);
 
         $carga = $this->subir($this->archivo([$this->fila('PDVT1', 'Aprobada')]));
 
@@ -205,17 +206,17 @@ class CargaDrivinTest extends TestCase
         );
     }
 
-    public function test_cliente_por_defecto_para_planes_no_reconocidos()
+    public function test_sede_por_defecto_para_planes_no_reconocidos()
     {
         $carga = $this->subir($this->archivo([$this->fila('PDVT1', 'Aprobada', ['Nombre Plan' => 'RUTA ESPECIAL 2-10', 'Cliente' => 'OTRO'])]));
         $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p->where('analisis.totalErrores', 1));
 
-        $sodimac = Cliente::firstWhere('nombre', 'Sodimac');
-        $this->patch("/cargas/{$carga->id}", ['cliente_id' => $sodimac->id, 'sede_id' => $sodimac->sedes->first()->id]);
+        $sodimac = Sede::firstWhere('nombre', 'Sodimac');
+        $this->patch("/cargas/{$carga->id}", ['sede_id' => $sodimac->id, 'sucursal_id' => $sodimac->sucursales->first()->id]);
 
         $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p
             ->where('analisis.totalErrores', 0)
-            ->where('analisis.grupos.0.cliente', 'Sodimac')
+            ->where('analisis.grupos.0.sede', 'Sodimac')
         );
     }
 

@@ -20,7 +20,7 @@ enum Rol: string
     public function descripcion(): string
     {
         return match ($this) {
-            self::Admin => 'Crea usuarios, empresas y sedes.',
+            self::Admin => 'Crea usuarios, empresas, sedes y sucursales.',
             self::Coordinador => 'Supervisa la operación y al personal de sus sedes.',
             self::Auxiliar => 'Personal en campo: consulta su propia información.',
         };

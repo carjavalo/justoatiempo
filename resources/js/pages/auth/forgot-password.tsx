@@ -5,7 +5,6 @@ import { FormEventHandler } from 'react';
 import { BotonEnviar } from '@/components/boton-enviar';
 import InputError from '@/components/input-error';
 import { MensajeEstado } from '@/components/mensaje-estado';
-import TextLink from '@/components/text-link';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
@@ -25,7 +24,11 @@ export default function ForgotPassword({ status }: { status?: string }) {
     };
 
     return (
-        <AuthLayout title="Recupera tu contraseña" description="Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña.">
+        <AuthLayout
+            title="Recupera tu contraseña"
+            description="Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña."
+            volver={{ texto: 'Volver a iniciar sesión', href: route('login') }}
+        >
             <Head title="Recuperar contraseña" />
 
             <MensajeEstado mensaje={status} />
@@ -54,10 +57,6 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 <BotonEnviar procesando={processing} className="h-11 w-full rounded-lg text-[0.95rem] font-semibold">
                     Enviar enlace
                 </BotonEnviar>
-
-                <p className="text-muted-foreground text-center text-sm">
-                    ¿La recordaste? <TextLink href={route('login')}>Inicia sesión</TextLink>
-                </p>
             </form>
         </AuthLayout>
     );
