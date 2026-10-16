@@ -5,6 +5,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { initializeTheme } from './hooks/use-appearance';
+import { iniciarCsrf } from './lib/csrf';
 
 declare global {
     const route: typeof routeFn;
@@ -16,6 +17,8 @@ createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, import.meta.glob('./pages/**/*.tsx')),
     setup({ el, App, props }) {
+        // Cada envío lleva el código de seguridad de esta app (ver lib/csrf.ts)
+        iniciarCsrf(props.initialPage);
         const root = createRoot(el);
 
         root.render(<App {...props} />);

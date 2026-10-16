@@ -1,3 +1,5 @@
+import { codigoCsrf } from '@/lib/csrf';
+
 /**
  * Subida de muchos archivos en tandas: PHP acepta un número limitado de archivos por
  * petición (max_file_uploads, 20 por defecto) y descarta el resto sin avisar.
@@ -13,12 +15,12 @@ export interface ResultadoSubida {
     errores: string[];
 }
 
-function tokenXsrf(): string {
-    const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : '';
-}
-
-export async function subirEnTandas(url: string, archivos: File[], extra: Record<string, string>, alAvanzar: (enviados: number, total: number) => void): Promise<ResultadoSubida> {
+export async function subirEnTandas(
+    url: string,
+    archivos: File[],
+    extra: Record<string, string>,
+    alAvanzar: (enviados: number, total: number) => void,
+): Promise<ResultadoSubida> {
     const total: ResultadoSubida = { asignados: 0, repetidos: 0, ordenes: [], sinOrden: [], cerrados: [], errores: [] };
 
     for (let i = 0; i < archivos.length; i += TAMANO_TANDA) {
@@ -32,7 +34,7 @@ export async function subirEnTandas(url: string, archivos: File[], extra: Record
                 method: 'POST',
                 body: datos,
                 credentials: 'same-origin',
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-XSRF-TOKEN': tokenXsrf() },
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': codigoCsrf() ?? '' },
             });
             const json = await r.json().catch(() => ({}));
 

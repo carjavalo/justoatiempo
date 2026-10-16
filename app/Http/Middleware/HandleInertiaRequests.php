@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -40,6 +41,10 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            // Código de seguridad de esta sesión: el navegador lo envía en X-CSRF-TOKEN en cada envío. No depende de
+            // la cookie XSRF-TOKEN, que otra app Laravel abierta en la misma dirección (otro puerto) puede sobrescribir.
+            // Siempre incluido, también en las recargas parciales.
+            'csrf' => Inertia::always(fn () => csrf_token()),
             'auth' => [
                 'user' => $user ? [
                     ...$user->only(['id', 'name', 'nombres', 'primer_apellido', 'segundo_apellido', 'email', 'email_verified_at', 'created_at', 'updated_at', 'empleado_id']),

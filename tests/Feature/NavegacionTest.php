@@ -102,4 +102,14 @@ class NavegacionTest extends TestCase
             ->assertSessionHasErrors(['email' => 'El correo o la contraseña no son correctos.']);
         $this->assertGuest();
     }
+
+    public function test_cada_pagina_comparte_el_codigo_de_seguridad_de_la_sesion(): void
+    {
+        // El navegador lo envía en X-CSRF-TOKEN: así otra app Laravel en la misma dirección no lo pisa con su cookie
+        $this->actingAs(User::factory()->admin()->create())->get('/usuarios')
+            ->assertInertia(fn (Assert $p) => $p->where('csrf', session()->token()));
+        // También a quien aún no ingresa (el formulario de ingreso lo necesita)
+        auth()->logout();
+        $this->get('/login')->assertInertia(fn (Assert $p) => $p->where('csrf', session()->token()));
+    }
 }

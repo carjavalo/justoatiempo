@@ -19,7 +19,7 @@ export function useCodigoVigente() {
         const alVolver = () => {
             if (document.visibilityState !== 'visible' || Date.now() - ultimoContacto < ESPERA_MS) return;
             ultimoContacto = Date.now();
-            // Recarga parcial sin datos: la respuesta trae el código nuevo (cookie XSRF-TOKEN). Asíncrona para que un
+            // Recarga parcial sin datos: la respuesta trae el código nuevo (props.csrf). Asíncrona para que un
             // envío inmediato no la cancele ni espere por ella.
             router.reload({ only: ['__codigo_vigente'], async: true });
         };
