@@ -32,6 +32,7 @@ class User extends Authenticatable
         'sede_id',
         'sucursal_id',
         'linea_servicio_id',
+        'carnet_path',
         'empleado_id',
         'activo',
         'ultimo_acceso_en',
@@ -45,6 +46,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        // Ruta interna del archivo: el carnet se entrega solo por la ruta de la administración
+        'carnet_path',
     ];
 
     /**

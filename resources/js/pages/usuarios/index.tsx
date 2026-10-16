@@ -1,5 +1,6 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
+import { CampoImagen } from '@/components/admin/campo-imagen';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import {
@@ -43,6 +44,8 @@ interface FilaUsuario {
     sede: string | null;
     sucursalId: number | null;
     sucursal: string | null;
+    /** Dirección de la imagen del carnet (solo para la administración), si tiene. */
+    carnet: string | null;
     lineaId: number | null;
     linea: string | null;
     activo: boolean;
@@ -80,6 +83,8 @@ const VACIO = {
     empresa_id: '',
     sede_id: '',
     sucursal_id: '',
+    carnet: null as File | null,
+    quitar_carnet: false,
     password: '',
 };
 const ORDEN_CAMPOS = [
@@ -92,6 +97,7 @@ const ORDEN_CAMPOS = [
     'empresa_id',
     'sede_id',
     'sucursal_id',
+    'carnet',
     'password',
 ];
 
@@ -137,6 +143,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
                       sede_id: usuario.sedeId ? String(usuario.sedeId) : '',
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
+                      carnet: null,
+                      quitar_carnet: false,
                       password: '',
                   }
                 : // Si la lista viene filtrada por empresa, sede o sucursal, el usuario nuevo nace ahí
@@ -162,8 +170,12 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
 
     const guardar = () => {
         const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
-        if (editando) form.put(route('usuarios.update', editando.id), opciones);
-        else form.post(route('usuarios.store'), opciones);
+        // Con una imagen al editar, el envío va como formulario con archivos, que PHP solo lee en POST: se marca como edición
+        const conArchivoAlEditar = Boolean(editando && form.data.carnet);
+        form.transform((d) => (conArchivoAlEditar ? { ...d, _method: 'put' } : d));
+        if (!editando) form.post(route('usuarios.store'), opciones);
+        else if (conArchivoAlEditar) form.post(route('usuarios.update', editando.id), opciones);
+        else form.put(route('usuarios.update', editando.id), opciones);
     };
 
     // Cascada línea → empresa → sede → sucursal: la empresa debe recibir la línea, la sede es de la empresa
@@ -628,6 +640,19 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         </div>
                     </>
                 )}
+
+                <CampoImagen
+                    id="carnet"
+                    etiqueta="Carnet"
+                    ayuda="Imagen del carnet de la empresa (JPG, PNG o WebP). Solo la ve la administración."
+                    error={form.errors.carnet}
+                    archivo={form.data.carnet}
+                    actual={editando?.carnet ?? null}
+                    quitar={form.data.quitar_carnet}
+                    descripcion={`Carnet de ${editando?.nombre ?? ([form.data.nombres, form.data.primer_apellido].filter(Boolean).join(' ') || 'la persona')}`}
+                    onArchivo={(archivo) => form.setData('carnet', archivo)}
+                    onQuitar={(quitar) => form.setData('quitar_carnet', quitar)}
+                />
 
                 <Campo
                     id="password"

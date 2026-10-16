@@ -53,6 +53,9 @@ class UsuarioRequest extends FormRequest
             'linea_id' => ['nullable', 'integer', Rule::exists('lineas_servicio', 'id')],
             // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
             'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
+            // Carnet de la empresa: imagen opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
+            'carnet' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            'quitar_carnet' => ['nullable', 'boolean'],
         ];
     }
 
@@ -126,12 +129,16 @@ class UsuarioRequest extends FormRequest
     {
         return [
             'email.unique' => 'Ya hay un usuario con este correo.',
+            'carnet.image' => 'El carnet debe ser una imagen JPG, PNG o WebP.',
+            'carnet.mimes' => 'El carnet debe ser una imagen JPG, PNG o WebP.',
+            'carnet.max' => 'La imagen del carnet no puede pesar más de 8 MB.',
+            'carnet.uploaded' => 'No se pudo subir la imagen del carnet. Intenta con una más liviana.',
         ];
     }
 
     public function attributes(): array
     {
-        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña'];
+        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'carnet' => 'el carnet'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */

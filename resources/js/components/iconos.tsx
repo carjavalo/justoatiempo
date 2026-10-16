@@ -6,6 +6,7 @@
  * - Controles pequeños (flechas, cerrar, agregar…): trazo grueso, nítido en 16 px.
  * Se conservan los nombres que usaba la app para no tocar cada pantalla; aquí se decide el dibujo.
  */
+import { cn } from '@/lib/utils';
 import {
     ArrowCounterClockwiseIcon,
     ArrowDownIcon,
@@ -60,6 +61,7 @@ import {
     type Icon as IconoPhosphor,
     type IconProps,
     type IconWeight,
+    IdentificationCardIcon,
     InfoIcon,
     KeyIcon,
     LightbulbIcon,
@@ -117,7 +119,6 @@ import {
     XCircleIcon,
     XIcon,
 } from '@phosphor-icons/react';
-import { cn } from '@/lib/utils';
 import { forwardRef } from 'react';
 
 export type PropsIcono = Omit<IconProps, 'ref'> & {
@@ -132,9 +133,13 @@ const PESO: Record<Papel, IconWeight> = { concepto: 'duotone', estado: 'fill', c
 
 function icono(Base: IconoPhosphor, papel: Papel, nombre: string): TipoIcono {
     const Componente = forwardRef<SVGSVGElement, PropsIcono>(({ className, strokeWidth, weight, size = 24, ...props }, ref) => {
-        const peso = weight ?? (strokeWidth !== undefined && strokeWidth <= 1.25 ? 'light' : strokeWidth !== undefined && strokeWidth >= 2.5 ? 'bold' : PESO[papel]);
+        const peso =
+            weight ??
+            (strokeWidth !== undefined && strokeWidth <= 1.25 ? 'light' : strokeWidth !== undefined && strokeWidth >= 2.5 ? 'bold' : PESO[papel]);
         // El tamaño real lo da la clase (size-4, size-5…); 24 solo aplica si no hay clase
-        return <Base ref={ref} weight={peso} size={size} className={cn('icono shrink-0', peso === 'duotone' && 'icono-acento', className)} {...props} />;
+        return (
+            <Base ref={ref} weight={peso} size={size} className={cn('icono shrink-0', peso === 'duotone' && 'icono-acento', className)} {...props} />
+        );
     });
     Componente.displayName = nombre;
     return Componente;
@@ -157,6 +162,7 @@ export const FileX2 = icono(FileXIcon, 'concepto', 'FileX2');
 export const FolderUp = icono(FolderSimplePlusIcon, 'concepto', 'FolderUp');
 export const GraduationCap = icono(GraduationCapIcon, 'concepto', 'GraduationCap');
 export const Hammer = icono(HammerIcon, 'concepto', 'Hammer');
+export const IdCard = icono(IdentificationCardIcon, 'concepto', 'IdCard');
 export const HardHat = icono(HardHatIcon, 'concepto', 'HardHat');
 export const HeartPulse = icono(HeartbeatIcon, 'concepto', 'HeartPulse');
 export const ImagePlus = icono(FilePlusIcon, 'concepto', 'ImagePlus');

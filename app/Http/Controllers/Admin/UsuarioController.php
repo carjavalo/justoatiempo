@@ -14,9 +14,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UsuarioController extends Controller
 {
@@ -65,6 +68,8 @@ class UsuarioController extends Controller
                 'sede' => $u->sede?->nombre,
                 'sucursalId' => $u->sucursal_id,
                 'sucursal' => $u->sucursal?->nombre,
+                // La versión en la dirección evita que el navegador muestre el carnet anterior tras reemplazarlo
+                'carnet' => $u->carnet_path ? route('usuarios.carnet', ['usuario' => $u->id, 'v' => substr(md5($u->carnet_path), 0, 8)]) : null,
                 'lineaId' => $u->linea_servicio_id,
                 'linea' => $u->linea?->nombre,
                 'activo' => $u->activo,
@@ -122,6 +127,7 @@ class UsuarioController extends Controller
         $usuario = User::create([...$request->datos(), 'activo' => true]);
         // Lo crea el administrador: el correo ya se da por verificado
         $usuario->markEmailAsVerified();
+        $this->guardarCarnet($request, $usuario);
 
         return back()->with('success', "Usuario creado: {$usuario->name} ya puede ingresar con su correo.");
     }
@@ -130,6 +136,7 @@ class UsuarioController extends Controller
     {
         $datos = $request->datos();
         $usuario->update($datos);
+        $this->guardarCarnet($request, $usuario);
 
         // Contraseña nueva: las sesiones abiertas con la anterior dejan de valer (menos la de quien edita)
         if (array_key_exists('password', $datos)) {
@@ -140,6 +147,37 @@ class UsuarioController extends Controller
         }
 
         return back()->with('success', "Cambios guardados en {$usuario->name}.");
+    }
+
+    /** Imagen del carnet, solo para la administración (no hay dirección pública para estos archivos). */
+    public function carnet(User $usuario): StreamedResponse
+    {
+        abort_unless($usuario->carnet_path && Storage::disk('local')->exists($usuario->carnet_path), 404);
+
+        $nombre = 'carnet-'.Str::slug($usuario->name).'.'.pathinfo($usuario->carnet_path, PATHINFO_EXTENSION);
+
+        return Storage::disk('local')->response($usuario->carnet_path, $nombre, [
+            'Cache-Control' => 'private, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /** Guarda el carnet nuevo o lo quita; el archivo anterior se borra una vez guardado el cambio. */
+    private function guardarCarnet(UsuarioRequest $request, User $usuario): void
+    {
+        $anterior = $usuario->carnet_path;
+
+        if ($request->hasFile('carnet')) {
+            $usuario->update(['carnet_path' => $request->file('carnet')->store("carnets/{$usuario->id}", 'local')]);
+        } elseif ($request->boolean('quitar_carnet')) {
+            $usuario->update(['carnet_path' => null]);
+        } else {
+            return;
+        }
+
+        if ($anterior && $anterior !== $usuario->carnet_path) {
+            Storage::disk('local')->delete($anterior);
+        }
     }
 
     public function estado(Request $request, User $usuario): RedirectResponse

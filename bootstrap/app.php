@@ -80,9 +80,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Una acción (POST, PUT…) que ya no se puede hacer o que se repitió demasiado vuelve a la pantalla
             // anterior con el aviso: así no queda en la barra una dirección que no se abre con GET (405)
-            if (! $request->isMethod('GET') && in_array($estado, [409, 429], true)) {
+            if (! $request->isMethod('GET') && in_array($estado, [409, 413, 429], true)) {
                 return back(303)->with('error', $motivo ?? match (true) {
                     $estado === 409 => 'Esta acción ya no se puede hacer: el registro cambió mientras lo veías.',
+                    // El servidor descartó el envío por pesado (límite de PHP del hosting), p. ej. una imagen
+                    $estado === 413 => 'Lo que intentaste enviar pesa demasiado para el servidor. Usa un archivo más liviano.',
                     $usuario !== null => 'Hiciste demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.',
                     default => 'Ha hecho demasiados intentos seguidos. Espere un minuto e intente de nuevo.',
                 });
