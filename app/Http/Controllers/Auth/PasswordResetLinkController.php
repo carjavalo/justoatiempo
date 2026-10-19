@@ -16,6 +16,9 @@ class PasswordResetLinkController extends Controller
     /** Solicitudes permitidas por equipo (dirección IP) cada 15 minutos. */
     private const SOLICITUDES = 5;
 
+    /** Momento (marca de tiempo) del último enlace pedido desde este navegador. */
+    private const ULTIMO_ENVIO = 'restablecer_enviado_en';
+
     /**
      * Show the password reset link request page.
      */
@@ -23,6 +26,9 @@ class PasswordResetLinkController extends Controller
     {
         return Inertia::render('auth/forgot-password', [
             'status' => $request->session()->get('status'),
+            // Contador para volver a pedir el enlace; sigue corriendo aunque se recargue la página
+            'espera' => $this->espera($request),
+            'enviadoEn' => $request->session()->get(self::ULTIMO_ENVIO),
         ]);
     }
 
@@ -37,6 +43,14 @@ class PasswordResetLinkController extends Controller
             'email' => 'required|email',
         ]);
 
+        // El mismo plazo del contador de la pantalla (p. ej. si se envía desde otra pestaña)
+        $espera = $this->espera($request);
+        if ($espera > 0) {
+            throw ValidationException::withMessages([
+                'email' => 'Espera '.($espera === 1 ? 'un segundo' : "{$espera} segundos").' para pedir otro enlace.',
+            ]);
+        }
+
         // Freno por equipo: este formulario no sirve para llenar buzones ajenos ni para probar correo tras correo
         $clave = 'restablecer|'.$request->ip();
         if (RateLimiter::tooManyAttempts($clave, self::SOLICITUDES)) {
@@ -50,9 +64,21 @@ class PasswordResetLinkController extends Controller
 
         // Solo las cuentas activas reciben el enlace. La respuesta es la misma exista o no la cuenta, y el correo
         // sale después de responder (User::avisarDespues): ni el mensaje ni la espera delatan qué correos existen.
-        // Pedirlo de nuevo antes de un minuto no envía otro correo (auth.passwords.users.throttle).
         Password::sendResetLink([...$request->only('email'), 'activo' => true]);
+        $request->session()->put(self::ULTIMO_ENVIO, now()->getTimestamp());
 
         return back()->with('status', "Si {$request->email} tiene una cuenta activa en la plataforma, en unos minutos te llegará un correo con el enlace para crear una nueva contraseña. Revisa también la carpeta de correo no deseado.");
+    }
+
+    /**
+     * Segundos que faltan para poder pedir otro enlace. Es el mismo plazo con el que la plataforma deja de enviar
+     * correos repetidos a una misma cuenta (auth.passwords.*.throttle).
+     */
+    private function espera(Request $request): int
+    {
+        $enviado = $request->session()->get(self::ULTIMO_ENVIO);
+        $plazo = (int) config('auth.passwords.'.config('auth.defaults.passwords').'.throttle');
+
+        return $enviado ? max(0, (int) $enviado + $plazo - now()->getTimestamp()) : 0;
     }
 }

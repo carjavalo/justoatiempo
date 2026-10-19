@@ -84,6 +84,7 @@ class PasswordResetTest extends TestCase
             $this->post('/forgot-password', ['email' => $correo])
                 ->assertSessionHasNoErrors()
                 ->assertSessionHas('status', fn ($texto) => str_contains($texto, self::AVISO));
+            $this->travel(31)->seconds();
         }
 
         Notification::assertNothingSent();
@@ -92,13 +93,42 @@ class PasswordResetTest extends TestCase
     public function test_un_mismo_equipo_no_puede_pedir_enlaces_sin_limite()
     {
         Notification::fake();
+        $this->freezeTime();
 
         for ($i = 0; $i < 5; $i++) {
             $this->post('/forgot-password', ['email' => "persona{$i}@example.com"])->assertSessionHasNoErrors();
+            $this->travel(31)->seconds();
         }
 
+        // 5 envíos en 155 segundos: faltan 745 s de los 15 minutos
         $this->post('/forgot-password', ['email' => 'otra@example.com'])
-            ->assertSessionHasErrors(['email' => 'Hiciste muchas solicitudes seguidas. Espera 15 minutos y vuelve a intentarlo.']);
+            ->assertSessionHasErrors(['email' => 'Hiciste muchas solicitudes seguidas. Espera 13 minutos y vuelve a intentarlo.']);
+    }
+
+    public function test_despues_de_enviar_hay_que_esperar_30_segundos_para_pedir_otro_enlace()
+    {
+        Notification::fake();
+        $this->freezeTime();
+        $usuario = User::factory()->create();
+
+        $this->get('/forgot-password')->assertInertia(fn (Assert $p) => $p->where('espera', 0)->where('enviadoEn', null));
+
+        $this->post('/forgot-password', ['email' => $usuario->email])->assertSessionHasNoErrors();
+        // El contador sigue aunque se recargue la página
+        $this->get('/forgot-password')->assertInertia(fn (Assert $p) => $p->where('espera', 30)->where('enviadoEn', now()->getTimestamp()));
+
+        $this->travel(10)->seconds();
+        $this->get('/forgot-password')->assertInertia(fn (Assert $p) => $p->where('espera', 20));
+        // Antes de tiempo (p. ej. desde otra pestaña) no se envía nada
+        $this->post('/forgot-password', ['email' => $usuario->email])
+            ->assertSessionHasErrors(['email' => 'Espera 20 segundos para pedir otro enlace.']);
+        Notification::assertSentToTimes($usuario, RestablecerContrasena::class, 1);
+
+        // Cumplido el plazo, el correo vuelve a salir
+        $this->travel(20)->seconds();
+        $this->get('/forgot-password')->assertInertia(fn (Assert $p) => $p->where('espera', 0));
+        $this->post('/forgot-password', ['email' => $usuario->email])->assertSessionHasNoErrors();
+        Notification::assertSentToTimes($usuario, RestablecerContrasena::class, 2);
     }
 
     public function test_la_pagina_del_enlace_dice_de_entrada_si_aun_sirve()

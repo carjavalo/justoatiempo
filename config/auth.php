@@ -95,7 +95,8 @@ return [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
-            'throttle' => 60,
+            // Segundos antes de poder pedir otro enlace: el mismo contador que ve la persona en la pantalla
+            'throttle' => 30,
         ],
     ],
 

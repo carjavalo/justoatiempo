@@ -6,20 +6,34 @@ import { BotonEnviar } from '@/components/boton-enviar';
 import InputError from '@/components/input-error';
 import { MensajeEstado } from '@/components/mensaje-estado';
 import { Input } from '@/components/ui/input';
+import { useCuentaRegresiva } from '@/hooks/use-cuenta-regresiva';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
+import { cn } from '@/lib/utils';
 
-export default function ForgotPassword({ status }: { status?: string }) {
+interface ForgotPasswordProps {
+    status?: string;
+    /** Segundos que faltan para poder pedir otro enlace. */
+    espera: number;
+    /** Momento del último envío desde este navegador (reinicia el contador en cada envío). */
+    enviadoEn?: number | null;
+}
+
+export default function ForgotPassword({ status, espera, enviadoEn }: ForgotPasswordProps) {
     const { data, setData, post, processing, errors } = useForm({
         email: '',
     });
 
     useFocoPrimerError(errors, ['email']);
 
+    // Después de enviar, el botón cuenta los segundos que faltan para poder pedir otro enlace
+    const restante = useCuentaRegresiva(espera, enviadoEn);
+    const esperando = restante > 0;
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        if (processing) return;
+        if (processing || esperando) return;
         post(route('password.email'));
     };
 
@@ -54,9 +68,26 @@ export default function ForgotPassword({ status }: { status?: string }) {
                     <InputError id="email-error" message={errors.email} />
                 </div>
 
-                <BotonEnviar procesando={processing} className="h-11 w-full rounded-lg text-[0.95rem] font-semibold">
-                    Enviar enlace
+                {/* Mientras cuenta, queda aria-disabled (no disabled): no suelta el foco y se anuncia como no disponible */}
+                <BotonEnviar
+                    procesando={processing}
+                    aria-disabled={processing || esperando || undefined}
+                    className={cn('h-11 w-full rounded-lg text-[0.95rem] font-semibold', esperando && 'aria-disabled:cursor-not-allowed')}
+                >
+                    {esperando ? (
+                        <span>
+                            Reenviar en <span className="tabular-nums">{restante}</span> s
+                        </span>
+                    ) : enviadoEn ? (
+                        'Reenviar enlace'
+                    ) : (
+                        'Enviar enlace'
+                    )}
                 </BotonEnviar>
+                {/* Solo se anuncia el final de la cuenta, no cada segundo */}
+                <p role="status" className="sr-only">
+                    {espera > 0 && !esperando ? 'Ya puedes pedir otro enlace.' : ''}
+                </p>
             </form>
         </AuthLayout>
     );
