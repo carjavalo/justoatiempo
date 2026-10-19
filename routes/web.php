@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\SedeController;
+use App\Http\Controllers\Admin\SolicitudController;
 use App\Http\Controllers\Admin\SucursalController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\AuditoriaController;
@@ -45,6 +46,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('sucursales', [SucursalController::class, 'store'])->name('sucursales.store');
         Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->name('sucursales.update');
         Route::patch('sucursales/{sucursal}/estado', [SucursalController::class, 'estado'])->name('sucursales.estado');
+
+        // Solicitudes de cotización del sitio web
+        Route::get('solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.index');
+        Route::patch('solicitudes/{solicitud}/atencion', [SolicitudController::class, 'atencion'])->name('solicitudes.atencion');
     });
 
     // Cada línea de servicio: su tablero (logística) o su resumen de empresas y personal

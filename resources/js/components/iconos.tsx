@@ -82,6 +82,7 @@ import {
     PaintRollerIcon,
     PaperclipIcon,
     PencilSimpleIcon,
+    PhoneIcon,
     PlantIcon,
     PlusIcon,
     ProhibitIcon,
@@ -106,6 +107,7 @@ import {
     ToggleLeftIcon,
     ToggleRightIcon,
     TrashIcon,
+    TrayArrowDownIcon,
     TrayIcon,
     TreeEvergreenIcon,
     TruckIcon,
@@ -184,6 +186,7 @@ export const PackageCheck = icono(PackageIcon, 'concepto', 'PackageCheck');
 export const PackageOpen = icono(ShippingContainerIcon, 'concepto', 'PackageOpen');
 export const PackageSearch = icono(TrayIcon, 'concepto', 'PackageSearch');
 export const PackageX = icono(ArrowUUpLeftIcon, 'concepto', 'PackageX');
+export const Phone = icono(PhoneIcon, 'concepto', 'Phone');
 export const Scale = icono(ScalesIcon, 'concepto', 'Scale');
 export const Settings = icono(GearSixIcon, 'control', 'Settings');
 export const ShieldCheck = icono(ShieldCheckIcon, 'concepto', 'ShieldCheck');
@@ -210,6 +213,8 @@ export const Zap = icono(LightningIcon, 'concepto', 'Zap');
 export const AseoIndustrial = icono(BroomIcon, 'concepto', 'AseoIndustrial');
 export const AseoConstruccion = icono(PaintRollerIcon, 'concepto', 'AseoConstruccion');
 export const ApoyoPlantas = icono(UserGearIcon, 'concepto', 'ApoyoPlantas');
+/** Solicitudes de cotización que llegan desde el sitio web. */
+export const Bandeja = icono(TrayArrowDownIcon, 'concepto', 'Bandeja');
 export const ServicioLogistico = icono(PackageIcon, 'concepto', 'ServicioLogistico');
 export const Sectores = icono(ChartPieSliceIcon, 'concepto', 'Sectores');
 export const ConjuntoResidencial = icono(HouseLineIcon, 'concepto', 'ConjuntoResidencial');

@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UsersRound } from '@/components/iconos';
+import { ArrowRight, Bandeja, Building2, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UsersRound } from '@/components/iconos';
 import AppLayout from '@/layouts/app-layout';
 import { SERVICIOS } from '@/lib/portafolio';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ interface Resumen {
     empresas: { total: number; activas: number };
     sedes: { total: number; activas: number };
     sucursales: { total: number; activas: number; propias: number };
+    solicitudes: { total: number; pendientes: number };
 }
 
 interface LineaPanel {
@@ -72,7 +73,7 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 }
 
 function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
-    const { usuarios, empresas, sedes, sucursales } = resumen;
+    const { usuarios, empresas, sedes, sucursales, solicitudes } = resumen;
     const opciones: { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string }[] = [
         {
             id: 'usuarios',
@@ -157,6 +158,8 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                 ))}
             </ul>
 
+            <SolicitudesSitio solicitudes={solicitudes} />
+
             {empresas.total === 0 && (
                 <p className="bg-secondary/60 text-secondary-foreground flex items-start gap-3 rounded-2xl px-5 py-4 text-sm">
                     <Lightbulb className="text-brand-coral-ink mt-0.5 size-5 shrink-0" aria-hidden="true" />
@@ -167,6 +170,58 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                 </p>
             )}
         </section>
+    );
+}
+
+/**
+ * Lo que llega del formulario "Hablemos de su operación" del sitio web. Va a lo ancho, debajo de las cuatro
+ * tarjetas: no es un registro que se administre sino una bandeja que se revisa, y así resalta lo pendiente.
+ */
+function SolicitudesSitio({ solicitudes }: { solicitudes: Resumen['solicitudes'] }) {
+    const { total, pendientes } = solicitudes;
+    const dato = pendientes
+        ? plural(pendientes, 'solicitud pendiente', 'solicitudes pendientes')
+        : total
+          ? 'Todas atendidas'
+          : 'Aún no han llegado';
+
+    return (
+        <div
+            className={cn(
+                'group bg-card relative isolate flex flex-wrap items-center gap-x-5 gap-y-3 overflow-hidden rounded-3xl border p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all md:px-7',
+                'hover:border-primary/30 hover:-translate-y-0.5 hover:shadow-[var(--sombra-elevada)]',
+                'has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-ring/25 has-[a:focus-visible]:ring-[3px]',
+            )}
+        >
+            <span className="bg-brand-navy-deep flex size-12 shrink-0 items-center justify-center rounded-2xl shadow-md">
+                <Bandeja className="text-brand-coral-on-dark size-7" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1 basis-64">
+                <h3 className="text-lg font-extrabold tracking-tight">
+                    <Link
+                        href={route('solicitudes.index')}
+                        prefetch
+                        aria-describedby="opcion-solicitudes"
+                        className="outline-hidden after:absolute after:inset-0 after:content-['']"
+                    >
+                        Solicitudes de cotización
+                    </Link>
+                </h3>
+                <p id="opcion-solicitudes" className="text-muted-foreground text-sm">
+                    Lo que escriben los clientes desde el formulario del sitio web.
+                </p>
+            </div>
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold whitespace-nowrap',
+                    pendientes ? 'bg-warning-soft text-warning' : 'bg-muted text-muted-foreground',
+                )}
+            >
+                {pendientes > 0 && <span className="bg-warning size-2 rounded-full" aria-hidden="true" />}
+                {dato}
+            </span>
+            <ArrowRight className="text-primary size-5 shrink-0 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+        </div>
     );
 }
 

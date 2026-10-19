@@ -35,7 +35,7 @@
                                     </td>
                                     <td style="padding-left:14px; font-family:{!! $fuente !!}; text-align:left;">
                                         <div style="font-size:17px; line-height:1.3; font-weight:800; color:#ffffff;">Justo a Tiempo SP S.A.S</div>
-                                        <div style="font-size:11px; line-height:1.6; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#f4b2a8;">Plataforma de gestión</div>
+                                        <div style="font-size:11px; line-height:1.6; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#f4b2a8;">@yield('subtitulo', 'Plataforma de gestión')</div>
                                     </td>
                                 </tr>
                             </table>
@@ -49,7 +49,7 @@
                     <tr>
                         <td align="center" style="padding:24px 16px 8px; font-family:{!! $fuente !!}; font-size:12px; line-height:1.6; color:#5b6577;">
                             Justo a Tiempo SP S.A.S · Cali, Colombia<br>
-                            Mensaje automático de la plataforma: por favor no respondas a este correo.
+                            @yield('pie', 'Mensaje automático de la plataforma: por favor no respondas a este correo.')
                         </td>
                     </tr>
                 </table>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\Sede;
+use App\Models\SolicitudContacto;
 use App\Models\Sucursal;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -47,6 +48,7 @@ class PanelController extends Controller
                 'empresas' => ['total' => (int) $empresas->total, 'activas' => (int) $empresas->activas],
                 'sedes' => ['total' => (int) $sedes->total, 'activas' => (int) $sedes->activas],
                 'sucursales' => ['total' => (int) $sucursales->total, 'activas' => (int) $sucursales->activas, 'propias' => (int) $sucursales->propias],
+                'solicitudes' => ['total' => SolicitudContacto::count(), 'pendientes' => SolicitudContacto::where('atendida', false)->count()],
             ],
             'lineas' => LineaServicio::ordenadas()
                 ->withCount([

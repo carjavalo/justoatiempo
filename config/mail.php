@@ -114,4 +114,8 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    // Buzones que reciben las solicitudes del formulario "Hablemos de su operación", separados por comas.
+    // Vacío: les llegan a los administradores activos de la plataforma.
+    'contacto' => env('MAIL_CONTACTO'),
+
 ];
