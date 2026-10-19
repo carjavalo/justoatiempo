@@ -31,7 +31,7 @@ export default function AuthSplitLayout({ children, title, description, volver }
                 className="bg-brand-navy-deep relative isolate hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex xl:p-14"
             >
                 <img
-                    src="/images/marca/equipo.jpg"
+                    src="/images/operacion/equipo-en-bodega.jpg"
                     alt=""
                     className="absolute inset-x-0 top-0 -z-20 h-[62%] w-full object-cover object-[50%_30%] opacity-60"
                 />

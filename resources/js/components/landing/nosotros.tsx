@@ -17,12 +17,12 @@ export function Nosotros() {
                         </Revelar>
                     </div>
 
-                    {/* Foto del equipo con el logo oficial como sello */}
+                    {/* Foto real de la operación, con el logo oficial como sello */}
                     <Revelar retraso={150} className="relative mx-auto w-full max-w-md">
                         <div className="bg-brand-coral-soft absolute -top-5 -right-5 -z-10 hidden size-40 rounded-3xl sm:block" aria-hidden="true" />
                         <img
-                            src="/images/servicios/despachos.jpg"
-                            alt="Colaborador de Justo a Tiempo SP con una caja de despacho"
+                            src="/images/operacion/colaborador-alistando-pedido.jpg"
+                            alt="Colaborador de Justo a Tiempo SP alistando un pedido en un centro de distribución"
                             className="aspect-[3/4] w-full rounded-3xl object-cover object-top shadow-xl"
                         />
                         <LogoMarca

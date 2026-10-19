@@ -63,7 +63,10 @@ export interface LineaServicio {
     id: string;
     nombre: string;
     icono: TipoIcono;
-    /** Foto del servicio: todas con la misma proporción vertical (0,62) y encuadre de cabeza a cintura. */
+    /**
+     * Foto del servicio: todas con la misma proporción vertical (0,62). Las de logística, personal y apoyo a
+     * plantas son fotos reales de la operación (images/operacion); las demás, ilustrativas con el logo oficial.
+     */
     imagen: string;
     descripcion: string;
     /** Cómo nombra el portafolio la lista: actividades, perfiles, incluye o servicios. */
@@ -76,7 +79,7 @@ export const SERVICIOS: LineaServicio[] = [
         id: 'logisticos',
         nombre: 'Servicios logísticos',
         icono: ServicioLogistico,
-        imagen: '/images/servicios/cargue-descargue.jpg',
+        imagen: '/images/operacion/cargue-en-bodega.jpg',
         descripcion:
             'Soluciones logísticas mediante el suministro de personal especializado para apoyar todas las etapas de la cadena de abastecimiento, garantizando operaciones eficientes, seguras y organizadas.',
         tituloLista: 'Actividades',
@@ -102,7 +105,7 @@ export const SERVICIOS: LineaServicio[] = [
         id: 'personal',
         nombre: 'Suministro de personal operativo',
         icono: UsersRound,
-        imagen: '/images/servicios/personal-logistico.jpg',
+        imagen: '/images/operacion/coordinacion-de-equipo.jpg',
         descripcion: 'Talento humano para necesidades operativas temporales, permanentes o por proyectos, adaptado a los procesos internos de cada cliente.',
         tituloLista: 'Perfiles',
         items: [
@@ -167,7 +170,7 @@ export const SERVICIOS: LineaServicio[] = [
         id: 'apoyo-plantas',
         nombre: 'Apoyo operativo para plantas y centros logísticos',
         icono: ApoyoPlantas,
-        imagen: '/images/servicios/operarios.jpg',
+        imagen: '/images/operacion/organizacion-de-bodega.jpg',
         descripcion: 'Personal de apoyo para fortalecer procesos productivos, logísticos y de almacenamiento.',
         tituloLista: 'Actividades',
         items: ['Abastecimiento de líneas', 'Clasificación', 'Empaque', 'Reempaque', 'Etiquetado', 'Inventarios', 'Organización de bodegas'],
