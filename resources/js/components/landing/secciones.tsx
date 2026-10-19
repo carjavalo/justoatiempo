@@ -4,7 +4,7 @@ import { EncabezadoSeccion, Revelar } from './piezas';
 
 export function PorQueElegirnos() {
     return (
-        <section id="por-que-elegirnos" aria-labelledby="titulo-razones" className="bg-brand-navy-deep relative isolate overflow-hidden py-20 text-white md:py-28">
+        <section id="por-que-elegirnos" aria-labelledby="titulo-razones" data-fondo-oscuro className="bg-brand-navy-deep relative isolate overflow-hidden py-20 text-white md:py-28">
             <div className="bg-brand-coral/15 pointer-events-none absolute -bottom-48 -left-40 -z-10 size-[34rem] rounded-full blur-3xl" aria-hidden="true" />
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <EncabezadoSeccion

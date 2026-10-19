@@ -5,7 +5,7 @@ import { Revelar } from './piezas';
 export function Portada() {
     return (
         <section id="inicio" aria-labelledby="titulo-portada" className="relative isolate">
-            <div className="bg-brand-navy-deep relative isolate overflow-hidden text-white">
+            <div data-fondo-oscuro className="bg-brand-navy-deep relative isolate overflow-hidden text-white">
                 {/* Textura de marca: trama de puntos y resplandor coral */}
                 <div className="absolute inset-0 -z-10 opacity-[0.07] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:22px_22px]" aria-hidden="true" />
                 <div className="bg-brand-coral/20 absolute -top-40 -right-40 -z-10 size-[36rem] rounded-full blur-3xl" aria-hidden="true" />

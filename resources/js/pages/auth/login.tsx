@@ -22,11 +22,13 @@ type LoginForm = {
 interface LoginProps {
     status?: string;
     canResetPassword: boolean;
+    /** Correo de quien acaba de restablecer su contraseña: ya va escrito. */
+    correo?: string | null;
 }
 
-export default function Login({ status, canResetPassword }: LoginProps) {
+export default function Login({ status, canResetPassword, correo }: LoginProps) {
     const { data, setData, post, processing, errors, reset } = useForm<LoginForm>({
-        email: '',
+        email: correo ?? '',
         password: '',
         remember: false,
     });
@@ -61,7 +63,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                 {...propsCampo('email', errors.email)}
                                 type="email"
                                 required
-                                autoFocus
+                                autoFocus={!correo}
                                 autoComplete="username"
                                 value={data.email}
                                 onChange={(e) => setData('email', e.target.value)}
@@ -79,6 +81,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             <PasswordInput
                                 {...propsCampo('password', errors.password)}
                                 required
+                                autoFocus={!!correo}
                                 autoComplete="current-password"
                                 placeholder="Escribe tu contraseña"
                                 value={data.password}

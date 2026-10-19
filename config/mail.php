@@ -45,7 +45,8 @@ return [
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            // Si el servidor de correo no responde, se desiste a los 20 s en vez de dejar colgado el proceso
+            'timeout' => env('MAIL_TIMEOUT', 20),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url(env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

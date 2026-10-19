@@ -7,6 +7,7 @@ import { Portada } from '@/components/landing/portada';
 import { PorQueElegirnos, Sectores, SeguridadCobertura } from '@/components/landing/secciones';
 import { Servicios } from '@/components/landing/servicios';
 import { useCodigoVigente } from '@/hooks/use-codigo-vigente';
+import { useFondoBajoLaBarra } from '@/hooks/use-fondo-bajo-la-barra';
 import { EMPRESA } from '@/lib/portafolio';
 import { Head } from '@inertiajs/react';
 
@@ -14,6 +15,8 @@ import { Head } from '@inertiajs/react';
 export default function Welcome({ servicios }: { servicios: string[] }) {
     // El formulario de contacto no debe fallar si la página llevaba horas abierta
     useCodigoVigente();
+    // La barra de desplazamiento toma el color de la franja que tiene al lado (azul o claro)
+    useFondoBajoLaBarra();
 
     return (
         <>

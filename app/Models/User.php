@@ -4,11 +4,17 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\Rol;
+use App\Notifications\RestablecerContrasena;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
+use Throwable;
+
+use function Illuminate\Support\defer;
 
 class User extends Authenticatable
 {
@@ -82,6 +88,34 @@ class User extends Authenticatable
         $texto = implode(' ', array_filter([$nombres, $primerApellido, $segundoApellido], fn ($parte) => filled($parte)));
 
         return trim(preg_replace('/\s+/u', ' ', $texto));
+    }
+
+    /** Cómo se le saluda en los correos: "Ana María" (o la primera palabra del nombre, si no tiene nombres aparte). */
+    public function nombreDePila(): string
+    {
+        return filled($this->nombres) ? trim($this->nombres) : Str::before(trim($this->name), ' ');
+    }
+
+    /** "¿Olvidaste tu contraseña?": el correo propio de la plataforma, en vez del genérico de Laravel. */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->avisarDespues(new RestablecerContrasena($token));
+    }
+
+    /**
+     * Envía el correo después de responder: quien lo pide no espera al servidor de correo, y la respuesta tarda
+     * lo mismo exista o no la cuenta (así no delata qué correos están registrados). Si el envío falla, queda en
+     * el registro de errores.
+     */
+    public function avisarDespues(Notification $aviso): void
+    {
+        defer(function () use ($aviso) {
+            try {
+                $this->notify($aviso);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        });
     }
 
     public function empleado(): BelongsTo

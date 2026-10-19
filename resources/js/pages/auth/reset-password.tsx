@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { XCircle } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
@@ -6,6 +6,7 @@ import { BotonEnviar } from '@/components/boton-enviar';
 import InputError from '@/components/input-error';
 import { PasswordInput } from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/auth-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -13,6 +14,10 @@ import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 interface ResetPasswordProps {
     token: string;
     email: string;
+    /** Falso si el enlace venció, ya se usó o llegó incompleto. */
+    vigente: boolean;
+    /** Minutos que dura un enlace. */
+    minutos: number;
 }
 
 type ResetPasswordForm = {
@@ -22,7 +27,30 @@ type ResetPasswordForm = {
     password_confirmation: string;
 };
 
-export default function ResetPassword({ token, email }: ResetPasswordProps) {
+export default function ResetPassword(props: ResetPasswordProps) {
+    // Enlace que ya no sirve: se dice de entrada, en vez de dejar escribir una contraseña que no se guardará
+    if (!props.vigente) return <EnlaceVencido minutos={props.minutos} />;
+
+    return <FormularioNuevaContrasena {...props} />;
+}
+
+function EnlaceVencido({ minutos }: { minutos: number }) {
+    return (
+        <AuthLayout
+            title="Este enlace ya no sirve"
+            description={`Los enlaces para crear una nueva contraseña vencen a los ${minutos} minutos y solo sirven una vez. Pide uno nuevo y usa el del correo más reciente.`}
+            volver={{ texto: 'Volver a iniciar sesión', href: route('login') }}
+        >
+            <Head title="Enlace vencido" />
+
+            <Button asChild className="h-11 w-full rounded-lg text-[0.95rem] font-semibold">
+                <Link href={route('password.request')}>Pedir un enlace nuevo</Link>
+            </Button>
+        </AuthLayout>
+    );
+}
+
+function FormularioNuevaContrasena({ token, email }: ResetPasswordProps) {
     const { data, setData, post, processing, errors, reset } = useForm<ResetPasswordForm>({
         token: token,
         email: email,

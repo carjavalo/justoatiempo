@@ -314,10 +314,23 @@
     border-width: 2px;
 }
 
+/*
+ * Barra de la página: en la portada su carril toma el color de la franja que tiene al lado (useFondoBajoLaBarra).
+ * Chrome toma el estilo de la barra principal del <body> (y si no, del <html>), por eso van los dos.
+ */
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+    background: var(--carril, transparent);
+}
+
 @supports not selector(::-webkit-scrollbar) {
     * {
         scrollbar-width: thin;
         scrollbar-color: var(--scroll-thumb) transparent;
+    }
+
+    html {
+        scrollbar-color: var(--scroll-thumb) var(--carril-plano, transparent);
     }
 }
 
