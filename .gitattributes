@@ -8,3 +8,7 @@
 
 CHANGELOG.md export-ignore
 README.md export-ignore
+
+# Pantallas compiladas (npm run build): van en Git para que el servidor se actualice con git pull.
+# Se marcan como generadas para que no llenen las comparaciones de cambios.
+public/build/** linguist-generated=true -diff
