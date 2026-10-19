@@ -4,7 +4,8 @@
     descarga de internet), así se ve aunque el lector bloquee las imágenes externas.
 --}}
 @php
-    $fuente = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+    // La letra de la web donde el lector de correo la permite (Apple Mail, iPhone); Gmail y Outlook usan la siguiente
+    $fuente = "'Plus Jakarta Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
     $logo = isset($message) ? $message->embed(resource_path('images/logo-correo.png')) : asset('images/marca/logo-240.webp');
 @endphp
 <!DOCTYPE html>
@@ -15,6 +16,7 @@
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
     <title>@yield('titulo')</title>
+    <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,700,800" rel="stylesheet">
 </head>
 <body style="margin:0; padding:0; background-color:#f5f7fb; -webkit-text-size-adjust:100%;">
     {{-- Texto de vista previa que muestran las bandejas de entrada junto al asunto --}}
