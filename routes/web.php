@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\SucursalController;
 use App\Http\Controllers\Admin\UsuarioController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CargaController;
+use App\Http\Controllers\CarnetController;
 use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\PanelController;
@@ -19,6 +20,8 @@ Route::get('/', function () {
     return Inertia::render('welcome', ['servicios' => ContactoController::SERVICIOS]);
 })->name('home');
 Route::post('contacto', [ContactoController::class, 'store'])->middleware('throttle:5,1')->name('contacto.store');
+// Lo que se abre al escanear el QR de un carnet
+Route::get('carnet/{codigo}', [CarnetController::class, 'verificar'])->where('codigo', '[A-Za-z0-9]{12}')->middleware('throttle:30,1')->name('carnet.verificar');
 
 Route::middleware(['auth'])->group(function () {
     // Inicio después de ingresar: opciones de administración
@@ -29,6 +32,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
         Route::post('usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
         Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
+        Route::get('usuarios/{usuario}/foto', [UsuarioController::class, 'foto'])->name('usuarios.foto');
         Route::get('usuarios/{usuario}/carnet', [UsuarioController::class, 'carnet'])->name('usuarios.carnet');
         Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'estado'])->name('usuarios.estado');
 

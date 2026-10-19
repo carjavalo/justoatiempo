@@ -3,10 +3,11 @@ const LADO_MAXIMO = 1600;
 const PESO_MAXIMO = 1.5 * 1024 * 1024;
 
 /**
- * Reduce en el navegador una foto pesada antes de subirla: lado mayor de 1600 px, en JPEG de buena calidad.
- * La subida es rápida, no choca con el límite de tamaño del hosting y la foto pierde sus datos ocultos (por
- * ejemplo, la ubicación donde se tomó). Una imagen que ya es liviana se envía tal cual, así un carnet diseñado
- * conserva la nitidez de sus letras. Si el navegador no puede leerla, se envía la original y el servidor decide.
+ * Reduce en el navegador una foto pesada antes de subirla: lado mayor de 1600 px, en JPEG de buena calidad
+ * (o en WebP si es un PNG o WebP: así una foto sin fondo conserva su transparencia). La subida es rápida, no
+ * choca con el límite de tamaño del hosting y la foto pierde sus datos ocultos (por ejemplo, la ubicación donde
+ * se tomó). Una imagen que ya es liviana se envía tal cual. Si el navegador no puede leerla, se envía la
+ * original y el servidor decide.
  */
 export async function reducirImagen(archivo: File): Promise<File> {
     if (!archivo.type.startsWith('image/')) return archivo;
@@ -34,17 +35,23 @@ export async function reducirImagen(archivo: File): Promise<File> {
         return archivo;
     }
 
-    // Fondo blanco: un PNG con transparencia quedaría negro en JPEG
-    contexto.fillStyle = '#ffffff';
-    contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+    const conTransparencia = archivo.type === 'image/png' || archivo.type === 'image/webp';
+    if (!conTransparencia) {
+        // Fondo blanco por si acaso: el JPEG no tiene transparencia
+        contexto.fillStyle = '#ffffff';
+        contexto.fillRect(0, 0, lienzo.width, lienzo.height);
+    }
     contexto.imageSmoothingQuality = 'high';
     contexto.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
     imagen.close();
 
-    const reducida = await new Promise<Blob | null>((listo) => lienzo.toBlob(listo, 'image/jpeg', 0.9));
+    const tipo = conTransparencia ? 'image/webp' : 'image/jpeg';
+    const reducida = await new Promise<Blob | null>((listo) => lienzo.toBlob(listo, tipo, 0.9));
+    // Un navegador sin WebP devuelve PNG: si no quedó más liviana, se envía la original
     if (!reducida || reducida.size >= archivo.size) return archivo;
 
-    return new File([reducida], `${archivo.name.replace(/\.[^.]+$/, '') || 'imagen'}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+    const extension = reducida.type === 'image/webp' ? 'webp' : reducida.type === 'image/png' ? 'png' : 'jpg';
+    return new File([reducida], `${archivo.name.replace(/\.[^.]+$/, '') || 'imagen'}.${extension}`, { type: reducida.type, lastModified: Date.now() });
 }
 
 /** "2,4 MB", "380 KB": el peso de un archivo para mostrarlo. */

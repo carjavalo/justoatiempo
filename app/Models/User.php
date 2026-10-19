@@ -31,6 +31,8 @@ class User extends Authenticatable
         'nombres',
         'primer_apellido',
         'segundo_apellido',
+        'cedula',
+        'cargo',
         'email',
         'password',
         'rol',
@@ -38,7 +40,7 @@ class User extends Authenticatable
         'sede_id',
         'sucursal_id',
         'linea_servicio_id',
-        'carnet_path',
+        'foto_path',
         'empleado_id',
         'activo',
         'ultimo_acceso_en',
@@ -52,8 +54,10 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        // Ruta interna del archivo: el carnet se entrega solo por la ruta de la administración
-        'carnet_path',
+        // Ruta interna del archivo: la foto se entrega solo por la ruta de la administración
+        'foto_path',
+        // Código del QR del carnet: va en el carnet, no en las respuestas de la plataforma
+        'carnet_codigo',
     ];
 
     /**
@@ -75,6 +79,11 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         // El nombre completo (para mostrar y buscar) sale de las partes, cuando las hay
+        // Cada persona nace con el código que lleva el QR de su carnet
+        static::creating(function (User $user) {
+            $user->carnet_codigo ??= Str::random(12);
+        });
+
         static::saving(function (User $user) {
             if (filled($user->nombres)) {
                 $user->name = self::nombreCompleto($user->nombres, $user->primer_apellido, $user->segundo_apellido);

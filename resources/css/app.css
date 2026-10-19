@@ -5,6 +5,8 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
 @custom-variant dark (&:is(.dark *));
+/* Solo mientras se navega con teclado (lib/modalidad.ts): el borde de foco de menús y listas */
+@custom-variant teclado (&:is([data-modalidad='teclado'] *));
 
 @theme {
     --font-sans:

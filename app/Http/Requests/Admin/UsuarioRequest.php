@@ -27,6 +27,9 @@ class UsuarioRequest extends FormRequest
             'nombres' => $this->texto('nombres'),
             'primer_apellido' => $this->texto('primer_apellido'),
             'segundo_apellido' => $this->texto('segundo_apellido') ?: null,
+            // La cédula se guarda solo con sus números ("1.144.123.456" → "1144123456")
+            'cedula' => is_string($c = $this->input('cedula')) ? (preg_replace('/[\s.,-]/', '', $c) ?: null) : $c,
+            'cargo' => $this->texto('cargo') ?: null,
             'email' => is_string($e = $this->texto('email')) ? mb_strtolower($e) : $e,
             'empresa_id' => $this->input('empresa_id') ?: null,
             'sede_id' => $this->input('sede_id') ?: null,
@@ -45,6 +48,8 @@ class UsuarioRequest extends FormRequest
             'nombres' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
+            'cedula' => ['nullable', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
+            'cargo' => ['nullable', 'string', 'max:60'],
             'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol' => ['required', Rule::enum(Rol::class)],
             'empresa_id' => ['nullable', 'integer', Rule::exists('empresas', 'id')->whereNull('deleted_at')],
@@ -53,9 +58,9 @@ class UsuarioRequest extends FormRequest
             'linea_id' => ['nullable', 'integer', Rule::exists('lineas_servicio', 'id')],
             // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
             'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
-            // Carnet de la empresa: imagen opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
-            'carnet' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
-            'quitar_carnet' => ['nullable', 'boolean'],
+            // Foto para el carnet: opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
+            'foto' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            'quitar_foto' => ['nullable', 'boolean'],
         ];
     }
 
@@ -129,16 +134,18 @@ class UsuarioRequest extends FormRequest
     {
         return [
             'email.unique' => 'Ya hay un usuario con este correo.',
-            'carnet.image' => 'El carnet debe ser una imagen JPG, PNG o WebP.',
-            'carnet.mimes' => 'El carnet debe ser una imagen JPG, PNG o WebP.',
-            'carnet.max' => 'La imagen del carnet no puede pesar más de 8 MB.',
-            'carnet.uploaded' => 'No se pudo subir la imagen del carnet. Intenta con una más liviana.',
+            'cedula.regex' => 'Escribe solo los números de la cédula (entre 5 y 12).',
+            'cedula.unique' => 'Ya hay un usuario con esta cédula.',
+            'foto.image' => 'La foto debe ser una imagen JPG, PNG o WebP.',
+            'foto.mimes' => 'La foto debe ser una imagen JPG, PNG o WebP.',
+            'foto.max' => 'La foto no puede pesar más de 8 MB.',
+            'foto.uploaded' => 'No se pudo subir la foto. Intenta con una más liviana.',
         ];
     }
 
     public function attributes(): array
     {
-        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'carnet' => 'el carnet'];
+        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
@@ -151,6 +158,8 @@ class UsuarioRequest extends FormRequest
             'nombres' => $datos['nombres'],
             'primer_apellido' => $datos['primer_apellido'],
             'segundo_apellido' => $datos['segundo_apellido'] ?? null,
+            'cedula' => $datos['cedula'] ?? null,
+            'cargo' => $datos['cargo'] ?? null,
             'email' => $datos['email'],
             'rol' => $datos['rol'],
             // El administrador ve todo: no se le asigna línea ni lugar de trabajo

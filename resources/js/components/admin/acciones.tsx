@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { router } from '@inertiajs/react';
-import { MoreHorizontal, Pencil, Power, PowerOff } from '@/components/iconos';
+import { Link, router } from '@inertiajs/react';
+import { MoreHorizontal, Pencil, Power, PowerOff, type TipoIcono } from '@/components/iconos';
 import { useRef, useState } from 'react';
 
 interface Props {
@@ -14,13 +14,15 @@ interface Props {
     onEditar: (origen: HTMLElement | null) => void;
     /** Qué pasa al desactivar y cómo revertirlo, para la confirmación. */
     consecuencia: string;
+    /** Páginas propias del registro (p. ej. el carnet de un usuario), antes de las acciones. */
+    enlaces?: { texto: string; href: string; icono: TipoIcono }[];
 }
 
 /**
  * Acciones de una fila: editar y activar/desactivar. Desactivar pide confirmación porque
  * cambia el acceso de otras personas; activar es inmediato.
  */
-export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia }: Props) {
+export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia, enlaces = [] }: Props) {
     const [confirmando, setConfirmando] = useState(false);
     const [procesando, setProcesando] = useState(false);
     const boton = useRef<HTMLButtonElement>(null);
@@ -52,6 +54,14 @@ export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-44">
+                    {enlaces.map(({ texto, href, icono: Icono }) => (
+                        <DropdownMenuItem key={href} asChild className="gap-2">
+                            <Link href={href}>
+                                <Icono className="size-4" aria-hidden="true" />
+                                {texto}
+                            </Link>
+                        </DropdownMenuItem>
+                    ))}
                     <DropdownMenuItem onSelect={() => onEditar(boton.current)} className="gap-2">
                         <Pencil className="size-4" aria-hidden="true" />
                         Editar

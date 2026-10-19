@@ -15,7 +15,7 @@ import {
     SinResultados,
     Tabla,
 } from '@/components/admin/piezas';
-import { Plus, Sparkles, UsersRound, X } from '@/components/iconos';
+import { IdCard, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { PasswordInput } from '@/components/password-input';
 import { Selector } from '@/components/selector';
@@ -35,6 +35,8 @@ interface FilaUsuario {
     nombres: string | null;
     primerApellido: string | null;
     segundoApellido: string | null;
+    cedula: string | null;
+    cargo: string | null;
     email: string;
     rol: Rol;
     rolLabel: string;
@@ -44,8 +46,8 @@ interface FilaUsuario {
     sede: string | null;
     sucursalId: number | null;
     sucursal: string | null;
-    /** Dirección de la imagen del carnet (solo para la administración), si tiene. */
-    carnet: string | null;
+    /** Dirección de la foto (solo para la administración), si tiene. */
+    foto: string | null;
     lineaId: number | null;
     linea: string | null;
     activo: boolean;
@@ -77,27 +79,31 @@ const VACIO = {
     nombres: '',
     primer_apellido: '',
     segundo_apellido: '',
+    cedula: '',
+    cargo: '',
     email: '',
     rol: '',
     linea_id: '',
     empresa_id: '',
     sede_id: '',
     sucursal_id: '',
-    carnet: null as File | null,
-    quitar_carnet: false,
+    foto: null as File | null,
+    quitar_foto: false,
     password: '',
 };
 const ORDEN_CAMPOS = [
     'nombres',
     'primer_apellido',
     'segundo_apellido',
+    'cedula',
+    'cargo',
     'email',
     'rol',
     'linea_id',
     'empresa_id',
     'sede_id',
     'sucursal_id',
-    'carnet',
+    'foto',
     'password',
 ];
 
@@ -137,14 +143,16 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       nombres: usuario.nombres ?? '',
                       primer_apellido: usuario.primerApellido ?? '',
                       segundo_apellido: usuario.segundoApellido ?? '',
+                      cedula: usuario.cedula ?? '',
+                      cargo: usuario.cargo ?? '',
                       email: usuario.email,
                       rol: usuario.rol,
                       linea_id: usuario.lineaId ? String(usuario.lineaId) : '',
                       empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
                       sede_id: usuario.sedeId ? String(usuario.sedeId) : '',
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
-                      carnet: null,
-                      quitar_carnet: false,
+                      foto: null,
+                      quitar_foto: false,
                       password: '',
                   }
                 : // Si la lista viene filtrada por empresa, sede o sucursal, el usuario nuevo nace ahí
@@ -171,7 +179,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
     const guardar = () => {
         const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
         // Con una imagen al editar, el envío va como formulario con archivos, que PHP solo lee en POST: se marca como edición
-        const conArchivoAlEditar = Boolean(editando && form.data.carnet);
+        const conArchivoAlEditar = Boolean(editando && form.data.foto);
         form.transform((d) => (conArchivoAlEditar ? { ...d, _method: 'put' } : d));
         if (!editando) form.post(route('usuarios.store'), opciones);
         else if (conArchivoAlEditar) form.post(route('usuarios.update', editando.id), opciones);
@@ -359,10 +367,20 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                         <tr key={u.id} className={cn('hover:bg-muted/40 transition-colors', !u.activo && 'text-muted-foreground')}>
                                             <th scope="row" className={cn(claseTd, 'font-normal')}>
                                                 <div className="flex items-center gap-3">
-                                                    <Iniciales
-                                                        texto={u.nombre}
-                                                        className={u.esUsted ? 'bg-brand-coral text-brand-coral-foreground' : undefined}
-                                                    />
+                                                    {u.foto ? (
+                                                        // Decorativa: el nombre va al lado
+                                                        <img
+                                                            src={u.foto}
+                                                            alt=""
+                                                            loading="lazy"
+                                                            className="bg-muted size-9 shrink-0 rounded-xl object-cover object-[50%_20%]"
+                                                        />
+                                                    ) : (
+                                                        <Iniciales
+                                                            texto={u.nombre}
+                                                            className={u.esUsted ? 'bg-brand-coral text-brand-coral-foreground' : undefined}
+                                                        />
+                                                    )}
                                                     <div className="min-w-0">
                                                         <p className="text-foreground flex items-center gap-2 font-semibold">
                                                             <span className="truncate">{u.nombre}</span>
@@ -414,6 +432,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                     urlEstado={u.esUsted ? undefined : route('usuarios.estado', u.id)}
                                                     onEditar={(boton) => abrir(u, boton)}
                                                     consecuencia="Perderá el acceso de inmediato, incluso si tiene la sesión abierta. Podrás devolverle el acceso cuando quieras."
+                                                    enlaces={[{ texto: 'Ver carnet', href: route('usuarios.carnet', u.id), icono: IdCard }]}
                                                 />
                                             </td>
                                         </tr>
@@ -468,6 +487,32 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                             autoComplete="off"
                             value={form.data.segundo_apellido}
                             onChange={(e) => form.setData('segundo_apellido', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                </div>
+
+                {/* Van en el carnet */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Campo id="cedula" etiqueta="Cédula" ayuda="Solo los números." error={form.errors.cedula}>
+                        <Input
+                            {...propsCampo('cedula', form.errors.cedula, 'cedula-ayuda')}
+                            inputMode="numeric"
+                            autoComplete="off"
+                            placeholder="Ej.: 1144123456"
+                            value={form.data.cedula}
+                            onChange={(e) => form.setData('cedula', e.target.value)}
+                            className="h-10 rounded-lg tabular-nums"
+                        />
+                    </Campo>
+                    <Campo id="cargo" etiqueta="Cargo" ayuda="Como aparece en el carnet." error={form.errors.cargo}>
+                        <Input
+                            {...propsCampo('cargo', form.errors.cargo, 'cargo-ayuda')}
+                            autoComplete="off"
+                            placeholder="Ej.: Auxiliar logístico"
+                            maxLength={60}
+                            value={form.data.cargo}
+                            onChange={(e) => form.setData('cargo', e.target.value)}
                             className="h-10 rounded-lg"
                         />
                     </Campo>
@@ -642,16 +687,16 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                 )}
 
                 <CampoImagen
-                    id="carnet"
-                    etiqueta="Carnet"
-                    ayuda="Imagen del carnet de la empresa (JPG, PNG o WebP). Solo la ve la administración."
-                    error={form.errors.carnet}
-                    archivo={form.data.carnet}
-                    actual={editando?.carnet ?? null}
-                    quitar={form.data.quitar_carnet}
-                    descripcion={`Carnet de ${editando?.nombre ?? ([form.data.nombres, form.data.primer_apellido].filter(Boolean).join(' ') || 'la persona')}`}
-                    onArchivo={(archivo) => form.setData('carnet', archivo)}
-                    onQuitar={(quitar) => form.setData('quitar_carnet', quitar)}
+                    id="foto"
+                    etiqueta="Foto para el carnet"
+                    ayuda="De frente y con fondo blanco o sin fondo (PNG transparente). Con ella la plataforma arma el carnet."
+                    error={form.errors.foto}
+                    archivo={form.data.foto}
+                    actual={editando?.foto ?? null}
+                    quitar={form.data.quitar_foto}
+                    descripcion={`Foto de ${editando?.nombre ?? ([form.data.nombres, form.data.primer_apellido].filter(Boolean).join(' ') || 'la persona')}`}
+                    onArchivo={(archivo) => form.setData('foto', archivo)}
+                    onQuitar={(quitar) => form.setData('quitar_foto', quitar)}
                 />
 
                 <Campo

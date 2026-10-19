@@ -39,7 +39,7 @@ class UsuarioController extends Controller
             ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
-                $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like));
+                $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('cedula', 'like', $like));
             })
             ->when($filtros['rol'] ?? null, fn (Builder $q, string $rol) => $q->where('rol', $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
@@ -59,6 +59,8 @@ class UsuarioController extends Controller
                 'nombres' => $u->nombres,
                 'primerApellido' => $u->primer_apellido,
                 'segundoApellido' => $u->segundo_apellido,
+                'cedula' => $u->cedula,
+                'cargo' => $u->cargo,
                 'email' => $u->email,
                 'rol' => $u->rol->value,
                 'rolLabel' => $u->rol->label(),
@@ -68,8 +70,7 @@ class UsuarioController extends Controller
                 'sede' => $u->sede?->nombre,
                 'sucursalId' => $u->sucursal_id,
                 'sucursal' => $u->sucursal?->nombre,
-                // La versión en la dirección evita que el navegador muestre el carnet anterior tras reemplazarlo
-                'carnet' => $u->carnet_path ? route('usuarios.carnet', ['usuario' => $u->id, 'v' => substr(md5($u->carnet_path), 0, 8)]) : null,
+                'foto' => $this->direccionFoto($u),
                 'lineaId' => $u->linea_servicio_id,
                 'linea' => $u->linea?->nombre,
                 'activo' => $u->activo,
@@ -127,7 +128,7 @@ class UsuarioController extends Controller
         $usuario = User::create([...$request->datos(), 'activo' => true]);
         // Lo crea el administrador: el correo ya se da por verificado
         $usuario->markEmailAsVerified();
-        $this->guardarCarnet($request, $usuario);
+        $this->guardarFoto($request, $usuario);
 
         return back()->with('success', "Usuario creado: {$usuario->name} ya puede ingresar con su correo.");
     }
@@ -136,7 +137,7 @@ class UsuarioController extends Controller
     {
         $datos = $request->datos();
         $usuario->update($datos);
-        $this->guardarCarnet($request, $usuario);
+        $this->guardarFoto($request, $usuario);
 
         // Contraseña nueva: las sesiones abiertas con la anterior dejan de valer (menos la de quien edita)
         if (array_key_exists('password', $datos)) {
@@ -149,33 +150,62 @@ class UsuarioController extends Controller
         return back()->with('success', "Cambios guardados en {$usuario->name}.");
     }
 
-    /** Imagen del carnet, solo para la administración (no hay dirección pública para estos archivos). */
-    public function carnet(User $usuario): StreamedResponse
+    /** Foto de la persona, solo para la administración (no hay dirección pública para estos archivos). */
+    public function foto(User $usuario): StreamedResponse
     {
-        abort_unless($usuario->carnet_path && Storage::disk('local')->exists($usuario->carnet_path), 404);
+        abort_unless($usuario->foto_path && Storage::disk('local')->exists($usuario->foto_path), 404);
 
-        $nombre = 'carnet-'.Str::slug($usuario->name).'.'.pathinfo($usuario->carnet_path, PATHINFO_EXTENSION);
+        $nombre = 'foto-'.Str::slug($usuario->name).'.'.pathinfo($usuario->foto_path, PATHINFO_EXTENSION);
 
-        return Storage::disk('local')->response($usuario->carnet_path, $nombre, [
+        return Storage::disk('local')->response($usuario->foto_path, $nombre, [
             'Cache-Control' => 'private, max-age=3600',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
-    /** Guarda el carnet nuevo o lo quita; el archivo anterior se borra una vez guardado el cambio. */
-    private function guardarCarnet(UsuarioRequest $request, User $usuario): void
+    /** El carnet de la persona, armado con su foto y sus datos sobre el diseño de la empresa. */
+    public function carnet(User $usuario): Response
     {
-        $anterior = $usuario->carnet_path;
+        return Inertia::render('usuarios/carnet', [
+            'persona' => [
+                'id' => $usuario->id,
+                'nombres' => $usuario->nombres ?: Str::before($usuario->name, ' '),
+                'apellidos' => trim(implode(' ', array_filter([$usuario->primer_apellido, $usuario->segundo_apellido])))
+                    ?: Str::after($usuario->name, ' '),
+                'nombreCompleto' => $usuario->name,
+                'cedula' => $usuario->cedula,
+                // Sin cargo escrito, el carnet lleva el rol en la plataforma
+                'cargo' => $usuario->cargo ?: $usuario->rol->label(),
+                'tieneCargo' => filled($usuario->cargo),
+                'email' => $usuario->email,
+                'foto' => $this->direccionFoto($usuario),
+                'activo' => $usuario->activo,
+                // Lo que se lee al escanear el QR
+                'qr' => route('carnet.verificar', $usuario->carnet_codigo),
+            ],
+        ]);
+    }
 
-        if ($request->hasFile('carnet')) {
-            $usuario->update(['carnet_path' => $request->file('carnet')->store("carnets/{$usuario->id}", 'local')]);
-        } elseif ($request->boolean('quitar_carnet')) {
-            $usuario->update(['carnet_path' => null]);
+    /** La versión en la dirección evita que el navegador muestre la foto anterior tras reemplazarla. */
+    private function direccionFoto(User $usuario): ?string
+    {
+        return $usuario->foto_path ? route('usuarios.foto', ['usuario' => $usuario->id, 'v' => substr(md5($usuario->foto_path), 0, 8)]) : null;
+    }
+
+    /** Guarda la foto nueva o la quita; el archivo anterior se borra una vez guardado el cambio. */
+    private function guardarFoto(UsuarioRequest $request, User $usuario): void
+    {
+        $anterior = $usuario->foto_path;
+
+        if ($request->hasFile('foto')) {
+            $usuario->update(['foto_path' => $request->file('foto')->store("fotos/{$usuario->id}", 'local')]);
+        } elseif ($request->boolean('quitar_foto')) {
+            $usuario->update(['foto_path' => null]);
         } else {
             return;
         }
 
-        if ($anterior && $anterior !== $usuario->carnet_path) {
+        if ($anterior && $anterior !== $usuario->foto_path) {
             Storage::disk('local')->delete($anterior);
         }
     }

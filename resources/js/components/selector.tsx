@@ -96,7 +96,7 @@ export const Selector = React.forwardRef<HTMLButtonElement, Props>(
                                     className={cn(
                                         'relative flex w-full cursor-pointer items-center rounded-lg py-2 pr-9 pl-3 outline-hidden select-none',
                                         tamano === 'sm' ? 'text-xs' : 'text-sm',
-                                        'data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground data-[highlighted]:shadow-[inset_3px_0_0_var(--color-ring)]',
+                                        'data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground teclado:data-[highlighted]:shadow-[inset_3px_0_0_var(--color-ring)]',
                                         'data-[state=checked]:font-semibold data-disabled:pointer-events-none data-disabled:opacity-50',
                                     )}
                                 >
