@@ -14,8 +14,31 @@ const LADO_MAXIMO = 1200;
 
 let segmentador: Promise<ImageSegmenter> | null = null;
 
+/**
+ * Mensajes informativos que la herramienta escribe en la consola al arrancar y al procesar ("Graph successfully
+ * started running", "I1020 …", "W1020 …"): no son fallas, pero parecen errores. Mientras trabaja se callan
+ * solo esos; cualquier otro mensaje, y sus errores ("E…"), pasan igual.
+ */
+const RUIDO = [/^[IW]\d{4} \d\d:\d\d:\d\d/, /^Graph successfully started running/, /^INFO: /];
+
+async function enSilencio<T>(tarea: () => Promise<T> | T): Promise<T> {
+    // El aviso de "INFO:" llega por console.error aunque no es un error: por eso también se mira ese canal
+    const originales = { log: console.log, info: console.info, warn: console.warn, debug: console.debug, error: console.error };
+    for (const metodo of Object.keys(originales) as (keyof typeof originales)[]) {
+        console[metodo] = (...datos: unknown[]) => {
+            if (typeof datos[0] === 'string' && RUIDO.some((patron) => patron.test(datos[0] as string))) return;
+            originales[metodo](...datos);
+        };
+    }
+    try {
+        return await tarea();
+    } finally {
+        Object.assign(console, originales);
+    }
+}
+
 function obtenerSegmentador(): Promise<ImageSegmenter> {
-    segmentador ??= (async () => {
+    segmentador ??= enSilencio(async () => {
         const { FilesetResolver, ImageSegmenter } = await import('@mediapipe/tasks-vision');
         const archivos = await FilesetResolver.forVisionTasks(ARCHIVOS);
         return ImageSegmenter.createFromOptions(archivos, {
@@ -24,7 +47,7 @@ function obtenerSegmentador(): Promise<ImageSegmenter> {
             outputConfidenceMasks: true,
             outputCategoryMask: false,
         });
-    })();
+    });
     // Si falló (p. ej. sin conexión), el próximo intento vuelve a empezar
     segmentador.catch(() => (segmentador = null));
     return segmentador;
@@ -123,7 +146,7 @@ export async function quitarFondo(archivo: Blob, nombre = 'foto'): Promise<File>
     imagen.close();
 
     const modelo = await obtenerSegmentador();
-    const resultado = modelo.segment(foto);
+    const resultado = await enSilencio(() => modelo.segment(foto));
     try {
         const indice = Math.max(0, modelo.getLabels().indexOf('background'));
         const fondo = resultado.confidenceMasks?.[indice];
