@@ -44,7 +44,8 @@ export interface User {
     rol_label: string;
     /** Primera página de quien ingresa (el panel o su línea) y el texto del enlace para volver a ella. */
     inicio: { titulo: string; volver: string; url: string };
-    linea: { slug: string; nombre: string } | null;
+    /** Las líneas en las que trabaja hoy (por sus asignaciones vigentes). */
+    lineas: { slug: string; nombre: string }[];
     empleado_id: number | null;
     email_verified_at: string | null;
     created_at: string;

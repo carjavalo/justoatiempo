@@ -58,7 +58,7 @@ class SucursalRequest extends FormRequest
 
             // Con usuarios u operación registrada, cambiarla de sede dejaría datos de una sede en otra
             if ($sucursal && $sedeId !== $sucursal->sede_id && (
-                $sucursal->usuarios()->exists()
+                $sucursal->asignaciones()->exists()
                 || Orden::where('sucursal_id', $sucursal->id)->exists()
                 || InformeDiario::where('sucursal_id', $sucursal->id)->exists()
                 || Programacion::where('sucursal_id', $sucursal->id)->exists()

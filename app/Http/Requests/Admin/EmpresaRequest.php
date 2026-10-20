@@ -2,9 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\Orden;
-use App\Models\User;
 use App\Support\Nit;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -80,9 +80,13 @@ class EmpresaRequest extends FormRequest
             // tablero, operación registrada (su historial dejaría de verse en el tablero de la línea)
             $quitadas = $empresa->lineas()->whereNotIn('lineas_servicio.id', $this->lineas())->get(['lineas_servicio.id', 'nombre', 'modulo']);
             foreach ($quitadas as $linea) {
-                $personas = User::where('empresa_id', $empresa->id)->where('linea_servicio_id', $linea->id)->count();
+                // Asignaciones vigentes o por empezar en esa línea
+                $personas = Asignacion::where('empresa_id', $empresa->id)
+                    ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', today()->toDateString()))
+                    ->whereHas('lineas', fn ($q) => $q->whereKey($linea->id))
+                    ->distinct()->count('user_id');
                 if ($personas > 0) {
-                    $validator->errors()->add('lineas', "No puedes quitar «{$linea->nombre}»: {$personas} ".($personas === 1 ? 'persona de esta empresa trabaja' : 'personas de esta empresa trabajan').' en esa línea.');
+                    $validator->errors()->add('lineas', "No puedes quitar «{$linea->nombre}»: {$personas} ".($personas === 1 ? 'persona está asignada' : 'personas están asignadas').' a esta empresa en esa línea.');
                 } elseif ($linea->modulo !== null && Orden::whereIn('sede_id', $empresa->sedes()->withTrashed()->select('id'))->exists()) {
                     $validator->errors()->add('lineas', "No puedes quitar «{$linea->nombre}»: las sedes de esta empresa ya tienen operación registrada en esa línea.");
                 }

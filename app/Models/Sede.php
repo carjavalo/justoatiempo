@@ -41,7 +41,8 @@ class Sede extends Model
             if ($this->empresa_id !== $empresa->id) {
                 $this->update(['empresa_id' => $empresa->id]);
             }
-            User::where('sede_id', $this->id)->update(['empresa_id' => $empresa->id]);
+            // Las asignaciones a la sede pasan con ella a la empresa nueva
+            Asignacion::where('sede_id', $this->id)->update(['empresa_id' => $empresa->id]);
         });
     }
 
@@ -50,9 +51,10 @@ class Sede extends Model
         return $this->hasMany(Sucursal::class);
     }
 
-    public function usuarios(): HasMany
+    /** Las asignaciones de personas a esta sede. */
+    public function asignaciones(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(Asignacion::class);
     }
 
     public function ordenes(): HasMany

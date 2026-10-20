@@ -71,7 +71,11 @@ class SedeRequest extends FormRequest
             // Al trasladar una sede, su personal pasa con ella: la empresa nueva debe recibir sus líneas
             if ($sede) {
                 $recibe = Empresa::find($empresaId)->lineas()->pluck('lineas_servicio.id');
-                $faltan = LineaServicio::whereIn('id', $sede->usuarios()->whereNotNull('linea_servicio_id')->distinct()->pluck('linea_servicio_id'))
+                // Las líneas de sus asignaciones vigentes o por empezar
+                $lineas = $sede->asignaciones()
+                    ->where(fn ($q) => $q->whereNull('fecha_fin')->orWhereDate('fecha_fin', '>=', today()->toDateString()))
+                    ->with('lineas:id')->get()->flatMap(fn ($a) => $a->lineas->pluck('id'))->unique();
+                $faltan = LineaServicio::whereIn('id', $lineas)
                     ->whereNotIn('id', $recibe)
                     ->pluck('nombre');
                 if ($faltan->isNotEmpty()) {

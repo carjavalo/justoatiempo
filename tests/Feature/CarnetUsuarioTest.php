@@ -186,18 +186,19 @@ class CarnetUsuarioTest extends TestCase
                 ->where('persona.tieneCargo', true)
                 ->where('persona.email', 'ana@example.com')
                 ->where('persona.foto', null)
-                // Sin empresa asignada, la franja del carnet lo dice
-                ->where('persona.empresa', null)
+                // Asignada a toda la línea logística (sin empresa)
+                ->where('persona.asignaciones', [['empresa' => null, 'sede' => null, 'sucursal' => null, 'lineas' => [LineaServicio::logistica()->nombre], 'hasta' => null]])
                 ->where('persona.qr', route('carnet.verificar', $usuario->carnet_codigo)));
 
-        // Dónde presta el servicio va en el carnet: empresa, sede y sucursal
+        // Dónde presta el servicio va en el carnet: cada asignación vigente con su empresa, sede, sucursal y líneas
         $sede = $this->sede('TuGo');
         $caliSur = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
-        $usuario->update(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $caliSur->id]);
+        $usuario->asignaciones()->update(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $caliSur->id, 'fecha_fin' => '2099-12-31']);
         $this->actingAs($this->admin)->get("/usuarios/{$usuario->id}/carnet")->assertInertia(fn (Assert $p) => $p
-            ->where('persona.empresa', 'Ditranza')
-            ->where('persona.sede', 'TuGo')
-            ->where('persona.sucursal', 'Cali Sur'));
+            ->where('persona.asignaciones.0.empresa', 'Ditranza')
+            ->where('persona.asignaciones.0.sede', 'TuGo')
+            ->where('persona.asignaciones.0.sucursal', 'Cali Sur')
+            ->where('persona.asignaciones.0.hasta', '2099-12-31'));
 
         // Sin cargo escrito, el carnet lleva el rol
         $sinCargo = User::factory()->coordinador()->create(['cargo' => null]);
@@ -279,9 +280,7 @@ class CarnetUsuarioTest extends TestCase
                 ->where('cargo', 'Gerente general')
                 ->where('cedula', '1144123456')
                 ->where('email', 'johnny@example.com')
-                ->where('empresa', 'Ditranza')
-                ->where('sede', 'TuGo')
-                ->where('linea', LineaServicio::logistica()->nombre)
+                ->where('asignaciones', [['empresa' => 'Ditranza', 'sede' => 'TuGo', 'sucursal' => null, 'lineas' => [LineaServicio::logistica()->nombre], 'hasta' => null]])
                 ->where('foto', fn ($url) => str_contains($url, "/carnet/{$codigo}/foto"))
                 ->where('arl.pdf', true)
                 ->where('arl.url', fn ($url) => str_contains($url, "/carnet/{$codigo}/arl")));

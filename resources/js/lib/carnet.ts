@@ -17,11 +17,13 @@ const HOJA_FUENTE = 'https://fonts.bunny.net/css?family=montserrat:600,700,800';
 const FOTO = { x: 146.2, y: 266.6, radio: 125.4 };
 /**
  * Franja azul de abajo: dónde presta el servicio (empresa, sede y sucursal), en blanco. Va de x 22 hasta antes del
- * corte en diagonal de la franja (x ≈ 488) y su renglón base centra el texto en la franja (y 585 a 612).
+ * corte en diagonal de la franja (x ≈ 488) y su renglón base centra el texto en la franja (y 585 a 612). Debajo,
+ * en la franja blanca del borde (y 612 a 637), van sus líneas de servicio.
  */
 const FRANJA = { x: 22, y: 605, ancho: 458 };
 const ETIQUETA = { peso: 700, tamano: 10.5, espaciado: 0.08, color: '#ffb4a9' };
 const VALOR = { peso: 800, tamano: 18, espaciado: 0, color: '#ffffff' };
+const LINEAS = { x: 22, y: 629, ancho: 593, peso: 700, tamano: 11.5, espaciado: 0.04 };
 
 /** Recuadro blanco del QR, sobre las siluetas de los edificios. */
 const QR = { x: 540, y: 438, lado: 90, margen: 6 };
@@ -43,10 +45,8 @@ export interface DatosCarnet {
     cedula: string | null;
     cargo: string;
     email: string;
-    /** Dónde presta el servicio (empresa cliente, su sede y su sucursal); puede no tener empresa asignada. */
-    empresa: string | null;
-    sede: string | null;
-    sucursal: string | null;
+    /** Dónde presta el servicio hoy: cada asignación vigente con su empresa (sin empresa: toda la línea), sede, sucursal y líneas. */
+    asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
     /** Dirección de la foto (fondo blanco o sin fondo), si la tiene. */
     foto: string | null;
     /** Lo que se lee al escanear el QR. */
@@ -106,7 +106,9 @@ export function cedulaLegible(cedula: string): string {
  * Escribe un texto en su sitio. Si no cabe, primero se achica la letra (hasta un 62 % del tamaño original) y,
  * si aún así no cabe, se angosta: nunca se sale del espacio del diseño.
  */
-function escribir(ctx: CanvasRenderingContext2D, texto: string, estilo: (typeof TEXTOS)[keyof typeof TEXTOS], escalaFija?: number) {
+type Estilo = { x: number; y: number; ancho: number; peso: number; tamano: number; espaciado: number };
+
+function escribir(ctx: CanvasRenderingContext2D, texto: string, estilo: Estilo, escalaFija?: number) {
     if (!texto) return;
     const factor = escalaFija ?? ajuste(ctx, texto, estilo);
     letra(ctx, estilo, estilo.tamano * factor);
@@ -114,7 +116,7 @@ function escribir(ctx: CanvasRenderingContext2D, texto: string, estilo: (typeof 
 }
 
 /** Cuánto hay que achicar un texto para que quepa (1 si cabe). */
-function ajuste(ctx: CanvasRenderingContext2D, texto: string, estilo: (typeof TEXTOS)[keyof typeof TEXTOS]): number {
+function ajuste(ctx: CanvasRenderingContext2D, texto: string, estilo: Estilo): number {
     letra(ctx, estilo, estilo.tamano);
     return Math.max(0.62, Math.min(1, estilo.ancho / Math.max(1, ctx.measureText(texto).width)));
 }
@@ -151,16 +153,44 @@ export function dibujarCarnet(lienzo: HTMLCanvasElement, recursos: RecursosCarne
     escribir(ctx, datos.email, TEXTOS.correo);
 
     dibujarAsignacion(ctx, datos);
+    dibujarLineas(ctx, datos);
     dibujarQr(ctx, recursos.qr);
 }
 
-/** "EMPRESA DITRANZA · SEDE TUGO · SUCURSAL CALI SUR" (sin empresa: "EMPRESA SIN ASIGNAR"). */
-export function partesAsignacion(datos: Pick<DatosCarnet, 'empresa' | 'sede' | 'sucursal'>): [string, string][] {
-    return [
-        ['Empresa', datos.empresa ?? 'Sin asignar'],
-        ['Sede', datos.sede],
-        ['Sucursal', datos.sucursal],
-    ].filter((p): p is [string, string] => Boolean(p[1]));
+/** En la franja blanca del borde, en azul: "LÍNEAS  SERVICIOS LOGÍSTICOS · ASEO GENERAL" (se achica si no cabe). */
+function dibujarLineas(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
+    const lineas = lineasCarnet(datos);
+    if (lineas.length === 0) return;
+    const texto = `${lineas.length === 1 ? 'LÍNEA' : 'LÍNEAS'}  ${lineas.join('  ·  ').toLocaleUpperCase('es-CO')}`;
+    ctx.save();
+    ctx.fillStyle = AZUL;
+    ctx.textBaseline = 'alphabetic';
+    escribir(ctx, texto, LINEAS);
+    ctx.restore();
+}
+
+/**
+ * Lo que dice la franja: con una asignación, "EMPRESA DITRANZA · SEDE TUGO · SUCURSAL CALI SUR"; con varias, sus
+ * empresas ("EMPRESAS DITRANZA · SODIMAC"); sin empresa, toda la línea; sin asignaciones, "EMPRESA SIN ASIGNAR".
+ */
+export function partesAsignacion(datos: Pick<DatosCarnet, 'asignaciones'>): [string, string][] {
+    const asignaciones = datos.asignaciones;
+    if (asignaciones.length === 0) return [['Empresa', 'Sin asignar']];
+    if (asignaciones.length === 1) {
+        const a = asignaciones[0];
+        return [
+            ['Empresa', a.empresa ?? 'Todas las de su línea'],
+            ['Sede', a.sede],
+            ['Sucursal', a.sucursal],
+        ].filter((p): p is [string, string] => Boolean(p[1]));
+    }
+    const empresas = [...new Set(asignaciones.map((a) => a.empresa).filter((e): e is string => Boolean(e)))];
+    return [[empresas.length === 1 ? 'Empresa' : 'Empresas', empresas.length ? empresas.join(' · ') : 'Todas las de sus líneas']];
+}
+
+/** Las líneas de servicio que hace hoy, sin repetir: "SERVICIOS LOGÍSTICOS · ASEO GENERAL". */
+export function lineasCarnet(datos: Pick<DatosCarnet, 'asignaciones'>): string[] {
+    return [...new Set(datos.asignaciones.flatMap((a) => a.lineas))];
 }
 
 /**

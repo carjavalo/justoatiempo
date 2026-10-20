@@ -324,7 +324,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                     id="meta_efectividad"
                     etiqueta="Meta de efectividad"
                     requerido
-                    ayuda="Porcentaje de entregas aprobadas pactado con la sede."
+                    ayuda="De cada 100 entregas, cuántas deben salir bien (aprobadas, sin devolución). Es lo pactado con el cliente; el tablero de logística compara la efectividad real contra esta meta. Si no hay un acuerdo, deja 95 %."
                     error={form.errors.meta_efectividad}
                 >
                     <div className="relative w-36">

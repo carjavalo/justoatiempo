@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
+use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\RolUsuario;
@@ -37,28 +38,24 @@ class UsuarioController extends Controller
         ]);
 
         $yo = $request->user();
-        // Lo que ve de los usuarios: con empresa (o sede, sucursal o línea) fija, solo los de la suya
-        $limites = [
-            'empresaId' => $yo->empresaFija(),
-            'sedeId' => $yo->sedeFija(),
-            'sucursalId' => $yo->sucursalFija(),
-            'lineaId' => $yo->rolPermite(Permisos::TODAS_LAS_LINEAS) ? null : $yo->linea_servicio_id,
-            'unaLinea' => ! $yo->rolPermite(Permisos::TODAS_LAS_LINEAS),
-        ];
+        // Filtros desde los conteos de empresas, sedes, sucursales y líneas: quien tiene ahí una asignación vigente
+        $enLugar = fn (string $columna, int $id) => fn (Builder $q) => $q->whereHas('asignacionesVigentes', fn ($a) => $columna === 'linea'
+            ? $a->whereHas('lineas', fn ($l) => $l->whereKey($id))
+            : $a->where("asignaciones.{$columna}", $id));
 
         $usuarios = User::query()
             ->alcanceDe($yo)
-            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre', 'rolUsuario:id,nombre,permisos,alcance,base,nivel'])
+            ->with(['rolUsuario:id,nombre,clave,permisos,alcance,base,nivel'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('cedula', 'like', $like));
             })
             ->when($filtros['rol'] ?? null, fn (Builder $q, int|string $rol) => $q->where('rol_id', (int) $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
-            ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
-            ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->where('sede_id', $id))
-            ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->where('sucursal_id', $id))
-            ->when($filtros['linea'] ?? null, fn (Builder $q, int $id) => $q->where('linea_servicio_id', $id))
+            ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('empresa_id', $id)))
+            ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sede_id', $id)))
+            ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sucursal_id', $id)))
+            ->when($filtros['linea'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('linea', $id)))
             ->orderByDesc('activo')
             ->orderBy('primer_apellido')
             ->orderBy('segundo_apellido')
@@ -74,21 +71,18 @@ class UsuarioController extends Controller
                 'cedula' => $u->cedula,
                 'cargo' => $u->cargo,
                 'email' => $u->email,
-                // Su rol dentro de la empresa; sin línea, si su rol las ve todas
+                // Su rol dentro de la empresa
                 'rolId' => $u->rol_id,
                 'rolNombre' => $u->nombreRol(),
                 'todasLasLineas' => $u->rolPermite(Permisos::TODAS_LAS_LINEAS),
-                'empresaId' => $u->empresa_id,
-                'empresa' => $u->empresa?->nombre,
-                'sedeId' => $u->sede_id,
-                'sede' => $u->sede?->nombre,
-                'sucursalId' => $u->sucursal_id,
-                'sucursal' => $u->sucursal?->nombre,
+                // Dónde presta el servicio hoy (sus asignaciones vigentes que quien mira alcanza a ver)
+                'asignaciones' => $u->vigentes()
+                    ->filter(fn (Asignacion $a) => $yo->sinLimites() || $yo->veAsignacion($a))
+                    ->values()
+                    ->map(fn (Asignacion $a) => ['lugar' => $a->lugar(), 'lineas' => $a->lineas->pluck('nombre')]),
                 'foto' => $this->direccionFoto($u),
                 'arl' => $this->direccionArl($u),
                 'arlEsPdf' => Carnet::esPdf($u->arl_path),
-                'lineaId' => $u->linea_servicio_id,
-                'linea' => $u->linea?->nombre,
                 'activo' => $u->activo,
                 'ultimoAcceso' => $u->ultimo_acceso_en?->toIso8601String(),
                 'esUsted' => $u->is($request->user()),
@@ -99,8 +93,6 @@ class UsuarioController extends Controller
         return Inertia::render('usuarios/index', [
             'usuarios' => $usuarios,
             'total' => User::query()->alcanceDe($yo)->count(),
-            // Dónde puede asignar personas quien crea o edita (null: sin límite)
-            'limites' => $limites,
             'filtros' => [
                 'q' => $filtros['q'] ?? '',
                 'rol' => (string) ($filtros['rol'] ?? ''),
@@ -123,44 +115,10 @@ class UsuarioController extends Controller
                 'nombre' => $r->nombre,
                 'resumen' => $r->resumen(),
                 'alcance' => Permisos::alcances()[$r->alcance] ?? '',
-                'todasLasLineas' => $r->permite(Permisos::TODAS_LAS_LINEAS),
-                // A dónde entra quien lo tenga al ingresar: su línea, el panel, o nada aún (sin tablero)
-                'inicio' => match (true) {
-                    $r->permite(Permisos::TODAS_LAS_LINEAS) || collect(array_keys(Permisos::CATALOGO[0]['modulos']))->contains(fn ($m) => $r->permite("{$m}.ver")) => 'panel',
-                    $r->permite('tablero.ver') => 'linea',
-                    default => 'sinTablero',
-                },
                 'asignable' => (bool) $yo->rolUsuario?->cubre($r),
                 'activo' => $r->activo,
             ]),
-            // Cada empresa con las líneas que recibe: el formulario solo ofrece las de la línea elegida
-            'empresas' => Empresa::with('lineas:id')->when($limites['empresaId'], fn ($q, int $id) => $q->whereKey($id))
-                ->orderBy('nombre')->get(['id', 'nombre', 'activo'])->map(fn (Empresa $c) => [
-                    'id' => $c->id,
-                    'nombre' => $c->nombre,
-                    'activo' => $c->activo,
-                    'lineas' => $c->lineas->pluck('id'),
-                ]),
-            'lineas' => LineaServicio::ordenadas()->when($limites['unaLinea'], fn ($q) => $q->whereKey($limites['lineaId']))->get(['id', 'slug', 'nombre']),
-            'sedes' => Sede::when($limites['empresaId'], fn ($q, int $id) => $q->where('empresa_id', $id))
-                ->when($limites['sedeId'], fn ($q, int $id) => $q->whereKey($id))
-                ->orderBy('nombre')->get(['id', 'nombre', 'empresa_id', 'activo'])->map(fn (Sede $s) => [
-                    'id' => $s->id,
-                    'nombre' => $s->nombre,
-                    'empresaId' => $s->empresa_id,
-                    'activo' => $s->activo,
-                ]),
-            // Sin sede son las sucursales propias de Justo a Tiempo
-            'sucursales' => Sucursal::when($limites['empresaId'], fn ($q) => $q->whereHas('sede', fn ($s) => $s->where('empresa_id', $limites['empresaId'])))
-                ->when($limites['sedeId'], fn ($q, int $id) => $q->where('sede_id', $id))
-                ->when($limites['sucursalId'], fn ($q, int $id) => $q->whereKey($id))
-                ->orderBy('nombre')->get(['id', 'nombre', 'ciudad', 'sede_id', 'activo'])->map(fn (Sucursal $s) => [
-                    'id' => $s->id,
-                    'nombre' => $s->nombre,
-                    'ciudad' => $s->ciudad,
-                    'sedeId' => $s->sede_id,
-                    'activo' => $s->activo,
-                ]),
+            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre']),
         ]);
     }
 
@@ -170,6 +128,12 @@ class UsuarioController extends Controller
         // Lo crea el administrador: el correo ya se da por verificado
         $usuario->markEmailAsVerified();
         $this->guardarArchivos($request, $usuario);
+
+        // Lo siguiente es decir dónde presta el servicio: se abre Asignaciones con la persona elegida
+        if ($request->user()->puede('asignaciones.crear') && $request->user()->cubreA($usuario)) {
+            return to_route('asignaciones.index', ['usuario' => $usuario->id, 'nueva' => 1])
+                ->with('success', "Usuario creado: {$usuario->name}. Ahora elige dónde presta el servicio y qué líneas hace.");
+        }
 
         return back()->with('success', "Usuario creado: {$usuario->name} ya puede ingresar con su correo.");
     }

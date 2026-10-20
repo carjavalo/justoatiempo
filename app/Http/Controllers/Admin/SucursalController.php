@@ -9,6 +9,7 @@ use App\Models\Sucursal;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -27,7 +28,7 @@ class SucursalController extends Controller
 
         $sucursales = Sucursal::query()
             ->with('sede:id,empresa_id,nombre', 'sede.empresa:id,nombre')
-            ->withCount('usuarios')
+            ->withCount(['asignaciones as usuarios_count' => fn ($q) => $q->vigentes()->select(DB::raw('count(distinct asignaciones.user_id)'))])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('ciudad', 'like', $like)->orWhere('direccion', 'like', $like)->orWhere('alias_drivin', 'like', $like));

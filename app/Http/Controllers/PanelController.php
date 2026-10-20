@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\RolUsuario;
@@ -27,20 +28,23 @@ class PanelController extends Controller
         // Ver todas las líneas pasa por su tablero
         $verTodasLasLineas = $user->puede(Permisos::TODAS_LAS_LINEAS) && $user->puede('tablero.ver');
 
+        // Las líneas en las que trabaja hoy (por sus asignaciones) y cuyo tablero su rol abre
+        $misLineas = $user->lineas()->filter(fn (LineaServicio $l) => $user->puedeVerLinea($l))->values();
+
         if (! $user->administraAlgo() && ! $verTodasLasLineas) {
-            if ($user->linea && $user->puedeVerLinea($user->linea)) {
-                return redirect()->route('lineas.show', $user->linea);
+            // Trabaja en una sola línea: entra directo a ella
+            if ($misLineas->count() === 1) {
+                return redirect()->route('lineas.show', $misLineas->first());
             }
 
-            return Inertia::render('panel', [
-                'asignacion' => [
-                    'empresa' => $user->empresa?->nombre,
-                    'sede' => $user->sede?->nombre,
-                    'sucursal' => $user->sucursal?->nombre,
+            // En varias: el panel le muestra sus líneas; en ninguna, dónde está asignado
+            return Inertia::render('panel', $misLineas->isNotEmpty()
+                ? ['resumen' => (object) [], 'lineas' => $misLineas->map(fn (LineaServicio $l) => $this->tarjetaLinea($l, $user))]
+                : ['asignacion' => [
+                    'lugares' => $user->vigentes()->map(fn (Asignacion $a) => ['lugar' => $a->lugar(), 'lineas' => $a->lineas->pluck('nombre')]),
                     // Su rol no abre el tablero de la línea: aunque tenga (o le asignen) una, no entra a ella
                     'sinTablero' => ! $user->puede('tablero.ver'),
-                ],
-            ]);
+                ]]);
         }
 
         // Solo se cuenta lo que se muestra
@@ -50,6 +54,13 @@ class PanelController extends Controller
                 $u = User::query()->alcanceDe($user)->selectRaw('count(*) as total, sum(activo) as activos')->first();
 
                 return ['total' => (int) $u->total, 'activos' => (int) $u->activos];
+            })() : null,
+            'asignaciones' => $user->puede('asignaciones.ver') ? (function () use ($user) {
+                // Las vigentes que alcanza a ver
+                $vigentes = Asignacion::vigentes()->with('lineas:id')->whereIn('user_id', User::query()->alcanceDe($user)->select('users.id'))->get()
+                    ->filter(fn (Asignacion $a) => $user->sinLimites() || $user->veAsignacion($a));
+
+                return ['vigentes' => $vigentes->count(), 'personas' => $vigentes->pluck('user_id')->unique()->count()];
             })() : null,
             'roles' => $user->puede('roles.ver') ? ['total' => RolUsuario::count(), 'activos' => RolUsuario::where('activo', true)->count()] : null,
             'empresas' => $user->puede('empresas.ver') ? (function () {
@@ -72,27 +83,30 @@ class PanelController extends Controller
                 : null,
         ], fn ($dato) => $dato !== null);
 
-        // Las líneas que ve: todas o solo la suya (si su rol abre su tablero)
-        $lineas = $verTodasLasLineas || ($user->linea && $user->puedeVerLinea($user->linea))
-            ? LineaServicio::ordenadas()
-                ->when(! $verTodasLasLineas, fn ($q) => $q->whereKey($user->linea_servicio_id))
-                ->withCount([
-                    'empresas' => fn ($q) => $q->where('activo', true)->when($user->empresaFija(), fn ($e, int $id) => $e->whereKey($id)),
-                    'usuarios' => fn ($q) => $q->where('activo', true)->when($user->empresaFija(), fn ($u, int $id) => $u->where('empresa_id', $id)),
-                ])
-                ->get()
-                ->map(fn (LineaServicio $l) => [
-                    'slug' => $l->slug,
-                    'nombre' => $l->nombre,
-                    'empresas' => $l->empresas_count,
-                    'personas' => $l->usuarios_count,
-                    'tablero' => $l->modulo !== null,
-                ])
-            : [];
+        // Las líneas que ve: todas, o las suyas (si su rol abre su tablero)
+        $lineas = ($verTodasLasLineas ? LineaServicio::ordenadas()->get() : $misLineas)
+            ->map(fn (LineaServicio $l) => $this->tarjetaLinea($l, $user))
+            ->values();
 
         return Inertia::render('panel', [
             'resumen' => (object) $resumen,
             'lineas' => $lineas,
         ]);
+    }
+
+    /** Una línea con lo que quien mira ve en ella: sus empresas activas y su personal (por asignaciones vigentes). */
+    private function tarjetaLinea(LineaServicio $linea, User $user): array
+    {
+        $alcance = $user->alcanceEn($linea);
+
+        return [
+            'slug' => $linea->slug,
+            'nombre' => $linea->nombre,
+            'empresas' => $linea->empresas()->where('activo', true)->when(! $alcance->todo, fn ($q) => $q->whereIn('empresas.id', $alcance->empresas()))->count(),
+            'personas' => $alcance->filtrarAsignaciones(Asignacion::vigentes()->whereHas('lineas', fn ($q) => $q->whereKey($linea->id)))
+                ->whereHas('usuario', fn ($q) => $q->where('activo', true))
+                ->distinct()->count('user_id'),
+            'tablero' => $linea->modulo !== null,
+        ];
     }
 }

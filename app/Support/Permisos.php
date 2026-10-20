@@ -33,6 +33,7 @@ final class Permisos
             'titulo' => 'Administración',
             'modulos' => [
                 'usuarios' => ['titulo' => 'Usuarios', 'descripcion' => 'Accesos de las personas, con su carnet y su ARL.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
+                'asignaciones' => ['titulo' => 'Asignaciones', 'descripcion' => 'Dónde presta el servicio cada persona, qué líneas hace allí y por cuánto tiempo.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'terminar' => 'Terminar']],
                 'roles' => ['titulo' => 'Roles', 'descripcion' => 'Los roles de la empresa y sus permisos.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'empresas' => ['titulo' => 'Empresas', 'descripcion' => 'Empresas clientes y las líneas que reciben.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'sedes' => ['titulo' => 'Sedes', 'descripcion' => 'Sedes de cada empresa y su meta de efectividad.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
@@ -119,7 +120,7 @@ final class Permisos
     {
         return [
             self::ALCANCE_TODO => 'Todas las empresas, sedes y sucursales, aunque tenga una empresa asignada.',
-            self::ALCANCE_ASIGNACION => 'Si tiene empresa asignada, solo esa empresa (con su sede y su sucursal): sus usuarios y su tablero; los módulos que reúnen a todas las empresas no se le abren. Sin empresa, toda la operación.',
+            self::ALCANCE_ASIGNACION => 'Solo lo de sus asignaciones vigentes: las empresas (y sedes y sucursales) donde presta el servicio, con su personal. Una asignación sin empresa le muestra toda la línea. Los módulos que reúnen a todas las empresas no se le abren.',
             self::ALCANCE_PROPIO => 'Solo su propio desempeño en el tablero y Mis entregas: los demás módulos no se le abren.',
         ];
     }

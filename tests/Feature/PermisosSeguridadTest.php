@@ -33,77 +33,102 @@ class PermisosSeguridadTest extends TestCase
         return RolUsuario::create(['nombre' => $nombre, 'permisos' => $permisos, 'alcance' => $alcance, 'activo' => true]);
     }
 
-    private function datosUsuario(User|array $base, array $extra = []): array
+    /** Lo que envía el formulario de usuarios al editar a alguien sin cambiar nada. */
+    private function datosUsuario(User $base, array $extra = []): array
     {
-        $u = $base instanceof User ? [
+        return [
             'nombres' => $base->nombres ?? 'Ana', 'primer_apellido' => $base->primer_apellido ?? 'Torres', 'email' => $base->email,
-            'cargo' => $base->cargo ?? 'Supervisora', 'rol_id' => $base->rol_id, 'empresa_id' => $base->empresa_id ?? '',
-            'sede_id' => $base->sede_id ?? '', 'sucursal_id' => $base->sucursal_id ?? '', 'linea_id' => $base->linea_servicio_id ?? 'todas',
-        ] : $base;
+            'cargo' => $base->cargo ?? 'Supervisora', 'rol_id' => $base->rol_id, ...$extra,
+        ];
+    }
 
-        return [...$u, ...$extra];
+    /** Lo que envía el formulario de asignaciones. */
+    private function asignacion(?User $persona, array $extra = []): array
+    {
+        return [
+            ...($persona ? ['usuario_id' => $persona->id] : []),
+            'empresa_id' => '', 'sede_id' => '', 'sucursal_id' => '', 'lineas' => [LineaServicio::logistica()->id],
+            'fecha_inicio' => today()->toDateString(), 'duracion' => 'indefinida', ...$extra,
+        ];
     }
 
     public function test_quien_ve_solo_su_empresa_no_se_quita_ese_limite(): void
     {
         $ditranza = $this->empresa();
-        $rol = $this->rol(['usuarios.ver', 'usuarios.crear', 'usuarios.editar', 'tablero.ver', 'cargas.ver'], Permisos::ALCANCE_ASIGNACION, 'Supervisor cliente');
+        $otra = $this->empresa('Logística Sur');
+        $rol = $this->rol(
+            ['usuarios.ver', 'usuarios.crear', 'asignaciones.ver', 'asignaciones.crear', 'asignaciones.editar', 'asignaciones.terminar', 'tablero.ver', 'cargas.ver'],
+            Permisos::ALCANCE_ASIGNACION,
+            'Supervisor cliente',
+        );
         $supervisora = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditranza->id]);
         $this->actingAs($supervisora)->get('/cargas')->assertForbidden();
 
-        // Ni editándose sin empresa…
-        $this->actingAs($supervisora)->put("/usuarios/{$supervisora->id}", $this->datosUsuario($supervisora, ['empresa_id' => '']))
-            ->assertSessionHasErrors(['empresa_id' => 'Solo puedes asignar personas a tu empresa (Ditranza).']);
-        $this->assertSame($ditranza->id, $supervisora->fresh()->empresa_id);
+        // Ni asignándose a sí misma a toda la línea…
+        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($supervisora))
+            ->assertSessionHasErrors(['usuario_id' => 'No puedes cambiar tus propias asignaciones: pídeselo a otra persona.']);
+        // …ni terminando su propia asignación…
+        $suya = $supervisora->asignaciones()->sole();
+        $this->actingAs($supervisora)->patch("/asignaciones/{$suya->id}/terminar")->assertSessionHas('error');
+        $this->assertNull($suya->fresh()->fecha_fin);
 
-        // …ni creando una cuenta gemela sin empresa
-        $this->actingAs($supervisora)->post('/usuarios', $this->datosUsuario($supervisora, [
-            'email' => 'gemela@example.com', 'empresa_id' => '', 'password' => 'Clave-segura-1',
-        ]))->assertSessionHasErrors('empresa_id');
-        $this->assertDatabaseMissing('users', ['email' => 'gemela@example.com']);
+        // …ni con una cuenta gemela: a otra persona solo la asigna a su empresa
+        $gemela = User::factory()->create(['rol_id' => $rol->id, 'linea_servicio_id' => null]);
+        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($gemela))
+            ->assertSessionHasErrors(['empresa_id' => 'En «'.LineaServicio::logistica()->nombre.'» solo puedes asignar personas a los lugares donde tú trabajas.']);
+        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($gemela, ['empresa_id' => $otra->id]))
+            ->assertSessionHasErrors(['empresa_id' => 'En «'.LineaServicio::logistica()->nombre.'» solo puedes asignar personas a los lugares donde tú trabajas.']);
+        $this->actingAs($gemela)->get('/cargas')->assertForbidden();
 
         // Dentro de su empresa, sí
-        $this->actingAs($supervisora)->post('/usuarios', $this->datosUsuario($supervisora, [
-            'email' => 'nueva@example.com', 'password' => 'Clave-segura-1',
-        ]))->assertSessionHasNoErrors();
-        $this->actingAs($supervisora)->get('/cargas')->assertForbidden();
+        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($gemela, ['empresa_id' => $ditranza->id]))->assertSessionHasNoErrors();
+        $this->actingAs($gemela->fresh())->get('/cargas')->assertForbidden();
     }
 
-    public function test_quien_ve_solo_su_linea_no_se_cambia_a_otra(): void
+    public function test_quien_ve_solo_su_linea_no_asigna_otra(): void
     {
         $aseo = LineaServicio::where('slug', 'aseo-general')->sole();
-        $rol = $this->rol(['usuarios.ver', 'usuarios.editar', 'tablero.ver', 'auditoria.ver'], Permisos::ALCANCE_TODO, 'Coordinador de aseo');
+        $rol = $this->rol(['usuarios.ver', 'asignaciones.ver', 'asignaciones.crear', 'tablero.ver', 'auditoria.ver'], Permisos::ALCANCE_TODO, 'Coordinador de aseo');
         $coordinador = User::factory()->create(['rol_id' => $rol->id, 'linea_servicio_id' => $aseo->id]);
+        $nueva = User::factory()->create(['rol_id' => $rol->id, 'linea_servicio_id' => null]);
         $this->actingAs($coordinador)->get('/auditoria')->assertForbidden();
 
-        $this->actingAs($coordinador)->put("/usuarios/{$coordinador->id}", $this->datosUsuario($coordinador, ['linea_id' => LineaServicio::logistica()->id]))
-            ->assertSessionHasErrors(['linea_id' => "Solo puedes asignar personas a tu línea de servicio ({$aseo->nombre})."]);
-        $this->actingAs($coordinador->fresh())->get('/auditoria')->assertForbidden();
+        $this->actingAs($coordinador)->post('/asignaciones', $this->asignacion($nueva))
+            ->assertSessionHasErrors(['lineas' => 'No trabajas en «'.LineaServicio::logistica()->nombre.'»: solo puedes asignar tus líneas de servicio.']);
+        $this->actingAs($nueva->fresh())->get('/auditoria')->assertForbidden();
+
+        $this->actingAs($coordinador)->post('/asignaciones', $this->asignacion($nueva, ['lineas' => [$aseo->id]]))->assertSessionHasNoErrors();
     }
 
     public function test_quien_ve_solo_su_empresa_administra_solo_a_su_personal(): void
     {
         $ditranza = $this->empresa();
         $otra = $this->empresa('Logística Sur');
-        $rol = $this->rol(['usuarios.ver', 'usuarios.estado', 'tablero.ver', 'roles.ver', 'empresas.ver'], Permisos::ALCANCE_ASIGNACION, 'Talento cliente');
+        $rol = $this->rol(['usuarios.ver', 'usuarios.estado', 'tablero.ver', 'roles.ver', 'empresas.ver', 'asignaciones.ver'], Permisos::ALCANCE_ASIGNACION, 'Talento cliente');
         $talento = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditranza->id]);
         $deDitranza = User::factory()->create(['empresa_id' => $ditranza->id]);
         $deOtra = User::factory()->create(['empresa_id' => $otra->id]);
+        // Quien aún no tiene asignación sí se ve: hay que poder asignarlo
+        $sinAsignar = User::factory()->create(['rol_id' => $this->rol([], Permisos::ALCANCE_PROPIO, 'Visitante')->id, 'linea_servicio_id' => null]);
 
         $this->actingAs($talento)->get('/usuarios')->assertInertia(fn (Assert $p) => $p
-            ->where('usuarios.data', fn ($filas) => collect($filas)->pluck('id')->sort()->values()->all() === collect([$talento->id, $deDitranza->id])->sort()->values()->all())
-            ->where('limites.empresaId', $ditranza->id)
-            ->has('empresas', 1));
+            ->where('usuarios.data', fn ($filas) => collect($filas)->pluck('id')->sort()->values()->all() === collect([$talento->id, $deDitranza->id, $sinAsignar->id])->sort()->values()->all()));
         foreach (['carnet', 'foto', 'arl'] as $parte) {
             $this->actingAs($talento)->get("/usuarios/{$deOtra->id}/{$parte}")->assertNotFound();
         }
         $this->actingAs($talento)->patch("/usuarios/{$deOtra->id}/estado", ['activo' => false])->assertSessionHas('error');
         $this->assertTrue($deOtra->fresh()->activo);
 
+        // En Asignaciones tampoco ve a las de otras empresas
+        $this->actingAs($talento)->get('/asignaciones')->assertOk()->assertInertia(fn (Assert $p) => $p
+            ->where('personas.data', fn ($filas) => ! collect($filas)->pluck('id')->contains($deOtra->id))
+            ->has('opciones.empresas', 1)
+            ->where('opciones.sinEmpresa', false));
+
         // Los módulos que reúnen a todas las empresas no se le abren
         $this->actingAs($talento)->get('/roles')->assertForbidden();
         $this->actingAs($talento)->get('/empresas')->assertForbidden();
-        $this->actingAs($talento)->get('/panel')->assertInertia(fn (Assert $p) => $p->where('resumen.usuarios.total', 2)->missing('resumen.roles'));
+        $this->actingAs($talento)->get('/panel')->assertInertia(fn (Assert $p) => $p->where('resumen.usuarios.total', 3)->missing('resumen.roles'));
     }
 
     public function test_solo_lo_suyo_no_abre_la_operacion_de_los_demas(): void

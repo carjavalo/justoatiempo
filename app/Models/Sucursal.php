@@ -29,9 +29,10 @@ class Sucursal extends Model
         return $this->belongsTo(Sede::class);
     }
 
-    public function usuarios(): HasMany
+    /** Las asignaciones de personas a esta sucursal. */
+    public function asignaciones(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(Asignacion::class);
     }
 
     public function ordenes(): HasMany

@@ -9,6 +9,7 @@ use App\Models\LineaServicio;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,7 +26,8 @@ class EmpresaController extends Controller
 
         $empresas = Empresa::query()
             ->with('lineas:id')
-            ->withCount(['sedes', 'usuarios'])
+            // Su personal: quienes tienen hoy una asignación en ella
+            ->withCount(['sedes', 'asignaciones as usuarios_count' => fn ($q) => $q->vigentes()->select(DB::raw('count(distinct asignaciones.user_id)'))])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 // El NIT se guarda sin puntos: se buscan también los dígitos escritos con puntos

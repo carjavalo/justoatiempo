@@ -1,7 +1,8 @@
 import { Iniciales } from '@/components/admin/piezas';
 import { EnlaceVolver } from '@/components/enlace-volver';
-import { AlertTriangle, Building2, CheckCircle2, FileText, MapPinned, Store, XCircle } from '@/components/iconos';
+import { AlertTriangle, Building2, CheckCircle2, FileText, Layers, MapPinned, XCircle } from '@/components/iconos';
 import LogoMarca from '@/components/logo-marca';
+import { aFecha } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
 
@@ -11,11 +12,8 @@ interface Vigente {
     cedula: string | null;
     cargo: string;
     email: string;
-    /** Empresa cliente donde presta el servicio (todos son personal de Justo a Tiempo); puede no tener. */
-    empresa: string | null;
-    sede: string | null;
-    sucursal: string | null;
-    linea: string | null;
+    /** Dónde presta el servicio hoy (todos son personal de Justo a Tiempo): cada empresa con su sede, sucursal y líneas. */
+    asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
     foto: string | null;
     arl: { url: string; pdf: boolean; subida: string | null } | null;
 }
@@ -85,15 +83,8 @@ function NoVigente({ nombre }: { nombre: string }) {
 }
 
 function Datos({ persona: p }: { persona: Vigente }) {
-    // Dónde presta el servicio: lo primero que busca quien controla el ingreso
-    const asignacion = [
-        { titulo: 'Empresa', valor: p.empresa ?? 'Sin empresa asignada', icono: Building2, vacio: !p.empresa },
-        { titulo: 'Sede', valor: p.sede, icono: Store, vacio: false },
-        { titulo: 'Sucursal', valor: p.sucursal, icono: MapPinned, vacio: false },
-    ].filter((f) => f.valor);
     const filas = [
         { titulo: 'Cédula', valor: p.cedula ? `C.C. ${Number(p.cedula).toLocaleString('es-CO')}` : null },
-        { titulo: 'Línea de servicio', valor: p.linea },
         { titulo: 'Correo', valor: p.email },
     ].filter((f) => f.valor);
 
@@ -116,25 +107,44 @@ function Datos({ persona: p }: { persona: Vigente }) {
                 </div>
             </div>
 
+            {/* Dónde presta el servicio: lo primero que busca quien controla el ingreso */}
             <section aria-labelledby="titulo-asignacion" className="border-primary/25 bg-secondary/50 mt-6 rounded-2xl border p-4">
                 <h2 id="titulo-asignacion" className="text-xs font-bold tracking-[0.12em] uppercase">
                     Presta el servicio en
                 </h2>
-                <dl className="mt-3 grid gap-3">
-                    {asignacion.map(({ titulo, valor, icono: Icono, vacio }) => (
-                        <div key={titulo} className="flex items-center gap-3">
-                            <span className="bg-brand-navy-deep flex size-10 shrink-0 items-center justify-center rounded-xl">
-                                <Icono className="text-brand-coral-on-dark size-5" aria-hidden="true" />
-                            </span>
-                            <div className="min-w-0">
-                                <dt className="text-muted-foreground text-xs">{titulo}</dt>
-                                <dd className={cn('text-lg leading-tight font-extrabold break-words', vacio && 'text-muted-foreground text-base font-semibold')}>
-                                    {valor}
-                                </dd>
-                            </div>
-                        </div>
-                    ))}
-                </dl>
+                {p.asignaciones.length === 0 ? (
+                    <p className="text-muted-foreground mt-3 text-sm">Hoy no tiene asignaciones vigentes.</p>
+                ) : (
+                    <ul role="list" className="mt-3 grid gap-3">
+                        {p.asignaciones.map((a, i) => (
+                            <li key={i} className="bg-card rounded-xl border p-3.5">
+                                <div className="flex items-start gap-3">
+                                    <span className="bg-brand-navy-deep flex size-10 shrink-0 items-center justify-center rounded-xl">
+                                        <Building2 className="text-brand-coral-on-dark size-5" aria-hidden="true" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-lg leading-tight font-extrabold break-words">{a.empresa ?? 'Todas las empresas de su línea'}</p>
+                                        {(a.sede || a.sucursal) && (
+                                            <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-sm">
+                                                <MapPinned className="size-4 shrink-0" aria-hidden="true" />
+                                                {[a.sede, a.sucursal].filter(Boolean).join(' · ')}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                                <ul role="list" aria-label="Líneas de servicio" className="mt-3 flex flex-wrap gap-1.5">
+                                    {a.lineas.map((l) => (
+                                        <li key={l} className="bg-muted inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold">
+                                            <Layers className="text-primary size-3.5" aria-hidden="true" />
+                                            {l}
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="text-muted-foreground mt-2 text-xs">{a.hasta ? `Asignado hasta el ${fechaLarga.format(aFecha(a.hasta))}` : 'Asignación indefinida'}</p>
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </section>
 
             <dl className="mt-4 divide-y rounded-2xl border">

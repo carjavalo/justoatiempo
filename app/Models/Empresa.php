@@ -39,8 +39,9 @@ class Empresa extends Model
         return $this->belongsToMany(LineaServicio::class, 'empresa_linea_servicio')->withTimestamps();
     }
 
-    public function usuarios(): HasMany
+    /** Las asignaciones de personas a esta empresa (las vigentes son su personal). */
+    public function asignaciones(): HasMany
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(Asignacion::class);
     }
 }

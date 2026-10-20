@@ -52,7 +52,8 @@ class HandleInertiaRequests extends Middleware
                     'rol_label' => $user->nombreRol(),
                     // Destino de la miga raíz: el panel o la línea en la que trabaja
                     'inicio' => $user->inicio(),
-                    'linea' => $user->linea ? ['slug' => $user->linea->slug, 'nombre' => $user->linea->nombre] : null,
+                    // Las líneas en las que trabaja hoy (por sus asignaciones vigentes)
+                    'lineas' => $user->lineas()->map(fn ($l) => ['slug' => $l->slug, 'nombre' => $l->nombre])->values(),
                 ] : null,
                 // Lo que puede hacer (los permisos de su rol que le aplican): las pantallas muestran solo eso
                 'permisos' => $user ? $user->permisos() : [],

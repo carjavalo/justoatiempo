@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AsignacionController;
 use App\Http\Controllers\Admin\EmpresaController;
 use App\Http\Controllers\Admin\RolController;
 use App\Http\Controllers\Admin\SedeController;
@@ -49,6 +50,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('usuarios/{usuario}/arl', [UsuarioController::class, 'arl'])->name('usuarios.arl');
         Route::get('usuarios/{usuario}/carnet', [UsuarioController::class, 'carnet'])->name('usuarios.carnet');
     });
+
+    // Asignaciones: dónde presta el servicio cada persona, qué líneas hace allí y por cuánto tiempo
+    Route::get('asignaciones', [AsignacionController::class, 'index'])->middleware('permiso:asignaciones.ver')->name('asignaciones.index');
+    Route::post('asignaciones', [AsignacionController::class, 'store'])->middleware('permiso:asignaciones.crear')->name('asignaciones.store');
+    Route::put('asignaciones/{asignacion}', [AsignacionController::class, 'update'])->middleware('permiso:asignaciones.editar')->name('asignaciones.update');
+    Route::patch('asignaciones/{asignacion}/terminar', [AsignacionController::class, 'terminar'])->middleware('permiso:asignaciones.terminar')->name('asignaciones.terminar');
 
     // Roles dentro de la empresa (auxiliar, conductor…), cada uno con sus permisos
     Route::get('roles', [RolController::class, 'index'])->middleware('permiso:roles.ver')->name('roles.index');

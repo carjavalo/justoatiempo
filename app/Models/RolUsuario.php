@@ -74,6 +74,12 @@ class RolUsuario extends Model
         return $this->clave === self::CLAVES['admin'];
     }
 
+    /** El Administrador de la plataforma tiene siempre todo el catálogo, también lo que se agregue después. */
+    protected function getPermisosAttribute(?string $valor): array
+    {
+        return $this->esAdministradorBase() ? Permisos::todos() : (json_decode((string) $valor, true) ?: []);
+    }
+
     public function permite(string $permiso): bool
     {
         return in_array($permiso, $this->permisos ?? [], true);

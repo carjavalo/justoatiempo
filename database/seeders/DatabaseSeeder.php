@@ -35,30 +35,37 @@ class DatabaseSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        User::updateOrCreate(['email' => 'coordinador@justoatiempo.test'], [
+        $coordinador = User::updateOrCreate(['email' => 'coordinador@justoatiempo.test'], [
             'nombres' => 'Carlos',
             'primer_apellido' => 'Valderrama',
             'password' => 'password',
             'rol' => Rol::Coordinador,
             'empleado_id' => Empleado::where('cedula', '1000000006')->value('id'),
-            'linea_servicio_id' => $logistica->id,
-            'empresa_id' => $tugo?->empresa_id,
-            'sede_id' => $tugo?->id,
-            'sucursal_id' => $caliSur?->id,
             'email_verified_at' => now(),
         ]);
 
-        User::updateOrCreate(['email' => 'auxiliar@justoatiempo.test'], [
+        $auxiliar = User::updateOrCreate(['email' => 'auxiliar@justoatiempo.test'], [
             'nombres' => 'Andrés',
             'primer_apellido' => 'Moreno',
             'password' => 'password',
             'rol' => Rol::Auxiliar,
             'empleado_id' => Empleado::where('cedula', '1000000002')->value('id'),
-            'linea_servicio_id' => $logistica->id,
-            'empresa_id' => $tugo?->empresa_id,
-            'sede_id' => $tugo?->id,
-            'sucursal_id' => $caliSur?->id,
             'email_verified_at' => now(),
         ]);
+
+        // Los dos prestan el servicio logístico en TuGo · Cali Sur (de Ditranza)
+        foreach ([$coordinador, $auxiliar] as $persona) {
+            if ($persona->asignaciones()->exists()) {
+                continue;
+            }
+            $asignacion = $persona->asignaciones()->create([
+                'empresa_id' => $tugo?->empresa_id,
+                'sede_id' => $tugo?->id,
+                'sucursal_id' => $caliSur?->id,
+                'fecha_inicio' => today()->startOfMonth()->toDateString(),
+                'duracion' => 'indefinida',
+            ]);
+            $asignacion->lineas()->sync([$logistica->id]);
+        }
     }
 }

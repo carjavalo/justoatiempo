@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Asignacion;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,8 +18,6 @@ class Carnet
     /** @param  string|null  $foto  dirección por la que quien mira puede ver la foto */
     public static function datos(User $usuario, ?string $foto, ?string $arl = null): array
     {
-        $usuario->loadMissing(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre']);
-
         return [
             'id' => $usuario->id,
             'nombres' => $usuario->nombres ?: Str::before($usuario->name, ' '),
@@ -30,10 +29,8 @@ class Carnet
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'tieneCargo' => filled($usuario->cargo),
             'email' => $usuario->email,
-            // Dónde presta el servicio: va en la franja de abajo del carnet
-            'empresa' => $usuario->empresa?->nombre,
-            'sede' => $usuario->sede?->nombre,
-            'sucursal' => $usuario->sucursal?->nombre,
+            // Dónde presta el servicio hoy y qué hace allí: va abajo en el carnet
+            'asignaciones' => self::asignaciones($usuario),
             'foto' => $foto,
             'arl' => $arl,
             'activo' => $usuario->activo,
@@ -53,7 +50,6 @@ class Carnet
             return ['vigente' => false, 'nombre' => $usuario->name];
         }
 
-        $usuario->loadMissing(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre']);
         $codigo = $usuario->carnet_codigo;
 
         return [
@@ -62,11 +58,9 @@ class Carnet
             'cedula' => $usuario->cedula,
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'email' => $usuario->email,
-            // Empresa cliente donde presta el servicio (todos son personal de Justo a Tiempo); puede no tener
-            'empresa' => $usuario->empresa?->nombre,
-            'sede' => $usuario->sede?->nombre,
-            'sucursal' => $usuario->sucursal?->nombre,
-            'linea' => $usuario->linea?->nombre,
+            // Dónde presta el servicio hoy (todos son personal de Justo a Tiempo): cada empresa con su sede, su
+            // sucursal, las líneas que hace allí y hasta cuándo
+            'asignaciones' => self::asignaciones($usuario),
             'foto' => $usuario->foto_path ? route('carnet.foto', ['codigo' => $codigo, 'v' => self::version($usuario->foto_path)]) : null,
             'arl' => $usuario->arl_path ? [
                 'url' => route('carnet.arl', ['codigo' => $codigo, 'v' => self::version($usuario->arl_path)]),
@@ -74,6 +68,18 @@ class Carnet
                 'subida' => $usuario->arl_subida_en?->toIso8601String(),
             ] : null,
         ];
+    }
+
+    /** @return list<array<string, mixed>> Sus asignaciones vigentes: empresa (o toda la línea), sede, sucursal, líneas y fin. */
+    private static function asignaciones(User $usuario): array
+    {
+        return $usuario->vigentes()->map(fn (Asignacion $a) => [
+            'empresa' => $a->empresa?->nombre,
+            'sede' => $a->sede?->nombre,
+            'sucursal' => $a->sucursal?->nombre,
+            'lineas' => $a->lineas->pluck('nombre')->all(),
+            'hasta' => $a->fecha_fin?->toDateString(),
+        ])->values()->all();
     }
 
     /** La versión en la dirección evita que el navegador muestre el archivo anterior tras reemplazarlo. */

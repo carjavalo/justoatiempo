@@ -25,7 +25,7 @@ class OperacionSeeder extends Seeder
             'meta_efectividad' => 95,
             'color' => '#E8705F',
         ]);
-        // Si TuGo ya existía en otra empresa, pasa a Ditranza con su personal
+        // Si TuGo ya existía en otra empresa, pasa a Ditranza con sus asignaciones
         $tugo->trasladarA($ditranza);
         $tugo->sucursales()->updateOrCreate(['nombre' => 'Cali Sur'], ['alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
         $tugo->sucursales()->updateOrCreate(['nombre' => 'Cali Norte'], ['alias_drivin' => 'CALI NORTE', 'ciudad' => 'Cali']);

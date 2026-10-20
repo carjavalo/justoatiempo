@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asignacion;
 use App\Models\LineaServicio;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,9 +22,10 @@ class LineaController extends Controller
             return app(DashboardController::class)->mostrar($request, $linea);
         }
 
-        $empresaFija = $user->empresaFija();
+        // Lo que ve en esta línea: todas sus empresas o las de sus asignaciones
+        $alcance = $user->alcanceEn($linea);
         $empresas = $linea->empresas()
-            ->when($empresaFija, fn ($q) => $q->whereKey($empresaFija))
+            ->when(! $alcance->todo, fn ($q) => $q->whereIn('empresas.id', $alcance->empresas()))
             ->withCount([
                 'sedes' => fn ($q) => $q->where('activo', true),
                 'sucursales' => fn ($q) => $q->where('sucursales.activo', true),
@@ -32,13 +34,17 @@ class LineaController extends Controller
             ->orderBy('nombre')
             ->get(['empresas.id', 'nombre', 'activo']);
 
-        $activos = fn () => $linea->usuarios()->where('users.activo', true)
-            ->when($empresaFija, fn ($q) => $q->where('users.empresa_id', $empresaFija));
+        // Su personal: quienes tienen hoy una asignación en esta línea (dentro de lo que ve)
+        $asignaciones = fn () => $alcance->filtrarAsignaciones(Asignacion::vigentes()->whereHas('lineas', fn ($q) => $q->whereKey($linea->id)))
+            ->join('users', 'users.id', '=', 'asignaciones.user_id')
+            ->where('users.activo', true);
         // El personal por rol de la empresa ("Conductor", "Auxiliar operativo"…), de más a menos personas
-        $personal = $activos()->join('roles', 'roles.id', '=', 'users.rol_id')
-            ->selectRaw('roles.nombre as rol, count(*) as total')->groupBy('roles.nombre')
+        $personal = $asignaciones()->join('roles', 'roles.id', '=', 'users.rol_id')
+            ->selectRaw('roles.nombre as rol, count(distinct users.id) as total')->groupBy('roles.nombre')
             ->orderByDesc('total')->orderBy('roles.nombre')->toBase()->get();
-        $porEmpresa = $activos()->whereNotNull('empresa_id')->selectRaw('empresa_id, count(*) as total')->groupBy('empresa_id')->pluck('total', 'empresa_id');
+        $porEmpresa = $asignaciones()->whereNotNull('asignaciones.empresa_id')
+            ->selectRaw('asignaciones.empresa_id, count(distinct users.id) as total')->groupBy('asignaciones.empresa_id')
+            ->toBase()->pluck('total', 'empresa_id');
 
         return Inertia::render('lineas/linea', [
             'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre],

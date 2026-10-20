@@ -14,6 +14,7 @@ use App\Models\Parametro;
 use App\Models\Sede;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -36,29 +37,26 @@ class DashboardController extends Controller
         $esAuxiliar = $user->soloLoSuyo();
         $empleadoId = $esAuxiliar ? ($user->empleado_id ?? 0) : null;
 
-        // Alcance: las sedes de las empresas que reciben la línea. Quien está asignado a una empresa queda
-        // limitado a ella, y a su sede y su sucursal si las tiene; el auxiliar ve sus propias órdenes.
-        $empresaFija = $user->empresaFija();
-        $sedeFija = $esAuxiliar ? null : $user->sedeFija();
-        $sucursalFija = $esAuxiliar ? null : $user->sucursalFija();
+        // Alcance: las sedes de las empresas que reciben la línea. Quien solo ve sus asignaciones queda limitado a
+        // sus empresas (y a sus sedes y sucursales, si las fijan); el auxiliar ve sus propias órdenes en sus empresas.
+        $alcance = $esAuxiliar ? $user->alcanceEn($linea)->soloEmpresas() : $user->alcanceEn($linea);
         // Las sedes o empresas desactivadas conservan su historial en el tablero; el selector ofrece solo las activas
-        $sedesAlcance = Sede::query()
-            ->whereHas('empresa', fn ($q) => $q->whereHas('lineas', fn ($l) => $l->whereKey($linea->id)))
-            ->when($empresaFija, fn ($q) => $q->where('empresa_id', $empresaFija))
-            ->when($sedeFija, fn ($q) => $q->whereKey($sedeFija))
+        $sedesAlcance = $alcance->filtrarSedes(Sede::query()
+            ->whereHas('empresa', fn ($q) => $q->whereHas('lineas', fn ($l) => $l->whereKey($linea->id))))
             ->with('empresa:id,nombre,activo')
             ->orderBy('nombre')
             ->get(['id', 'empresa_id', 'nombre', 'color', 'activo']);
         $idsAlcance = $sedesAlcance->pluck('id')->all();
         $opcionesSede = $sedesAlcance->filter(fn (Sede $s) => $s->activo && $s->empresa?->activo)->values();
 
-        // La sede pedida (o la fija) debe estar dentro del alcance
-        $pedida = $sedeFija ?? ($request->integer('sede') ?: null);
+        // La sede pedida debe estar dentro del alcance; con una sola sede, es esa
+        $pedida = count($idsAlcance) === 1 && ! $alcance->todo ? $idsAlcance[0] : ($request->integer('sede') ?: null);
         $sedeId = in_array($pedida, $idsAlcance, true) ? $pedida : null;
+        $sedesVista = $sedeId ? $sedesAlcance->where('id', $sedeId)->values() : $sedesAlcance;
+        // Dentro de cada sede, solo las sucursales que fijan sus asignaciones
+        $ubicacion = fn (Builder $q) => $alcance->filtrarUbicacion($q, $sedesVista);
 
-        $enAlcance = fn (Builder $q) => $q
-            ->when($sedeId, fn (Builder $q) => $q->where('sede_id', $sedeId), fn (Builder $q) => $q->whereIn('sede_id', $idsAlcance))
-            ->when($sucursalFija, fn (Builder $q) => $q->where('sucursal_id', $sucursalFija))
+        $enAlcance = fn (Builder $q) => $ubicacion($q)
             ->when($empleadoId !== null, fn (Builder $q) => $q->where('empleado_id', $empleadoId));
 
         // El periodo termina en la última jornada con datos del alcance (la carga es a día vencido)
@@ -68,9 +66,8 @@ class DashboardController extends Controller
         $desde = $request->date('desde') ?? $hasta->copy()->subDays($periodo - 1);
 
         $base = fn (Carbon $d, Carbon $h) => $enAlcance(Orden::query()->whereBetween('fecha_operacion', [$d->toDateString(), $h->toDateString()]));
-        $sedesVista = $sedeId ? [$sedeId] : $idsAlcance;
-        // Con alcance fijo, las acciones de desempeño se limitan a lo ocurrido dentro de ese alcance
-        $limitarAcciones = $empresaFija !== null && $empleadoId === null;
+        // Con alcance limitado, las acciones de desempeño se limitan a lo ocurrido dentro de ese alcance
+        $limitarAcciones = ! $alcance->todo && $empleadoId === null;
 
         $dias = $desde->diffInDays($hasta) + 1;
         $prevHasta = $desde->copy()->subDay();
@@ -81,8 +78,8 @@ class DashboardController extends Controller
 
         return Inertia::render('lineas/logistica', [
             'linea' => ['slug' => $linea->slug, 'nombre' => $linea->nombre],
-            // Lo más específico a lo que está asignado: "TuGo · Cali Sur", "TuGo" o "Ditranza"
-            'alcanceFijo' => $this->alcanceFijo($user),
+            // Dónde está asignado en esta línea: "Ditranza · TuGo · Cali Sur" o "Ditranza y Sodimac"
+            'alcanceFijo' => $alcance->todo ? null : $this->alcanceFijo($user, $linea),
             'filtros' => [
                 'desde' => $desde->toDateString(),
                 'hasta' => $hasta->toDateString(),
@@ -100,11 +97,11 @@ class DashboardController extends Controller
             'tendencia' => $this->tendencia($base($desde, $hasta)),
             'motivos' => $this->motivos($base($desde, $hasta)),
             'porSede' => $esAuxiliar ? [] : $this->porSede($base($desde, $hasta)),
-            'ranking' => $this->ranking($base($desde, $hasta), $desde, $hasta, $limitarAcciones ? $this->informesDe($sedesVista, $sucursalFija) : null),
+            'ranking' => $this->ranking($base($desde, $hasta), $desde, $hasta, $limitarAcciones ? $this->informesDe($ubicacion) : null),
             'protocolo' => $this->protocolo($base($desde, $hasta)),
             // La última carga de Drivin solo la ve quien puede abrir Cargas
-            'pendientes' => $esAuxiliar ? null : $this->pendientes($sedesVista, $sucursalFija, $user->puede('cargas.ver')),
-            'acciones' => $this->accionesRecientes($empleadoId, $sedesVista, $sucursalFija, $limitarAcciones),
+            'pendientes' => $esAuxiliar ? null : $this->pendientes($ubicacion, $user->puede('cargas.ver')),
+            'acciones' => $this->accionesRecientes($empleadoId, $ubicacion, $limitarAcciones),
         ]);
     }
 
@@ -178,18 +175,19 @@ class DashboardController extends Controller
             ->all();
     }
 
-    private function alcanceFijo(User $user): ?string
+    /** Dónde está asignado en la línea: un lugar ("Ditranza · TuGo · Cali Sur") o sus empresas ("Ditranza y Sodimac"). */
+    private function alcanceFijo(User $user, LineaServicio $linea): ?string
     {
-        if ($user->empresaFija() === null) {
-            return null;
+        $asignaciones = $user->vigentes()->filter(fn ($a) => $a->lineas->contains('id', $linea->id));
+        if ($asignaciones->isEmpty()) {
+            $asignaciones = $user->vigentes();
         }
-        $user->loadMissing('empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre');
+        if ($asignaciones->count() === 1) {
+            return $asignaciones->first()->lugar();
+        }
+        $empresas = $asignaciones->map(fn ($a) => $a->empresa?->nombre)->filter()->unique()->values();
 
-        return match (true) {
-            $user->sucursal !== null => trim(($user->sede?->nombre ?? '').' · '.$user->sucursal->nombre, ' ·'),
-            $user->sede !== null => $user->sede->nombre,
-            default => $user->empresa?->nombre,
-        };
+        return $empresas->count() > 1 ? $empresas->slice(0, -1)->implode(', ').' y '.$empresas->last() : $empresas->first();
     }
 
     private function porSede(Builder $q): array
@@ -212,13 +210,10 @@ class DashboardController extends Controller
             ->all();
     }
 
-    /** Informes diarios de unas sedes (y de una sucursal, si se indica): el alcance de las acciones de desempeño. */
-    private function informesDe(array $sedes, ?int $sucursalId): Builder
+    /** Informes diarios dentro del alcance (sus sedes y sucursales): el alcance de las acciones de desempeño. */
+    private function informesDe(Closure $ubicacion): Builder
     {
-        return InformeDiario::query()
-            ->whereIn('sede_id', $sedes)
-            ->when($sucursalId, fn ($q) => $q->where('sucursal_id', $sucursalId))
-            ->select('id');
+        return $ubicacion(InformeDiario::query())->select('id');
     }
 
     /** @param  Builder|null  $informes  con alcance fijo, solo cuentan las acciones de esos informes */
@@ -308,13 +303,11 @@ class DashboardController extends Controller
      * @param  list<int>  $sedes
      * @param  bool  $verCarga  la última carga de Drivin mezcla empresas: solo para el personal propio
      */
-    private function pendientes(array $sedes, ?int $sucursalId, bool $verCarga): array
+    private function pendientes(Closure $ubicacion, bool $verCarga): array
     {
         return [
-            'informes' => InformeDiario::query()
+            'informes' => $ubicacion(InformeDiario::query())
                 ->with(['sede:id,nombre,color', 'sucursal:id,nombre'])
-                ->whereIn('sede_id', $sedes)
-                ->when($sucursalId, fn ($q) => $q->where('sucursal_id', $sucursalId))
                 ->where('estado', '<>', EstadoInforme::Cerrado)
                 ->orderByDesc('fecha_operacion')
                 ->limit(6)
@@ -341,17 +334,17 @@ class DashboardController extends Controller
      * @param  list<int>  $sedes
      * @param  bool  $limitar  con alcance fijo, las acciones generales (sin informe) solo de quienes operan en él
      */
-    private function accionesRecientes(?int $empleadoId, array $sedes, ?int $sucursalId, bool $limitar): array
+    private function accionesRecientes(?int $empleadoId, Closure $ubicacion, bool $limitar): array
     {
         return AccionDesempeno::query()
             ->with('empleado:id,nombres,apellidos')
             ->when($empleadoId !== null, fn ($q) => $q->where('empleado_id', $empleadoId))
             // Acciones ligadas a un informe fuera del alcance no se muestran
             ->where(fn ($q) => $q
-                ->whereIn('informe_id', $this->informesDe($sedes, $sucursalId))
+                ->whereIn('informe_id', $this->informesDe($ubicacion))
                 ->orWhere(fn ($g) => $g->whereNull('informe_id')->when($limitar, fn ($w) => $w->whereIn(
                     'empleado_id',
-                    Orden::query()->whereIn('sede_id', $sedes)->when($sucursalId, fn ($o) => $o->where('sucursal_id', $sucursalId))->whereNotNull('empleado_id')->select('empleado_id'),
+                    $ubicacion(Orden::query())->whereNotNull('empleado_id')->select('empleado_id'),
                 ))))
             ->latest('fecha')
             ->latest('id')

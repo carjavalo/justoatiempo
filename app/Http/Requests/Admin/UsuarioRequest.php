@@ -2,25 +2,21 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Models\Empresa;
-use App\Models\LineaServicio;
 use App\Models\RolUsuario;
-use App\Models\Sede;
-use App\Models\Sucursal;
 use App\Models\User;
 use App\Support\Permisos;
-use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Validator;
 
+/**
+ * Crear o editar a una persona: sus datos, su rol, su cargo, su foto y su ARL. Dónde presta el servicio (empresas,
+ * sedes, sucursales y líneas) va aparte, en Asignaciones.
+ */
 class UsuarioRequest extends FormRequest
 {
     use LimpiaTexto;
-
-    /** Línea elegida para quien ve todas (su rol lo permite; se guarda sin línea). */
-    public const TODAS = 'todas';
 
     /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
@@ -42,10 +38,6 @@ class UsuarioRequest extends FormRequest
             'cedula' => is_string($c = $this->input('cedula')) ? (preg_replace('/[\s.,-]/', '', $c) ?: null) : $c,
             'cargo' => $this->texto('cargo') ?: null,
             'email' => is_string($e = $this->texto('email')) ? mb_strtolower($e) : $e,
-            'empresa_id' => $this->input('empresa_id') ?: null,
-            'sede_id' => $this->input('sede_id') ?: null,
-            'sucursal_id' => $this->input('sucursal_id') ?: null,
-            'linea_id' => $this->input('linea_id') ?: null,
             'password' => $this->input('password') ?: null,
         ]);
     }
@@ -60,15 +52,10 @@ class UsuarioRequest extends FormRequest
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
             'cedula' => ['nullable', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
-            // Sin rol, línea y cargo no se crea el usuario: son su lugar en la empresa y van en su carnet
+            // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
             'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
-            // La empresa cliente donde presta el servicio; sin ella queda sin empresa asignada
-            'empresa_id' => ['nullable', 'integer', Rule::exists('empresas', 'id')->whereNull('deleted_at')],
-            'sede_id' => ['nullable', 'integer', Rule::exists('sedes', 'id')->whereNull('deleted_at')],
-            'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')->whereNull('deleted_at')],
-            'linea_id' => ['required', $this->idOTodas()],
             // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
             'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
             // Foto para el carnet: opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
@@ -78,16 +65,6 @@ class UsuarioRequest extends FormRequest
             'arl' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
             'quitar_arl' => ['nullable', 'boolean'],
         ];
-    }
-
-    /** Una línea que exista, o "todas" (solo si el rol ve todas; se revisa después). */
-    private function idOTodas(): Closure
-    {
-        return function (string $atributo, mixed $valor, Closure $falla) {
-            if ($valor !== self::TODAS && ! (is_numeric($valor) && LineaServicio::whereKey((int) $valor)->exists())) {
-                $falla('Elige una línea de la lista.');
-            }
-        };
     }
 
     public function after(): array
@@ -101,10 +78,6 @@ class UsuarioRequest extends FormRequest
             $usuario = $this->route('usuario');
             $rol = RolUsuario::find($this->integer('rol_id'));
             $miRol = $this->user()->rolUsuario;
-            $empresaId = $this->empresaId();
-            $sedeId = $this->integer('sede_id') ?: null;
-            $sucursalId = $this->integer('sucursal_id') ?: null;
-            $lineaId = $this->lineaId();
 
             if (! $rol->activo && $rol->id !== $usuario?->rol_id) {
                 $validator->errors()->add('rol_id', 'Este rol está inactivo: actívalo en Roles antes de asignarlo.');
@@ -113,12 +86,6 @@ class UsuarioRequest extends FormRequest
             // Solo se asignan roles con, como mucho, los permisos del propio (nadie da más acceso del que tiene)
             if ($rol->id !== $usuario?->rol_id && ! $miRol?->cubre($rol)) {
                 $validator->errors()->add('rol_id', 'Este rol tiene permisos que el tuyo no tiene: no puedes asignarlo.');
-            }
-
-            // Nadie asigna a alguien (ni a sí mismo) fuera de su propia empresa, sede, sucursal o línea: así nadie se
-            // quita sus límites editándose o creando a otra persona sin ellos
-            if ($fuera = $this->user()->motivoFueraDeAlcance($empresaId, $sedeId, $sucursalId, $lineaId)) {
-                $validator->errors()->add(...$fuera);
             }
 
             // Siempre queda al menos una persona activa con el rol Administrador (la que puede corregir todo)
@@ -136,66 +103,13 @@ class UsuarioRequest extends FormRequest
                 }
             }
 
-            // "Todas las líneas" es solo para roles que las ven todas; los demás trabajan en una
-            if ($lineaId === null && ! $rol->permite(Permisos::TODAS_LAS_LINEAS)) {
-                $validator->errors()->add('linea_id', 'Elige la línea de servicio en la que trabaja: "Todas" es solo para roles que ven todas las líneas.');
-            }
-            if ($lineaId && $empresaId && ! Empresa::whereKey($empresaId)->whereHas('lineas', fn ($q) => $q->whereKey($lineaId))->exists()) {
-                $validator->errors()->add('empresa_id', 'Esta empresa no recibe la línea de servicio elegida.');
-            }
-
-            if ($empresaId && $empresaId !== $usuario?->empresa_id && ! Empresa::whereKey($empresaId)->value('activo')) {
-                $validator->errors()->add('empresa_id', 'Esta empresa está inactiva: actívala antes de asignarle usuarios.');
-            }
-
-            // Cascada: la sede debe ser de la empresa elegida y la sucursal, de la sede elegida
-            if ($sedeId) {
-                $sede = Sede::find($sedeId, ['id', 'empresa_id', 'activo']);
-                if ($sede->empresa_id !== $empresaId) {
-                    $validator->errors()->add('sede_id', $empresaId
-                        ? 'Esta sede no pertenece a la empresa elegida.'
-                        : 'Esta sede es de una empresa: elige primero esa empresa.');
-                } elseif (! $sede->activo && $sedeId !== $usuario?->sede_id) {
-                    $validator->errors()->add('sede_id', 'Esta sede está inactiva: actívala antes de asignarle usuarios.');
-                }
-            }
-
-            if ($sucursalId) {
-                $sucursal = Sucursal::find($sucursalId, ['id', 'sede_id', 'activo']);
-                if ($sucursal->sede_id !== $sedeId) {
-                    $validator->errors()->add('sucursal_id', match (true) {
-                        $sedeId !== null => 'Esta sucursal no pertenece a la sede elegida.',
-                        $sucursal->sede_id !== null => 'Esta sucursal es de una sede: elige primero esa sede.',
-                        default => 'Esta sucursal es propia de Justo a Tiempo: quita la sede para asignarla.',
-                    });
-                } elseif ($sucursal->sede_id === null && $empresaId) {
-                    $validator->errors()->add('sucursal_id', 'Esta sucursal es propia de Justo a Tiempo: no se asigna a quien presta el servicio en una empresa.');
-                } elseif (! $sucursal->activo && $sucursalId !== $usuario?->sucursal_id) {
-                    $validator->errors()->add('sucursal_id', 'Esta sucursal está inactiva: actívala antes de asignarle usuarios.');
-                }
-            }
         }];
-    }
-
-    /** La empresa cliente elegida; null si queda sin empresa asignada. */
-    private function empresaId(): ?int
-    {
-        return $this->integer('empresa_id') ?: null;
-    }
-
-    /** La línea elegida; null si es un administrador con todas las líneas. */
-    private function lineaId(): ?int
-    {
-        return $this->input('linea_id') === self::TODAS ? null : ($this->integer('linea_id') ?: null);
     }
 
     public function messages(): array
     {
         return [
             'rol_id.required' => 'Elige el rol.',
-            'empresa_id.integer' => 'Elige una empresa de la lista.',
-            'empresa_id.exists' => 'Elige una empresa de la lista.',
-            'linea_id.required' => 'Elige la línea de servicio.',
             'cargo.required' => 'Escribe el cargo: va en el carnet.',
             'email.unique' => 'Ya hay un usuario con este correo.',
             'cedula.regex' => 'Escribe solo los números de la cédula (entre 5 y 12).',
@@ -212,7 +126,7 @@ class UsuarioRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL'];
+        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
@@ -229,10 +143,6 @@ class UsuarioRequest extends FormRequest
             'email' => $datos['email'],
             // El nivel de acceso sale del rol (lo pone el modelo al guardar)
             'rol_id' => (int) $datos['rol_id'],
-            'empresa_id' => $this->empresaId(),
-            'sede_id' => $datos['sede_id'] ?? null,
-            'sucursal_id' => $datos['sucursal_id'] ?? null,
-            'linea_servicio_id' => $this->lineaId(),
         ];
 
         if (filled($datos['password'] ?? null)) {

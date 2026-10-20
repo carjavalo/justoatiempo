@@ -1,4 +1,4 @@
-import { ArrowRight, Bandeja, Building2, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UserCheck, UsersRound } from '@/components/iconos';
+import { ArrowRight, Bandeja, Building2, CalendarRange, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UserCheck, UsersRound } from '@/components/iconos';
 import AppLayout from '@/layouts/app-layout';
 import { SERVICIOS } from '@/lib/portafolio';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ interface Resumen {
     sucursales?: { total: number; activas: number; propias: number };
     solicitudes?: { total: number; pendientes: number };
     roles?: { total: number; activos: number };
+    asignaciones?: { vigentes: number; personas: number };
 }
 
 interface LineaPanel {
@@ -27,7 +28,7 @@ interface Props {
     resumen?: Resumen;
     lineas?: LineaPanel[];
     /** Sin nada que administrar ni línea que ver; sinTablero: tiene línea, pero su rol no abre su tablero. */
-    asignacion?: { empresa: string | null; sede: string | null; sucursal: string | null; sinTablero: boolean };
+    asignacion?: { lugares: { lugar: string; lineas: string[] }[]; sinTablero: boolean };
 }
 
 const formatoFecha = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -76,7 +77,7 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 }
 
 function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
-    const { usuarios, roles, empresas, sedes, sucursales, solicitudes } = resumen;
+    const { usuarios, asignaciones, roles, empresas, sedes, sucursales, solicitudes } = resumen;
     type Opcion = { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string; pendiente?: boolean };
     const todas: (Opcion | undefined)[] = [
         usuarios && {
@@ -86,6 +87,16 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             href: route('usuarios.index'),
             icono: UsersRound,
             dato: usuarios.total ? plural(usuarios.activos, 'usuario activo', 'usuarios activos') : 'Aún no hay usuarios',
+        },
+        asignaciones && {
+            id: 'asignaciones',
+            titulo: 'Asignaciones',
+            texto: 'Dónde presta el servicio cada persona: sus empresas, sedes y sucursales, las líneas que hace allí y por cuánto tiempo.',
+            href: route('asignaciones.index'),
+            icono: CalendarRange,
+            dato: asignaciones.vigentes
+                ? `${plural(asignaciones.vigentes, 'vigente', 'vigentes')} · ${plural(asignaciones.personas, 'persona', 'personas')}`
+                : 'Aún no hay asignaciones',
         },
         roles && {
             id: 'roles',
@@ -268,24 +279,23 @@ function SinOpciones({ asignacion }: { asignacion?: Props['asignacion'] }) {
         <div className="grid gap-5 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
             <section aria-labelledby="titulo-asignacion" className="bg-card rounded-3xl border p-6">
                 <h2 id="titulo-asignacion" className="text-sm font-bold tracking-[0.14em] uppercase">
-                    Tu asignación
+                    Dónde prestas el servicio
                 </h2>
-                <dl className="mt-4 grid gap-3 text-sm">
-                    <div>
-                        <dt className="text-muted-foreground text-xs">Empresa</dt>
-                        <dd className="font-semibold">{asignacion?.empresa ?? 'Sin empresa asignada'}</dd>
-                    </div>
-                    {asignacion?.sede && (
-                        <div>
-                            <dt className="text-muted-foreground text-xs">Sede</dt>
-                            <dd className="font-semibold">{asignacion.sede}</dd>
-                        </div>
-                    )}
-                    <div>
-                        <dt className="text-muted-foreground text-xs">Sucursal</dt>
-                        <dd className="font-semibold">{asignacion?.sucursal ?? 'Sin sucursal asignada'}</dd>
-                    </div>
-                </dl>
+                {asignacion?.lugares.length ? (
+                    <ul role="list" className="mt-4 grid gap-3 text-sm">
+                        {asignacion.lugares.map((l) => (
+                            <li key={l.lugar} className="flex items-start gap-2.5">
+                                <Building2 className="text-primary mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                <span>
+                                    <span className="block font-semibold">{l.lugar}</span>
+                                    <span className="text-muted-foreground block text-xs">{l.lineas.join(', ')}</span>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-muted-foreground mt-4 text-sm">Aún no tienes asignaciones.</p>
+                )}
             </section>
             <section className="bg-card flex flex-col items-center justify-center rounded-3xl border border-dashed px-6 py-12 text-center">
                 <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
@@ -300,9 +310,9 @@ function SinOpciones({ asignacion }: { asignacion?: Props['asignacion'] }) {
                     </>
                 ) : (
                     <>
-                        <h2 className="mt-4 text-lg font-extrabold tracking-tight">Aún no tienes una línea de servicio asignada</h2>
+                        <h2 className="mt-4 text-lg font-extrabold tracking-tight">Aún no tienes dónde prestar el servicio</h2>
                         <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
-                            Cuando quien administra los usuarios te asigne la línea en la que trabajas, al ingresar entrarás directo a ella.
+                            Cuando te asignen a una empresa y una línea de servicio (en Asignaciones), al ingresar entrarás directo a ella.
                         </p>
                     </>
                 )}

@@ -27,7 +27,7 @@ class SedeController extends Controller
 
         $sedes = Sede::query()
             ->with('empresa:id,nombre')
-            ->withCount(['sucursales', 'usuarios'])
+            ->withCount(['sucursales', 'asignaciones as usuarios_count' => fn ($q) => $q->vigentes()->select(DB::raw('count(distinct asignaciones.user_id)'))])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('codigo', 'like', $like));

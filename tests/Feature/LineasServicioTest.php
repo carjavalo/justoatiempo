@@ -84,7 +84,7 @@ class LineasServicioTest extends TestCase
         $this->get('/panel')->assertRedirect('/lineas/aseo-general');
         $this->get('/lineas/aseo-general')->assertInertia(fn (Assert $p) => $p->component('lineas/linea')
             ->where('auth.user.inicio.url', '/lineas/aseo-general')
-            ->where('auth.user.linea.nombre', $this->aseo->nombre));
+            ->where('auth.user.lineas', [['slug' => 'aseo-general', 'nombre' => $this->aseo->nombre]]));
     }
 
     public function test_cada_quien_solo_entra_a_su_linea_y_el_administrador_a_todas(): void
@@ -174,12 +174,12 @@ class LineasServicioTest extends TestCase
         // Asignado a la sede: aunque pida la otra, sigue viendo solo la suya
         $deSede = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id]);
         $this->actingAs($deSede)->get("/lineas/logisticos?sede={$sodimac->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('sedes', 1)->where('filtros.sede', $tugo->id)->where('kpis.asignadas', 7)->where('alcanceFijo', 'TuGo'));
+            ->assertInertia(fn (Assert $p) => $p->has('sedes', 1)->where('filtros.sede', $tugo->id)->where('kpis.asignadas', 7)->where('alcanceFijo', 'Ditranza · TuGo'));
 
         // Asignado a la sucursal: solo su sucursal
         $deSucursal = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id, 'sucursal_id' => $caliSur->id]);
         $this->actingAs($deSucursal)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'TuGo · Cali Sur')->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver')));
+            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'Ditranza · TuGo · Cali Sur')->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver')));
     }
 
     public function test_con_alcance_fijo_no_se_ven_acciones_ni_cargas_de_otras_operaciones(): void
@@ -247,7 +247,7 @@ class LineasServicioTest extends TestCase
         User::factory()->create(['empresa_id' => $empresa->id, 'linea_servicio_id' => $this->aseo->id]);
 
         $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza', 'lineas' => [$this->logistica->id]])
-            ->assertSessionHasErrors(['lineas' => "No puedes quitar «{$this->aseo->nombre}»: 1 persona de esta empresa trabaja en esa línea."]);
+            ->assertSessionHasErrors(['lineas' => "No puedes quitar «{$this->aseo->nombre}»: 1 persona está asignada a esta empresa en esa línea."]);
         $this->assertSame(2, $empresa->lineas()->count());
 
         // La que no tiene personal sí se puede quitar
@@ -267,35 +267,6 @@ class LineasServicioTest extends TestCase
 
     // --- Usuarios: su línea ------------------------------------------------------------
 
-    public function test_el_personal_necesita_una_linea_que_su_empresa_reciba(): void
-    {
-        $empresa = $this->empresa();
-        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar), 'cargo' => 'Auxiliar', 'password' => 'Clave-segura-1'];
-
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id])
-            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio.']);
-        // "Todas las líneas" es solo para administradores
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id, 'linea_id' => 'todas'])
-            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio en la que trabaja: "Todas" es solo para roles que ven todas las líneas.']);
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'linea_id' => $this->aseo->id, 'empresa_id' => $empresa->id])
-            ->assertSessionHasErrors(['empresa_id' => 'Esta empresa no recibe la línea de servicio elegida.']);
-
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'linea_id' => $this->logistica->id, 'empresa_id' => $empresa->id])
-            ->assertSessionHasNoErrors();
-        $this->assertSame($this->logistica->id, User::where('email', 'ana@example.com')->value('linea_servicio_id'));
-    }
-
-    public function test_el_administrador_puede_tener_todas_las_lineas_o_una(): void
-    {
-        $datos = ['primer_apellido' => 'Admin', 'rol_id' => $this->rolBase(Rol::Admin), 'cargo' => 'Gerente', 'password' => 'Clave-segura-1'];
-
-        $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Todas', 'email' => 'todas@example.com', 'linea_id' => 'todas'])->assertSessionHasNoErrors();
-        $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Aseo', 'email' => 'aseo@example.com', 'linea_id' => $this->aseo->id])->assertSessionHasNoErrors();
-
-        $this->assertNull(User::where('email', 'todas@example.com')->value('linea_servicio_id'));
-        $this->assertSame($this->aseo->id, User::where('email', 'aseo@example.com')->value('linea_servicio_id'));
-    }
-
     public function test_filtra_usuarios_por_linea(): void
     {
         User::factory()->create(['name' => 'De aseo', 'linea_servicio_id' => $this->aseo->id]);
@@ -304,7 +275,7 @@ class LineasServicioTest extends TestCase
         $this->actingAs($this->admin)->get("/usuarios?linea={$this->aseo->id}")
             ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 1)
                 ->where('usuarios.data.0.nombre', 'De aseo')
-                ->where('usuarios.data.0.lineaId', $this->aseo->id)
+                ->where('usuarios.data.0.asignaciones.0.lineas', [$this->aseo->nombre])
                 ->where('filtros.linea', (string) $this->aseo->id));
     }
 }

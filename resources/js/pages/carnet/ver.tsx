@@ -2,7 +2,7 @@ import { contenedorModulo, EncabezadoModulo } from '@/components/admin/piezas';
 import { AlertTriangle, ArrowUpRight, Download, FileText, LoaderCircle } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { cedulaLegible, dibujarCarnet, partesAsignacion, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
+import { cedulaLegible, dibujarCarnet, lineasCarnet, partesAsignacion, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -80,6 +80,7 @@ export default function VerCarnet({ persona, propio, editable = false }: Props) 
         partesAsignacion(persona)
             .map(([etiqueta, valor]) => `${etiqueta.toLowerCase()} ${valor}`)
             .join(', '),
+        lineasCarnet(persona).length ? `líneas ${lineasCarnet(persona).join(', ')}` : null,
         'con código QR',
     ]
         .filter(Boolean)

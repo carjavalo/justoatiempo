@@ -44,7 +44,7 @@ class RolesTest extends TestCase
     {
         return [
             'nombres' => 'Carlos', 'primer_apellido' => 'Ruiz', 'email' => 'carlos@example.com', 'cargo' => 'Conductor',
-            'rol_id' => $rolId, 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
+            'rol_id' => $rolId, 'password' => 'Clave-segura-1', ...$extra,
         ];
     }
 
@@ -107,7 +107,12 @@ class RolesTest extends TestCase
         $this->actingAs($this->admin)->post('/usuarios', $this->usuario($conductor->id))->assertSessionHasNoErrors();
         $carlos = User::where('email', 'carlos@example.com')->sole();
         $this->assertSame([$conductor->id, 'Conductor'], [$carlos->rol_id, $carlos->nombreRol()]);
-        $this->assertSame(['tablero.ver', 'cargas.ver', 'cargas.subir'], $carlos->permisos());
+        // Las herramientas de logística le aplican cuando se le asigna esa línea
+        $this->assertSame(['tablero.ver'], $carlos->permisos());
+        $this->actingAs($this->admin)->post('/asignaciones', [
+            'usuario_id' => $carlos->id, 'lineas' => [LineaServicio::logistica()->id], 'fecha_inicio' => today()->toDateString(), 'duracion' => 'indefinida',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(['tablero.ver', 'cargas.ver', 'cargas.subir'], $carlos->fresh()->permisos());
     }
 
     public function test_lista_los_roles_con_lo_que_ven_y_sus_usuarios(): void
@@ -211,11 +216,11 @@ class RolesTest extends TestCase
         $deSuEmpresa = $this->persona($this->rol($permisos, Permisos::ALCANCE_ASIGNACION, 'Supervisor de cliente'), ['empresa_id' => $empresa->id]);
         $deTodo = $this->persona($this->rol($permisos, Permisos::ALCANCE_TODO, 'Supervisor general'), ['empresa_id' => $empresa->id]);
 
-        $this->assertSame($empresa->id, $deSuEmpresa->empresaFija());
+        $this->assertSame([$empresa->id], $deSuEmpresa->alcanceEn()->empresas());
         $this->actingAs($deSuEmpresa)->get('/cargas')->assertForbidden()
-            ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta sección reúne la operación de todas las empresas: no está disponible para quien presta el servicio en una sola.'));
+            ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta sección reúne la operación de todas las empresas: no está disponible para quien solo ve las suyas.'));
 
-        $this->assertNull($deTodo->empresaFija());
+        $this->assertTrue($deTodo->alcanceEn()->todo);
         $this->actingAs($deTodo)->get('/cargas')->assertOk();
         $this->actingAs($deTodo)->get('/lineas/logisticos')->assertInertia(fn (Assert $p) => $p->where('alcanceFijo', null)->where('vista', 'gerencial'));
 
@@ -238,11 +243,7 @@ class RolesTest extends TestCase
         $this->actingAs($deAseo)->get('/cargas')->assertForbidden()
             ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta herramienta es de otra línea de servicio.'));
 
-        // Solo un rol que ve todas las líneas deja a la persona sin línea ("Todas")
-        $this->actingAs($this->admin)->post('/usuarios', $this->usuario($todas->rol_id, ['linea_id' => 'todas']))->assertSessionHasNoErrors();
-        $this->actingAs($this->admin)->post('/usuarios', $this->usuario($soloLaSuya->rol_id, ['email' => 'otro@example.com', 'linea_id' => 'todas']))
-            ->assertSessionHasErrors('linea_id');
-        // Y su panel muestra todas las líneas
+        // Su panel muestra todas las líneas
         $this->actingAs($todas)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', LineaServicio::count()));
     }
 
@@ -285,7 +286,7 @@ class RolesTest extends TestCase
         $this->actingAs($talento)->post('/usuarios', $this->usuario(RolUsuario::base(Rol::Admin)->id))
             ->assertSessionHasErrors(['rol_id' => 'Este rol tiene permisos que el tuyo no tiene: no puedes asignarlo.']);
         // …ni edita ni desactiva a quien tiene más acceso (podría tomar su cuenta)
-        $this->actingAs($talento)->put("/usuarios/{$this->admin->id}", $this->usuario($this->admin->rol_id, ['email' => $this->admin->email, 'linea_id' => 'todas']))
+        $this->actingAs($talento)->put("/usuarios/{$this->admin->id}", $this->usuario($this->admin->rol_id, ['email' => $this->admin->email]))
             ->assertForbidden();
         $this->actingAs($talento)->patch("/usuarios/{$this->admin->id}/estado", ['activo' => false])->assertSessionHas('error');
         $this->assertTrue($this->admin->fresh()->activo);
