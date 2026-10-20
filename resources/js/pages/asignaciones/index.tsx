@@ -195,19 +195,12 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     const sedesFormulario = empresaId ? opciones.sedes.filter((s) => s.empresaId === empresaId && (s.activo || s.id === sedeId)) : [];
     const sucursalesFormulario =
         empresaId && !sedeId ? [] : opciones.sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id));
-    const lineasFormulario = empresaElegida ? opciones.lineas.filter((l) => empresaElegida.lineas.includes(l.id)) : opciones.lineas;
+    // Todas las líneas se pueden asignar; si la empresa aún no recibe alguna, se le agrega al guardar
+    const lineasFormulario = opciones.lineas;
     const empresasFormulario = opciones.empresas.filter((e) => e.activo || e.id === empresaId);
 
     const cambiarEmpresa = (valor: string) => {
-        const empresa = opciones.empresas.find((e) => String(e.id) === valor);
-        form.setData((d) => ({
-            ...d,
-            empresa_id: valor,
-            sede_id: '',
-            sucursal_id: '',
-            // Se quitan las líneas que la nueva empresa no recibe
-            lineas: empresa ? d.lineas.filter((l) => empresa.lineas.includes(l)) : d.lineas,
-        }));
+        form.setData((d) => ({ ...d, empresa_id: valor, sede_id: '', sucursal_id: '' }));
     };
     const cambiarSede = (valor: string) => form.setData((d) => ({ ...d, sede_id: valor, sucursal_id: '' }));
     const alternarLinea = (id: number, marcada: boolean) =>
@@ -451,11 +444,11 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                         Líneas de servicio que hará <span aria-hidden="true">*</span>
                     </legend>
                     <p id="lineas-ayuda" className="text-muted-foreground -mt-1 mb-1 text-xs">
-                        {empresaElegida ? `Las que recibe ${empresaElegida.nombre}.` : 'Puede hacer varias.'}
+                        Puede hacer varias.{empresaElegida && ` Si ${empresaElegida.nombre} aún no recibe alguna, se le agrega al guardar.`}
                     </p>
                     {lineasFormulario.length === 0 ? (
                         <p className="text-muted-foreground rounded-lg border border-dashed px-3 py-3 text-sm">
-                            {empresaElegida ? `${empresaElegida.nombre} aún no recibe ninguna de tus líneas.` : 'No tienes líneas para asignar.'}
+                            No tienes líneas para asignar.
                         </p>
                     ) : (
                         <ul role="list" className="grid gap-1.5">
@@ -464,6 +457,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                                 // La primera casilla lleva el id "lineas" para recibir el foco si el campo tiene error
                                 const id = i === 0 ? 'lineas' : `linea-${l.id}`;
                                 const marcada = form.data.lineas.includes(l.id);
+                                const nueva = empresaElegida !== undefined && !empresaElegida.lineas.includes(l.id);
                                 return (
                                     <li
                                         key={l.id}
@@ -473,6 +467,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                                         <Icono className="text-primary size-4" aria-hidden="true" />
                                         <label htmlFor={id} className="flex-1 cursor-pointer text-sm">
                                             {l.nombre}
+                                            {nueva && <span className="text-muted-foreground block text-xs">{empresaElegida.nombre} aún no la recibe</span>}
                                         </label>
                                     </li>
                                 );

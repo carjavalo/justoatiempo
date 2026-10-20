@@ -140,6 +140,7 @@ class AsignacionController extends Controller
         DB::transaction(function () use ($request, $persona) {
             $asignacion = Asignacion::create([...$request->datos(), 'user_id' => $persona->id, 'creada_por' => $request->user()->id]);
             $asignacion->lineas()->sync($request->lineas());
+            $this->empresaRecibe($asignacion, $request->lineas());
         });
 
         return back()->with('success', "{$persona->name} quedó asignado. Ya aparece en su carnet mientras la asignación esté vigente.");
@@ -150,6 +151,7 @@ class AsignacionController extends Controller
         DB::transaction(function () use ($request, $asignacion) {
             $asignacion->update($request->datos());
             $asignacion->lineas()->sync($request->lineas());
+            $this->empresaRecibe($asignacion, $request->lineas());
         });
 
         return back()->with('success', "Cambios guardados en la asignación de {$asignacion->usuario->name}.");
@@ -178,6 +180,12 @@ class AsignacionController extends Controller
         $asignacion->update(['fecha_fin' => today()->subDay()->toDateString(), 'duracion' => 'fechas', 'duracion_cantidad' => null]);
 
         return back()->with('success', "La asignación de {$persona->name} en {$asignacion->lugar()} terminó: ya no aparece en su carnet.");
+    }
+
+    /** Si la empresa aún no recibía alguna de las líneas asignadas, desde ahora la recibe (y aparece en su tablero). */
+    private function empresaRecibe(Asignacion $asignacion, array $lineas): void
+    {
+        $asignacion->empresa?->lineas()->syncWithoutDetaching($lineas);
     }
 
     /** @return array<string, mixed> */

@@ -114,13 +114,7 @@ class AsignacionRequest extends FormRequest
                 }
             }
 
-            // La empresa debe recibir cada línea que hará la persona en ella
-            if ($empresa) {
-                $faltan = LineaServicio::whereIn('id', array_diff($lineas, $empresa->lineas->pluck('id')->all()))->pluck('nombre');
-                if ($faltan->isNotEmpty()) {
-                    $validator->errors()->add('lineas', "{$empresa->nombre} no recibe «".$faltan->implode('», «').'».');
-                }
-            }
+            // Cualquier línea se puede asignar: si la empresa aún no la recibe, se le agrega al guardar (ver el controlador)
 
             // Solo dentro de lo que ve quien asigna
             if ($validator->errors()->isEmpty() && ($fuera = $yo->motivoFueraDeAlcance($empresaId, $sedeId, $sucursalId, $lineas))) {
