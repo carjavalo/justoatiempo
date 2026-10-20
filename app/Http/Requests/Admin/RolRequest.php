@@ -57,15 +57,15 @@ class RolRequest extends FormRequest
             $rol = $this->route('rol');
             $miRol = $this->user()->rolUsuario;
 
-            // El Administrador de la plataforma siempre lo puede todo: de él solo cambian el nombre y la descripción
-            if ($rol?->esAdministradorBase()) {
-                return;
-            }
-
-            // Nadie cambia un rol con más acceso que el suyo, ni da permisos que su propio rol no tiene
+            // Nadie cambia un rol con más acceso que el suyo (tampoco el nombre: el del Administrador, solo quien lo tiene todo)
             if ($rol && ! $miRol?->cubre($rol)) {
                 $validator->errors()->add('permisos', 'Este rol tiene permisos que el tuyo no tiene: no puedes cambiarlo.');
 
+                return;
+            }
+
+            // El Administrador de la plataforma siempre lo puede todo: de él solo cambian el nombre y la descripción
+            if ($rol?->esAdministradorBase()) {
                 return;
             }
 
@@ -88,10 +88,10 @@ class RolRequest extends FormRequest
         }];
     }
 
-    /** @return list<string> Los permisos elegidos, con lo que cada uno necesita. */
+    /** @return list<string> Los permisos elegidos, con lo que cada uno necesita (y solo los que el alcance permite). */
     public function permisos(): array
     {
-        return Permisos::normalizar((array) $this->input('permisos', []));
+        return Permisos::normalizar((array) $this->input('permisos', []), $this->input('alcance'));
     }
 
     /** ["usuarios.editar", "roles.editar"] → "«Usuarios: Editar» y «Roles: Editar»" */

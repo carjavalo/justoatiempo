@@ -102,7 +102,8 @@ class DashboardController extends Controller
             'porSede' => $esAuxiliar ? [] : $this->porSede($base($desde, $hasta)),
             'ranking' => $this->ranking($base($desde, $hasta), $desde, $hasta, $limitarAcciones ? $this->informesDe($sedesVista, $sucursalFija) : null),
             'protocolo' => $this->protocolo($base($desde, $hasta)),
-            'pendientes' => $esAuxiliar ? null : $this->pendientes($sedesVista, $sucursalFija, $empresaFija === null),
+            // La última carga de Drivin solo la ve quien puede abrir Cargas
+            'pendientes' => $esAuxiliar ? null : $this->pendientes($sedesVista, $sucursalFija, $user->puede('cargas.ver')),
             'acciones' => $this->accionesRecientes($empleadoId, $sedesVista, $sucursalFija, $limitarAcciones),
         ]);
     }

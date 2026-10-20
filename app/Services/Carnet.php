@@ -17,6 +17,8 @@ class Carnet
     /** @param  string|null  $foto  dirección por la que quien mira puede ver la foto */
     public static function datos(User $usuario, ?string $foto, ?string $arl = null): array
     {
+        $usuario->loadMissing(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre']);
+
         return [
             'id' => $usuario->id,
             'nombres' => $usuario->nombres ?: Str::before($usuario->name, ' '),
@@ -28,6 +30,10 @@ class Carnet
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'tieneCargo' => filled($usuario->cargo),
             'email' => $usuario->email,
+            // Dónde presta el servicio: va en la franja de abajo del carnet
+            'empresa' => $usuario->empresa?->nombre,
+            'sede' => $usuario->sede?->nombre,
+            'sucursal' => $usuario->sucursal?->nombre,
             'foto' => $foto,
             'arl' => $arl,
             'activo' => $usuario->activo,
@@ -56,7 +62,7 @@ class Carnet
             'cedula' => $usuario->cedula,
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'email' => $usuario->email,
-            // Empresa cliente donde presta el servicio (todos son de Justo a Tiempo); puede no tener
+            // Empresa cliente donde presta el servicio (todos son personal de Justo a Tiempo); puede no tener
             'empresa' => $usuario->empresa?->nombre,
             'sede' => $usuario->sede?->nombre,
             'sucursal' => $usuario->sucursal?->nombre,

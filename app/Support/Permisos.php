@@ -70,8 +70,17 @@ final class Permisos
         ],
     ];
 
-    /** Módulos que reúnen la información de todas las empresas: no se abren a quien ve solo la suya. */
-    public const MEZCLAN_EMPRESAS = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion', 'empleados', 'vehiculos', 'parametros'];
+    /**
+     * Módulos que reúnen la información de todas las empresas: no se abren a quien ve solo la suya. Usuarios sí:
+     * a esa persona le muestra solo los de su empresa (App\Models\User::alcanza).
+     */
+    public const MEZCLAN_EMPRESAS = [
+        'roles', 'empresas', 'sedes', 'sucursales', 'solicitudes',
+        'cargas', 'auditoria', 'informes', 'seguimiento', 'programacion', 'empleados', 'vehiculos', 'parametros',
+    ];
+
+    /** Lo único que tiene sentido con el alcance "solo lo suyo": su tablero (su desempeño) y sus entregas. */
+    public const SOLO_LO_SUYO = ['tablero', 'entregas', 'lineas'];
 
     /** Herramientas de la línea de servicios logísticos: solo para quien trabaja en ella (o ve todas). */
     public const DE_LOGISTICA = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion'];
@@ -110,8 +119,8 @@ final class Permisos
     {
         return [
             self::ALCANCE_TODO => 'Todas las empresas, sedes y sucursales, aunque tenga una empresa asignada.',
-            self::ALCANCE_ASIGNACION => 'Si tiene empresa asignada, solo esa empresa (y su sede y su sucursal). Sin empresa, toda la operación.',
-            self::ALCANCE_PROPIO => 'Solo su propio desempeño en el tablero.',
+            self::ALCANCE_ASIGNACION => 'Si tiene empresa asignada, solo esa empresa (con su sede y su sucursal): sus usuarios y su tablero; los módulos que reúnen a todas las empresas no se le abren. Sin empresa, toda la operación.',
+            self::ALCANCE_PROPIO => 'Solo su propio desempeño en el tablero y Mis entregas: los demás módulos no se le abren.',
         ];
     }
 
@@ -125,19 +134,25 @@ final class Permisos
 
     /**
      * Deja solo permisos del catálogo y agrega lo que cada uno necesita: cualquier acción incluye "ver" su
-     * módulo, y las herramientas de la línea (cargas, auditoría…) se usan desde su tablero.
+     * módulo, y las herramientas de la línea (cargas, auditoría…) y ver todas las líneas pasan por su tablero.
+     * Con el alcance "solo lo suyo" quedan únicamente los permisos que le aplican.
      *
      * @param  array<int, mixed>  $permisos
      * @return list<string>
      */
-    public static function normalizar(array $permisos): array
+    public static function normalizar(array $permisos, ?string $alcance = null): array
     {
         $validos = self::todos();
         $elegidos = array_values(array_intersect($validos, array_filter($permisos, 'is_string')));
+        if ($alcance === self::ALCANCE_PROPIO) {
+            $elegidos = array_values(array_filter($elegidos, fn (string $p) => in_array(strstr($p, '.', true), self::SOLO_LO_SUYO, true)));
+        }
 
         foreach ($elegidos as $permiso) {
             [$modulo] = explode('.', $permiso);
-            if ($permiso !== self::TODAS_LAS_LINEAS) {
+            if ($permiso === self::TODAS_LAS_LINEAS) {
+                $elegidos[] = 'tablero.ver';
+            } else {
                 $elegidos[] = "{$modulo}.ver";
             }
             if (in_array($modulo, self::DE_LOGISTICA, true)) {
@@ -167,7 +182,7 @@ final class Permisos
                 ]),
                 'alcance' => self::ALCANCE_ASIGNACION,
             ],
-            Rol::Auxiliar => ['permisos' => self::normalizar(['tablero.ver', 'entregas.ver']), 'alcance' => self::ALCANCE_PROPIO],
+            Rol::Auxiliar => ['permisos' => self::normalizar(['tablero.ver', 'entregas.ver'], self::ALCANCE_PROPIO), 'alcance' => self::ALCANCE_PROPIO],
         };
     }
 

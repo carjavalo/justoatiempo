@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Enums\Rol;
+use App\Models\RolUsuario;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,8 @@ use function Laravel\Prompts\text;
 
 /**
  * Recupera el acceso de un administrador desde el servidor (p. ej. la Terminal de cPanel) cuando ya no puede
- * ingresar: cambia su correo y su contraseña. La contraseña se escribe oculta y no queda en el historial.
+ * ingresar: cambia su correo y su contraseña y le devuelve el rol Administrador (que lo puede todo). La contraseña
+ * se escribe oculta y no queda en el historial.
  */
 class AccesoAdministrador extends Command
 {
@@ -27,9 +29,14 @@ class AccesoAdministrador extends Command
 
     public function handle(): int
     {
-        $admins = User::where('rol', Rol::Admin)->orderBy('id')->get();
+        $administrador = RolUsuario::administrador();
+        $admins = User::where('rol', Rol::Admin)->orWhere('rol_id', $administrador?->id)->orderBy('id')->get();
+        // Si nadie quedó con acceso de administrador, se le puede devolver a cualquier persona
         if ($admins->isEmpty()) {
-            $this->components->error('No hay ningún administrador en la base de datos.');
+            $admins = User::orderBy('id')->get();
+        }
+        if ($admins->isEmpty()) {
+            $this->components->error('No hay ningún usuario en la base de datos.');
 
             return self::FAILURE;
         }
@@ -68,6 +75,8 @@ class AccesoAdministrador extends Command
             'password' => $clave,
             'remember_token' => Str::random(60),
             'activo' => true,
+            // Con el rol Administrador de vuelta, puede corregir cualquier otro acceso
+            'rol_id' => $administrador?->id ?? $admin->rol_id,
         ])->save();
 
         // Quien siguiera dentro con la contraseña anterior (en otro equipo) queda por fuera

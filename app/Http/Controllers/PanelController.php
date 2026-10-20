@@ -24,7 +24,8 @@ class PanelController extends Controller
     public function __invoke(Request $request): Response|RedirectResponse
     {
         $user = $request->user();
-        $verTodasLasLineas = $user->puede(Permisos::TODAS_LAS_LINEAS);
+        // Ver todas las líneas pasa por su tablero
+        $verTodasLasLineas = $user->puede(Permisos::TODAS_LAS_LINEAS) && $user->puede('tablero.ver');
 
         if (! $user->administraAlgo() && ! $verTodasLasLineas) {
             if ($user->linea && $user->puedeVerLinea($user->linea)) {
@@ -36,16 +37,17 @@ class PanelController extends Controller
                     'empresa' => $user->empresa?->nombre,
                     'sede' => $user->sede?->nombre,
                     'sucursal' => $user->sucursal?->nombre,
-                    // Tiene línea, pero su rol no abre su tablero
-                    'sinTablero' => $user->linea !== null,
+                    // Su rol no abre el tablero de la línea: aunque tenga (o le asignen) una, no entra a ella
+                    'sinTablero' => ! $user->puede('tablero.ver'),
                 ],
             ]);
         }
 
         // Solo se cuenta lo que se muestra
         $resumen = array_filter([
-            'usuarios' => $user->puede('usuarios.ver') ? (function () {
-                $u = User::selectRaw('count(*) as total, sum(activo) as activos')->first();
+            'usuarios' => $user->puede('usuarios.ver') ? (function () use ($user) {
+                // Solo los que alcanza a ver (los de su empresa, si la tiene fija)
+                $u = User::query()->alcanceDe($user)->selectRaw('count(*) as total, sum(activo) as activos')->first();
 
                 return ['total' => (int) $u->total, 'activos' => (int) $u->activos];
             })() : null,
@@ -75,8 +77,8 @@ class PanelController extends Controller
             ? LineaServicio::ordenadas()
                 ->when(! $verTodasLasLineas, fn ($q) => $q->whereKey($user->linea_servicio_id))
                 ->withCount([
-                    'empresas' => fn ($q) => $q->where('activo', true),
-                    'usuarios' => fn ($q) => $q->where('activo', true),
+                    'empresas' => fn ($q) => $q->where('activo', true)->when($user->empresaFija(), fn ($e, int $id) => $e->whereKey($id)),
+                    'usuarios' => fn ($q) => $q->where('activo', true)->when($user->empresaFija(), fn ($u, int $id) => $u->where('empresa_id', $id)),
                 ])
                 ->get()
                 ->map(fn (LineaServicio $l) => [

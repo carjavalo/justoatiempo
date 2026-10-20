@@ -7,6 +7,7 @@ use App\Enums\Rol;
 use App\Notifications\RestablecerContrasena;
 use App\Support\Permisos;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -228,6 +229,9 @@ class User extends Authenticatable
         }
 
         $modulo = strstr($permiso, '.', true);
+        if ($this->soloLoSuyo() && ! in_array($modulo, Permisos::SOLO_LO_SUYO, true)) {
+            return 'Tu rol solo ve tu propia información: esta sección no está disponible.';
+        }
         if (in_array($modulo, Permisos::MEZCLAN_EMPRESAS, true) && $this->empresaFija() !== null) {
             return 'Esta sección reúne la operación de todas las empresas: no está disponible para quien presta el servicio en una sola.';
         }
@@ -293,12 +297,58 @@ class User extends Authenticatable
     }
 
     /**
-     * Si puede tocar a esta persona (editarla, desactivarla): solo a quien tiene, como mucho, sus mismos permisos.
-     * Así nadie toma la cuenta de alguien con más acceso que el suyo.
+     * Si puede tocar a esta persona (editarla, desactivarla): solo a quien tiene, como mucho, sus mismos permisos y
+     * está dentro de su alcance. Así nadie toma la cuenta de alguien con más acceso que el suyo.
      */
     public function cubreA(User $otro): bool
     {
-        return $this->is($otro) || ($this->rolUsuario !== null && $otro->rolUsuario !== null && $this->rolUsuario->cubre($otro->rolUsuario));
+        return $this->is($otro) || ($this->alcanza($otro) && $this->rolUsuario !== null && $otro->rolUsuario !== null && $this->rolUsuario->cubre($otro->rolUsuario));
+    }
+
+    /** Si esta persona entra en lo que ve de los usuarios: su empresa, sede y sucursal fijas y su línea. */
+    public function alcanza(User $otro): bool
+    {
+        return $this->is($otro) || $this->motivoFueraDeAlcance($otro->empresa_id, $otro->sede_id, $otro->sucursal_id, $otro->linea_servicio_id) === null;
+    }
+
+    /**
+     * Por qué no puede asignar a alguien a este lugar (null si puede): con empresa fija, solo a su empresa (y a su sede
+     * y su sucursal, si las tiene); sin ver todas las líneas, solo a su línea. Así nadie se quita sus propios límites
+     * editándose ni creando a otra persona sin ellos.
+     *
+     * @return array{0: string, 1: string}|null [campo, mensaje]
+     */
+    public function motivoFueraDeAlcance(?int $empresaId, ?int $sedeId, ?int $sucursalId, ?int $lineaId): ?array
+    {
+        if ($this->soloLoSuyo()) {
+            return ['empresa_id', 'Tu rol solo ve tu propia información.'];
+        }
+        if (($empresa = $this->empresaFija()) !== null && $empresaId !== $empresa) {
+            return ['empresa_id', "Solo puedes asignar personas a tu empresa ({$this->empresa?->nombre})."];
+        }
+        if (($sede = $this->sedeFija()) !== null && $sedeId !== $sede) {
+            return ['sede_id', "Solo puedes asignar personas a tu sede ({$this->sede?->nombre})."];
+        }
+        if (($sucursal = $this->sucursalFija()) !== null && $sucursalId !== $sucursal) {
+            return ['sucursal_id', "Solo puedes asignar personas a tu sucursal ({$this->sucursal?->nombre})."];
+        }
+        if (! $this->rolPermite(Permisos::TODAS_LAS_LINEAS) && $lineaId !== $this->linea_servicio_id) {
+            return ['linea_id', $this->linea ? "Solo puedes asignar personas a tu línea de servicio ({$this->linea->nombre})." : 'Tu rol no ve otras líneas de servicio.'];
+        }
+
+        return null;
+    }
+
+    /** Solo los usuarios que entran en lo que ve (ver alcanza). */
+    public function scopeAlcanceDe(Builder $consulta, User $quien): Builder
+    {
+        return $consulta
+            ->when($quien->soloLoSuyo(), fn (Builder $q) => $q->whereKey($quien->id))
+            ->when($quien->empresaFija(), fn (Builder $q, int $id) => $q->where('users.empresa_id', $id))
+            ->when($quien->sedeFija(), fn (Builder $q, int $id) => $q->where('users.sede_id', $id))
+            ->when($quien->sucursalFija(), fn (Builder $q, int $id) => $q->where('users.sucursal_id', $id))
+            ->when(! $quien->rolPermite(Permisos::TODAS_LAS_LINEAS), fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                ->where('users.linea_servicio_id', $quien->linea_servicio_id)->orWhere('users.id', $quien->id)));
     }
 
     /** Nivel de agrupación (administrador, coordinador o auxiliar); no da acceso: eso lo dan los permisos. */

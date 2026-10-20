@@ -75,9 +75,22 @@ interface Props {
     total: number;
     filtros: { q: string; rol: string; estado: string; empresa: string; sede: string; sucursal: string; linea: string };
     contexto: { empresa: string | null; sede: string | null; sucursal: string | null };
-    /** Roles de la empresa, cada uno con su nivel de acceso en la plataforma. */
-    /** asignable: el rol de quien edita lo cubre (nadie da más acceso del que tiene). */
-    roles: { id: number; nombre: string; resumen: string; alcance: string; todasLasLineas: boolean; asignable: boolean; activo: boolean }[];
+    /**
+     * Roles de la empresa con lo que permite cada uno. asignable: el rol de quien edita lo cubre (nadie da más acceso
+     * del que tiene); inicio: a dónde entra quien lo tenga al ingresar.
+     */
+    roles: {
+        id: number;
+        nombre: string;
+        resumen: string;
+        alcance: string;
+        todasLasLineas: boolean;
+        inicio: 'linea' | 'panel' | 'sinTablero';
+        asignable: boolean;
+        activo: boolean;
+    }[];
+    /** Dónde puede asignar personas quien crea o edita: su empresa, sede, sucursal y línea fijas (null: sin límite). */
+    limites: { empresaId: number | null; sedeId: number | null; sucursalId: number | null; lineaId: number | null; unaLinea: boolean };
     /** Cada empresa con las líneas de servicio que recibe. */
     empresas: (Opcion & { lineas: number[] })[];
     sedes: (Opcion & { empresaId: number })[];
@@ -137,7 +150,7 @@ function generarContrasena(): string {
     return letras.join('');
 }
 
-export default function Usuarios({ usuarios, total, filtros, contexto, roles, empresas, sedes, sucursales, lineas }: Props) {
+export default function Usuarios({ usuarios, total, filtros, contexto, roles, limites, empresas, sedes, sucursales, lineas }: Props) {
     const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('usuarios.index'), filtros);
     const [abierto, setAbierto] = useState(false);
@@ -176,10 +189,18 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       password: '',
                   }
                 : // Si la lista viene filtrada por empresa, sede o sucursal, el usuario nuevo nace ahí
-                  { ...VACIO, ...asignacionDesdeFiltros() },
+                  // y siempre dentro de los límites de quien lo crea (su empresa, sede, sucursal y línea, si los tiene)
+                  { ...VACIO, ...asignacionFija(), ...asignacionDesdeFiltros() },
         );
         setAbierto(true);
     };
+
+    const asignacionFija = () => ({
+        ...(limites.empresaId && { empresa_id: String(limites.empresaId) }),
+        ...(limites.sedeId && { sede_id: String(limites.sedeId) }),
+        ...(limites.sucursalId && { sucursal_id: String(limites.sucursalId) }),
+        ...(limites.unaLinea && limites.lineaId && { linea_id: String(limites.lineaId) }),
+    });
 
     const asignacionDesdeFiltros = () => {
         // Si la lista viene filtrada por línea (desde la página de una línea), el usuario nuevo trabaja en ella
@@ -625,7 +646,17 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     id="linea_id"
                     etiqueta="Línea de servicio"
                     requerido
-                    ayuda={todasLasLineas ? 'Su rol ve todas las líneas: puede tenerlas todas o la línea en la que trabaja.' : 'Al ingresar entrará directo a esta línea.'}
+                    ayuda={
+                        todasLasLineas
+                            ? 'Su rol ve todas las líneas: puede tenerlas todas o la línea en la que trabaja.'
+                            : rolElegido?.inicio === 'linea'
+                              ? 'Al ingresar entrará directo a esta línea.'
+                              : rolElegido?.inicio === 'panel'
+                                ? 'Al ingresar verá el panel con lo que su rol le permite.'
+                                : rolElegido?.inicio === 'sinTablero'
+                                  ? 'Su rol no abre el tablero de la línea: al ingresar solo verá su carnet.'
+                                  : 'La línea en la que trabaja.'
+                    }
                     error={form.errors.linea_id}
                 >
                     <Selector
@@ -635,7 +666,10 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         placeholder="Elige la línea en la que trabaja"
                         // "Todas" está siempre en la lista (si apareciera junto con su elección, la lista no la tomaría)
                         opciones={[
-                            { valor: TODAS, texto: 'Todas las líneas', detalle: todasLasLineas ? undefined : 'Solo para roles que ven todas', deshabilitada: !todasLasLineas },
+                            // Quien solo ve su línea no la ofrece
+                            ...(limites.unaLinea
+                                ? []
+                                : [{ valor: TODAS, texto: 'Todas las líneas', detalle: todasLasLineas ? undefined : 'Solo para roles que ven todas', deshabilitada: !todasLasLineas }]),
                             ...lineas.map((l) => ({ valor: String(l.id), texto: l.nombre })),
                         ]}
                     />
@@ -658,7 +692,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         valor={form.data.empresa_id}
                         onCambio={cambiarEmpresa}
                         opciones={[
-                            { valor: '', texto: 'Sin empresa asignada' },
+                            // Quien solo ve su empresa asigna personas únicamente a ella
+                            ...(limites.empresaId ? [] : [{ valor: '', texto: 'Sin empresa asignada' }]),
                             ...empresasFormulario.map((e) => ({
                                 valor: String(e.id),
                                 texto: e.activo ? e.nombre : `${e.nombre} (inactiva)`,
@@ -686,7 +721,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                             onCambio={cambiarSede}
                             disabled={sedesFormulario.length === 0}
                             opciones={[
-                                { valor: '', texto: 'Sin sede asignada' },
+                                ...(limites.sedeId ? [] : [{ valor: '', texto: 'Sin sede asignada' }]),
                                 ...sedesFormulario.map((x) => ({
                                     valor: String(x.id),
                                     texto: x.activo ? x.nombre : `${x.nombre} (inactiva)`,
@@ -717,7 +752,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                             onCambio={(v) => form.setData('sucursal_id', v)}
                             disabled={sucursalesFormulario.length === 0}
                             opciones={[
-                                { valor: '', texto: 'Sin sucursal asignada' },
+                                ...(limites.sucursalId ? [] : [{ valor: '', texto: 'Sin sucursal asignada' }]),
                                 ...sucursalesFormulario.map((u) => ({
                                     valor: String(u.id),
                                     texto: u.activo ? u.nombre : `${u.nombre} (inactiva)`,

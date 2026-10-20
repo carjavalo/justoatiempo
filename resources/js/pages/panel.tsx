@@ -302,7 +302,7 @@ function SinOpciones({ asignacion }: { asignacion?: Props['asignacion'] }) {
                     <>
                         <h2 className="mt-4 text-lg font-extrabold tracking-tight">Aún no tienes una línea de servicio asignada</h2>
                         <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
-                            Cuando el administrador te asigne la línea en la que trabajas, al ingresar entrarás directo a ella.
+                            Cuando quien administra los usuarios te asigne la línea en la que trabajas, al ingresar entrarás directo a ella.
                         </p>
                     </>
                 )}

@@ -36,7 +36,18 @@ class UsuarioController extends Controller
             'linea' => ['nullable', 'integer'],
         ]);
 
+        $yo = $request->user();
+        // Lo que ve de los usuarios: con empresa (o sede, sucursal o línea) fija, solo los de la suya
+        $limites = [
+            'empresaId' => $yo->empresaFija(),
+            'sedeId' => $yo->sedeFija(),
+            'sucursalId' => $yo->sucursalFija(),
+            'lineaId' => $yo->rolPermite(Permisos::TODAS_LAS_LINEAS) ? null : $yo->linea_servicio_id,
+            'unaLinea' => ! $yo->rolPermite(Permisos::TODAS_LAS_LINEAS),
+        ];
+
         $usuarios = User::query()
+            ->alcanceDe($yo)
             ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre', 'rolUsuario:id,nombre,permisos,alcance,base,nivel'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
@@ -87,7 +98,9 @@ class UsuarioController extends Controller
 
         return Inertia::render('usuarios/index', [
             'usuarios' => $usuarios,
-            'total' => User::count(),
+            'total' => User::query()->alcanceDe($yo)->count(),
+            // Dónde puede asignar personas quien crea o edita (null: sin límite)
+            'limites' => $limites,
             'filtros' => [
                 'q' => $filtros['q'] ?? '',
                 'rol' => (string) ($filtros['rol'] ?? ''),
@@ -111,31 +124,43 @@ class UsuarioController extends Controller
                 'resumen' => $r->resumen(),
                 'alcance' => Permisos::alcances()[$r->alcance] ?? '',
                 'todasLasLineas' => $r->permite(Permisos::TODAS_LAS_LINEAS),
-                'asignable' => (bool) $request->user()->rolUsuario?->cubre($r),
+                // A dónde entra quien lo tenga al ingresar: su línea, el panel, o nada aún (sin tablero)
+                'inicio' => match (true) {
+                    $r->permite(Permisos::TODAS_LAS_LINEAS) || collect(array_keys(Permisos::CATALOGO[0]['modulos']))->contains(fn ($m) => $r->permite("{$m}.ver")) => 'panel',
+                    $r->permite('tablero.ver') => 'linea',
+                    default => 'sinTablero',
+                },
+                'asignable' => (bool) $yo->rolUsuario?->cubre($r),
                 'activo' => $r->activo,
             ]),
             // Cada empresa con las líneas que recibe: el formulario solo ofrece las de la línea elegida
-            'empresas' => Empresa::with('lineas:id')->orderBy('nombre')->get(['id', 'nombre', 'activo'])->map(fn (Empresa $c) => [
-                'id' => $c->id,
-                'nombre' => $c->nombre,
-                'activo' => $c->activo,
-                'lineas' => $c->lineas->pluck('id'),
-            ]),
-            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre']),
-            'sedes' => Sede::orderBy('nombre')->get(['id', 'nombre', 'empresa_id', 'activo'])->map(fn (Sede $s) => [
-                'id' => $s->id,
-                'nombre' => $s->nombre,
-                'empresaId' => $s->empresa_id,
-                'activo' => $s->activo,
-            ]),
+            'empresas' => Empresa::with('lineas:id')->when($limites['empresaId'], fn ($q, int $id) => $q->whereKey($id))
+                ->orderBy('nombre')->get(['id', 'nombre', 'activo'])->map(fn (Empresa $c) => [
+                    'id' => $c->id,
+                    'nombre' => $c->nombre,
+                    'activo' => $c->activo,
+                    'lineas' => $c->lineas->pluck('id'),
+                ]),
+            'lineas' => LineaServicio::ordenadas()->when($limites['unaLinea'], fn ($q) => $q->whereKey($limites['lineaId']))->get(['id', 'slug', 'nombre']),
+            'sedes' => Sede::when($limites['empresaId'], fn ($q, int $id) => $q->where('empresa_id', $id))
+                ->when($limites['sedeId'], fn ($q, int $id) => $q->whereKey($id))
+                ->orderBy('nombre')->get(['id', 'nombre', 'empresa_id', 'activo'])->map(fn (Sede $s) => [
+                    'id' => $s->id,
+                    'nombre' => $s->nombre,
+                    'empresaId' => $s->empresa_id,
+                    'activo' => $s->activo,
+                ]),
             // Sin sede son las sucursales propias de Justo a Tiempo
-            'sucursales' => Sucursal::orderBy('nombre')->get(['id', 'nombre', 'ciudad', 'sede_id', 'activo'])->map(fn (Sucursal $s) => [
-                'id' => $s->id,
-                'nombre' => $s->nombre,
-                'ciudad' => $s->ciudad,
-                'sedeId' => $s->sede_id,
-                'activo' => $s->activo,
-            ]),
+            'sucursales' => Sucursal::when($limites['empresaId'], fn ($q) => $q->whereHas('sede', fn ($s) => $s->where('empresa_id', $limites['empresaId'])))
+                ->when($limites['sedeId'], fn ($q, int $id) => $q->where('sede_id', $id))
+                ->when($limites['sucursalId'], fn ($q, int $id) => $q->whereKey($id))
+                ->orderBy('nombre')->get(['id', 'nombre', 'ciudad', 'sede_id', 'activo'])->map(fn (Sucursal $s) => [
+                    'id' => $s->id,
+                    'nombre' => $s->nombre,
+                    'ciudad' => $s->ciudad,
+                    'sedeId' => $s->sede_id,
+                    'activo' => $s->activo,
+                ]),
         ]);
     }
 
@@ -166,24 +191,32 @@ class UsuarioController extends Controller
         return back()->with('success', "Cambios guardados en {$usuario->name}.");
     }
 
-    /** Foto de cualquier persona, para la administración (cada quien ve la suya en Mi carnet). */
-    public function foto(User $usuario): StreamedResponse
+    /** Foto de una persona que quien mira alcanza a ver (cada quien ve la suya en Mi carnet). */
+    public function foto(Request $request, User $usuario): StreamedResponse
     {
+        abort_unless($request->user()->alcanza($usuario), 404);
+
         return Carnet::respuestaFoto($usuario);
     }
 
-    /** Certificado de ARL de cualquier persona, para la administración. */
-    public function arl(User $usuario): StreamedResponse
+    /** Certificado de ARL de una persona que quien mira alcanza a ver. */
+    public function arl(Request $request, User $usuario): StreamedResponse
     {
+        abort_unless($request->user()->alcanza($usuario), 404);
+
         return Carnet::respuestaArl($usuario);
     }
 
     /** El carnet de la persona, armado con su foto y sus datos sobre el diseño de la empresa. */
-    public function carnet(User $usuario): Response
+    public function carnet(Request $request, User $usuario): Response
     {
+        abort_unless($request->user()->alcanza($usuario), 404);
+
         return Inertia::render('carnet/ver', [
             'persona' => Carnet::datos($usuario, $this->direccionFoto($usuario), $this->direccionArl($usuario)),
             'propio' => false,
+            // Si quien mira puede completarle lo que falte
+            'editable' => $request->user()->puede('usuarios.editar') && $request->user()->cubreA($usuario),
         ]);
     }
 
@@ -237,7 +270,13 @@ class UsuarioController extends Controller
             return back()->with('error', 'No puedes desactivar tu propio usuario.');
         }
         if (! $request->user()->cubreA($usuario)) {
-            return back()->with('error', "{$usuario->name} tiene permisos que tu rol no tiene: no puedes cambiar su acceso.");
+            return back()->with('error', "{$usuario->name} tiene más acceso que tu rol: no puedes cambiar su acceso.");
+        }
+        // Siempre queda al menos una persona activa con el rol Administrador
+        $administrador = RolUsuario::administrador();
+        if (! $activo && $administrador && $usuario->rol_id === $administrador->id
+            && ! User::where('rol_id', $administrador->id)->where('activo', true)->whereKeyNot($usuario->id)->exists()) {
+            return back()->with('error', "{$usuario->name} es la única persona activa con el rol {$administrador->nombre}: dáselo antes a otra persona.");
         }
 
         $usuario->update(['activo' => $activo]);

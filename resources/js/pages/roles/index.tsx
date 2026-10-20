@@ -75,6 +75,9 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
 
 /** Módulos que se usan desde el tablero de la línea: darlos incluye ver el tablero. */
 const DESDE_EL_TABLERO = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion'];
+/** Con el alcance "solo lo suyo" solo aplican su tablero (su desempeño) y sus entregas. */
+const SOLO_LO_SUYO = ['tablero', 'entregas', 'lineas'];
+const aplica = (alcance: string, modulo: string) => alcance !== 'propio' || SOLO_LO_SUYO.includes(modulo);
 
 export default function Roles({ roles, total, filtros, catalogo, todasLasLineas, alcances, miRol, modelos }: Props) {
     const puede = usePuede();
@@ -92,7 +95,12 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
         setOrigen(boton);
         setCopiado('');
         form.clearErrors();
-        form.setData(rol ? { nombre: rol.nombre, descripcion: rol.descripcion ?? '', permisos: rol.permisos, alcance: rol.alcance } : VACIO);
+        // Un rol nuevo arranca con un alcance que quien lo crea sí puede dar
+        form.setData(
+            rol
+                ? { nombre: rol.nombre, descripcion: rol.descripcion ?? '', permisos: rol.permisos, alcance: rol.alcance }
+                : { ...VACIO, alcance: alcancePermitido(VACIO.alcance) ? VACIO.alcance : miRol.alcance },
+        );
         setAbierto(true);
     };
 
@@ -118,10 +126,10 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                 permisos.add(`${modulo}.ver`);
                 if (DESDE_EL_TABLERO.includes(modulo)) permisos.add('tablero.ver');
             } else if (accion === 'ver') {
-                // Sin ver el módulo no se puede hacer nada en él; sin el tablero, tampoco usar sus herramientas
+                // Sin ver el módulo no se puede hacer nada en él; sin el tablero, tampoco usar sus herramientas ni ver todas las líneas
                 const quitar = (m: string) => [...permisos].filter((p) => p.startsWith(`${m}.`)).forEach((p) => permisos.delete(p));
                 quitar(modulo);
-                if (modulo === 'tablero') DESDE_EL_TABLERO.forEach(quitar);
+                if (modulo === 'tablero') [...DESDE_EL_TABLERO, 'lineas'].forEach(quitar);
             } else {
                 permisos.delete(permiso);
             }
@@ -133,13 +141,22 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
     const copiarDe = (valor: string) => {
         const modelo = modelos.find((m) => String(m.id) === valor);
         if (!modelo) return;
+        const alcance = alcancePermitido(modelo.alcance) ? modelo.alcance : miRol.alcance;
         form.setData((d) => ({
             ...d,
-            permisos: modelo.permisos.filter(puedeDar),
-            alcance: alcancePermitido(modelo.alcance) ? modelo.alcance : miRol.alcance,
+            permisos: modelo.permisos.filter((p) => puedeDar(p) && aplica(alcance, p.split('.')[0])),
+            alcance,
         }));
         setCopiado(`Se copiaron los permisos de ${modelo.nombre}. Ajústalos abajo si hace falta.`);
     };
+
+    /** Con "solo lo suyo" se quitan los permisos que no le aplican (el servidor hace lo mismo al guardar). */
+    const cambiarAlcance = (alcance: string) => {
+        form.setData((d) => ({ ...d, alcance, permisos: d.permisos.filter((p) => aplica(alcance, p.split('.')[0])) }));
+    };
+
+    const motivoNoDisponible = (permiso: string, modulo: string) =>
+        !aplica(form.data.alcance, modulo) ? 'No aplica con «Solo lo suyo»' : !puedeDar(permiso) ? 'Tu rol no tiene este permiso' : '';
 
     const nombreAlcance = (valor: string) => alcances.find((a) => a.valor === valor)?.label ?? valor;
     const totalPermisos = catalogo.reduce((n, g) => n + Object.values(g.modulos).reduce((m, mod) => m + Object.keys(mod.acciones).length, 0), 1);
@@ -392,7 +409,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                                             value={a.valor}
                                             checked={elegido}
                                             disabled={bloqueado}
-                                            onChange={() => form.setData('alcance', a.valor)}
+                                            onChange={() => cambiarAlcance(a.valor)}
                                             aria-invalid={form.errors.alcance ? true : undefined}
                                             aria-labelledby={`${id}-nombre`}
                                             aria-describedby={`${id}-descripcion`}
@@ -422,10 +439,14 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                                     id="todas-las-lineas"
                                     checked={form.data.permisos.includes(todasLasLineas)}
                                     disabled={!puedeDar(todasLasLineas)}
+                                    // Ver todas las líneas pasa por su tablero: lo incluye
                                     onCheckedChange={(v) =>
                                         form.setData((d) => ({
                                             ...d,
-                                            permisos: v === true ? [...d.permisos, todasLasLineas] : d.permisos.filter((p) => p !== todasLasLineas),
+                                            permisos:
+                                                v === true
+                                                    ? [...new Set([...d.permisos, todasLasLineas, 'tablero.ver'])]
+                                                    : d.permisos.filter((p) => p !== todasLasLineas),
                                         }))
                                     }
                                     aria-describedby="todas-las-lineas-descripcion"
@@ -450,6 +471,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                             </div>
                             <p className="text-muted-foreground text-xs">
                                 Cualquier acción incluye ver el módulo. Mi carnet lo ve siempre todo el mundo.
+                                {form.data.alcance === 'propio' && ' Con «Solo lo suyo» solo aplican el tablero y Mis entregas.'}
                                 {miRol.permisos.length < totalPermisos && ' Solo puedes dar los permisos que tu propio rol tiene.'}
                             </p>
                             <InputError id="permisos-error" message={form.errors.permisos} />
@@ -483,7 +505,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                                                     {Object.entries(modulo.acciones).map(([accion, texto]) => {
                                                         const permiso = `${clave}.${accion}`;
                                                         const id = `permiso-${clave}-${accion}`;
-                                                        const disponible = puedeDar(permiso);
+                                                        const disponible = puedeDar(permiso) && aplica(form.data.alcance, clave);
                                                         return (
                                                             <li key={accion} className="flex items-center gap-2">
                                                                 <Checkbox
@@ -496,13 +518,13 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                                                                 <label
                                                                     htmlFor={id}
                                                                     className={cn('text-sm', disponible ? 'cursor-pointer' : 'text-muted-foreground')}
-                                                                    title={disponible ? undefined : 'Tu rol no tiene este permiso'}
+                                                                    title={disponible ? undefined : motivoNoDisponible(permiso, clave)}
                                                                 >
                                                                     {texto}
                                                                     <span className="sr-only">
                                                                         {' '}
                                                                         {modulo.titulo}
-                                                                        {!disponible && ' (tu rol no lo tiene)'}
+                                                                        {!disponible && ` (${motivoNoDisponible(permiso, clave).toLowerCase()})`}
                                                                     </span>
                                                                 </label>
                                                             </li>

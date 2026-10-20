@@ -115,6 +115,19 @@ class UsuarioRequest extends FormRequest
                 $validator->errors()->add('rol_id', 'Este rol tiene permisos que el tuyo no tiene: no puedes asignarlo.');
             }
 
+            // Nadie asigna a alguien (ni a sí mismo) fuera de su propia empresa, sede, sucursal o línea: así nadie se
+            // quita sus límites editándose o creando a otra persona sin ellos
+            if ($fuera = $this->user()->motivoFueraDeAlcance($empresaId, $sedeId, $sucursalId, $lineaId)) {
+                $validator->errors()->add(...$fuera);
+            }
+
+            // Siempre queda al menos una persona activa con el rol Administrador (la que puede corregir todo)
+            $administrador = RolUsuario::administrador();
+            if ($usuario && $administrador && $usuario->rol_id === $administrador->id && $rol->id !== $administrador->id
+                && ! User::where('rol_id', $administrador->id)->where('activo', true)->whereKeyNot($usuario->id)->exists()) {
+                $validator->errors()->add('rol_id', "Es la única persona activa con el rol {$administrador->nombre}: dáselo antes a otra persona.");
+            }
+
             // Nadie se quita a sí mismo lo que necesita para corregir usuarios y roles
             if ($usuario?->is($this->user())) {
                 $quitados = array_diff(array_intersect(Permisos::IMPRESCINDIBLES, $miRol?->permisos ?? []), $rol->permisos ?? []);

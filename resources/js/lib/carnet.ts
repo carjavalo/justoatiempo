@@ -15,6 +15,14 @@ const HOJA_FUENTE = 'https://fonts.bunny.net/css?family=montserrat:600,700,800';
 
 /** Círculo de la foto, por dentro del aro blanco y coral. */
 const FOTO = { x: 146.2, y: 266.6, radio: 125.4 };
+/**
+ * Franja azul de abajo: dónde presta el servicio (empresa, sede y sucursal), en blanco. Va de x 22 hasta antes del
+ * corte en diagonal de la franja (x ≈ 488) y su renglón base centra el texto en la franja (y 585 a 612).
+ */
+const FRANJA = { x: 22, y: 605, ancho: 458 };
+const ETIQUETA = { peso: 700, tamano: 10.5, espaciado: 0.08, color: '#ffb4a9' };
+const VALOR = { peso: 800, tamano: 18, espaciado: 0, color: '#ffffff' };
+
 /** Recuadro blanco del QR, sobre las siluetas de los edificios. */
 const QR = { x: 540, y: 438, lado: 90, margen: 6 };
 /**
@@ -35,6 +43,10 @@ export interface DatosCarnet {
     cedula: string | null;
     cargo: string;
     email: string;
+    /** Dónde presta el servicio (empresa cliente, su sede y su sucursal); puede no tener empresa asignada. */
+    empresa: string | null;
+    sede: string | null;
+    sucursal: string | null;
     /** Dirección de la foto (fondo blanco o sin fondo), si la tiene. */
     foto: string | null;
     /** Lo que se lee al escanear el QR. */
@@ -108,7 +120,7 @@ function ajuste(ctx: CanvasRenderingContext2D, texto: string, estilo: (typeof TE
 }
 
 /** Letra, tamaño y espacio entre letras (en proporción al tamaño, como en el diseño). */
-function letra(ctx: CanvasRenderingContext2D, { peso, espaciado }: (typeof TEXTOS)[keyof typeof TEXTOS], tamano: number) {
+function letra(ctx: CanvasRenderingContext2D, { peso, espaciado }: { peso: number; espaciado: number }, tamano: number) {
     ctx.font = `${peso} ${tamano}px ${FUENTE}`;
     ctx.letterSpacing = `${espaciado * tamano}px`;
 }
@@ -138,7 +150,63 @@ export function dibujarCarnet(lienzo: HTMLCanvasElement, recursos: RecursosCarne
     escribir(ctx, datos.cedula ? cedulaLegible(datos.cedula) : '', TEXTOS.cedula);
     escribir(ctx, datos.email, TEXTOS.correo);
 
+    dibujarAsignacion(ctx, datos);
     dibujarQr(ctx, recursos.qr);
+}
+
+/** "EMPRESA DITRANZA · SEDE TUGO · SUCURSAL CALI SUR" (sin empresa: "EMPRESA SIN ASIGNAR"). */
+export function partesAsignacion(datos: Pick<DatosCarnet, 'empresa' | 'sede' | 'sucursal'>): [string, string][] {
+    return [
+        ['Empresa', datos.empresa ?? 'Sin asignar'],
+        ['Sede', datos.sede],
+        ['Sucursal', datos.sucursal],
+    ].filter((p): p is [string, string] => Boolean(p[1]));
+}
+
+/**
+ * Escribe en la franja azul dónde presta el servicio: cada dato con su etiqueta en coral claro y su valor en
+ * blanco. Si no cabe, se achica (hasta un 62 %) y, si aún así no cabe, se angosta: nunca pasa del corte de la franja.
+ */
+function dibujarAsignacion(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
+    const partes = partesAsignacion(datos).map(([etiqueta, valor]) => [etiqueta.toLocaleUpperCase('es-CO'), valor.toLocaleUpperCase('es-CO')] as const);
+    const separacion = 6;
+    const entrePartes = 16;
+
+    const medir = (factor: number) =>
+        partes.reduce((total, [etiqueta, valor], i) => {
+            letra(ctx, ETIQUETA, ETIQUETA.tamano * factor);
+            const anchoEtiqueta = ctx.measureText(etiqueta).width;
+            letra(ctx, VALOR, VALOR.tamano * factor);
+            return total + anchoEtiqueta + separacion * factor + ctx.measureText(valor).width + (i > 0 ? entrePartes * factor : 0);
+        }, 0);
+
+    const factor = Math.max(0.62, Math.min(1, FRANJA.ancho / Math.max(1, medir(1))));
+    const angosto = Math.min(1, FRANJA.ancho / Math.max(1, medir(factor)));
+
+    ctx.save();
+    ctx.translate(FRANJA.x, FRANJA.y);
+    ctx.scale(angosto, 1);
+    ctx.textBaseline = 'alphabetic';
+    let x = 0;
+    partes.forEach(([etiqueta, valor], i) => {
+        if (i > 0) {
+            // Punto coral entre un dato y otro
+            ctx.fillStyle = ETIQUETA.color;
+            ctx.beginPath();
+            ctx.arc(x + (entrePartes * factor) / 2, -VALOR.tamano * factor * 0.36, 1.6 * factor, 0, Math.PI * 2);
+            ctx.fill();
+            x += entrePartes * factor;
+        }
+        letra(ctx, ETIQUETA, ETIQUETA.tamano * factor);
+        ctx.fillStyle = ETIQUETA.color;
+        ctx.fillText(etiqueta, x, 0);
+        x += ctx.measureText(etiqueta).width + separacion * factor;
+        letra(ctx, VALOR, VALOR.tamano * factor);
+        ctx.fillStyle = VALOR.color;
+        ctx.fillText(valor, x, 0);
+        x += ctx.measureText(valor).width;
+    });
+    ctx.restore();
 }
 
 /** La foto llena el círculo; en fotos verticales se toma la parte de arriba, donde va la cara. */

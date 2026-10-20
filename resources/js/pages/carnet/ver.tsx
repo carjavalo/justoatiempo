@@ -2,7 +2,7 @@ import { contenedorModulo, EncabezadoModulo } from '@/components/admin/piezas';
 import { AlertTriangle, ArrowUpRight, Download, FileText, LoaderCircle } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { cedulaLegible, dibujarCarnet, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
+import { cedulaLegible, dibujarCarnet, partesAsignacion, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -19,13 +19,15 @@ interface Props {
     persona: Persona;
     /** Es el carnet de quien está mirando (Mi carnet); si no, lo mira la administración. */
     propio: boolean;
+    /** Si quien mira (la administración) puede editar a la persona para completarle lo que falte. */
+    editable?: boolean;
 }
 
 /**
  * Un carnet, armado por la plataforma con la foto y los datos de la persona sobre el diseño de la empresa. Lo ve
  * cada persona (el suyo, en Mi carnet) y la administración (el de cualquiera); se descarga como imagen.
  */
-export default function VerCarnet({ persona, propio }: Props) {
+export default function VerCarnet({ persona, propio, editable = false }: Props) {
     const lienzo = useRef<HTMLCanvasElement>(null);
     const [recursos, setRecursos] = useState<RecursosCarnet | null>(null);
     const [error, setError] = useState(false);
@@ -75,6 +77,9 @@ export default function VerCarnet({ persona, propio }: Props) {
         persona.cargo,
         persona.cedula ? cedulaLegible(persona.cedula) : null,
         persona.email,
+        partesAsignacion(persona)
+            .map(([etiqueta, valor]) => `${etiqueta.toLowerCase()} ${valor}`)
+            .join(', '),
         'con código QR',
     ]
         .filter(Boolean)
@@ -106,8 +111,13 @@ export default function VerCarnet({ persona, propio }: Props) {
                         <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
                         {propio ? (
                             <p className="text-foreground">
-                                <strong className="font-semibold">A tu carnet le falta {lista(faltan)}.</strong> Pídele al administrador de la
-                                plataforma que lo complete.
+                                <strong className="font-semibold">A tu carnet le falta {lista(faltan)}.</strong> Pídele a quien administra los
+                                usuarios que lo complete.
+                            </p>
+                        ) : !editable ? (
+                            <p className="text-foreground">
+                                <strong className="font-semibold">Para que el carnet quede completo, falta {lista(faltan)}.</strong> Pídele a quien
+                                administra los usuarios que lo complete.
                             </p>
                         ) : (
                             <p className="text-foreground">

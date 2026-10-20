@@ -32,10 +32,13 @@ class RolUsuario extends Model
                 $rol->permisos = Permisos::todos();
                 $rol->alcance = Permisos::ALCANCE_TODO;
             } else {
-                $rol->permisos = Permisos::normalizar($rol->permisos ?? []);
                 $rol->alcance = array_key_exists((string) $rol->alcance, Permisos::alcances()) ? $rol->alcance : Permisos::ALCANCE_ASIGNACION;
+                $rol->permisos = Permisos::normalizar($rol->permisos ?? [], $rol->alcance);
             }
-            $rol->nivel = $rol->nivelSegunPermisos();
+            // Los roles base conservan su nivel; los demás lo toman de sus permisos
+            if (! $rol->base || $rol->nivel === null) {
+                $rol->nivel = $rol->nivelSegunPermisos();
+            }
         });
 
         // Quienes tienen el rol quedan agrupados con su nuevo nivel
@@ -51,15 +54,24 @@ class RolUsuario extends Model
         return $this->hasMany(User::class, 'rol_id');
     }
 
+    /** Clave fija de cada rol base: los reconoce sin depender de sus permisos ni de su nombre. */
+    public const CLAVES = ['admin' => 'administrador', 'coordinador' => 'coordinador', 'auxiliar' => 'auxiliar'];
+
     /** El rol base de un nivel (Administrador, Coordinador / Supervisor o Auxiliar operativo). */
     public static function base(Rol $nivel): ?self
     {
-        return self::where('base', true)->where('nivel', $nivel->value)->first();
+        return self::where('clave', self::CLAVES[$nivel->value])->first();
+    }
+
+    /** El Administrador de la plataforma: el único rol que siempre lo puede todo. */
+    public static function administrador(): ?self
+    {
+        return self::base(Rol::Admin);
     }
 
     public function esAdministradorBase(): bool
     {
-        return $this->base && $this->getRawOriginal('nivel', $this->attributes['nivel'] ?? null) === Rol::Admin->value;
+        return $this->clave === self::CLAVES['admin'];
     }
 
     public function permite(string $permiso): bool

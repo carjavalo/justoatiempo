@@ -186,7 +186,18 @@ class CarnetUsuarioTest extends TestCase
                 ->where('persona.tieneCargo', true)
                 ->where('persona.email', 'ana@example.com')
                 ->where('persona.foto', null)
+                // Sin empresa asignada, la franja del carnet lo dice
+                ->where('persona.empresa', null)
                 ->where('persona.qr', route('carnet.verificar', $usuario->carnet_codigo)));
+
+        // Dónde presta el servicio va en el carnet: empresa, sede y sucursal
+        $sede = $this->sede('TuGo');
+        $caliSur = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        $usuario->update(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $caliSur->id]);
+        $this->actingAs($this->admin)->get("/usuarios/{$usuario->id}/carnet")->assertInertia(fn (Assert $p) => $p
+            ->where('persona.empresa', 'Ditranza')
+            ->where('persona.sede', 'TuGo')
+            ->where('persona.sucursal', 'Cali Sur'));
 
         // Sin cargo escrito, el carnet lleva el rol
         $sinCargo = User::factory()->coordinador()->create(['cargo' => null]);

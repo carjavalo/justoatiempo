@@ -294,7 +294,8 @@ class RolesTest extends TestCase
         $auxiliar = User::factory()->create();
         $this->actingAs($talento)->patch("/usuarios/{$auxiliar->id}/estado", ['activo' => false])->assertSessionHas('success');
         $this->actingAs($talento)->get('/usuarios')->assertInertia(fn (Assert $p) => $p
-            ->where('usuarios.data', fn ($filas) => collect($filas)->firstWhere('id', $this->admin->id)['editable'] === false
+            // Solo ve a los de su línea (el administrador, que las ve todas, no le aparece) y puede editarlos
+            ->where('usuarios.data', fn ($filas) => collect($filas)->firstWhere('id', $this->admin->id) === null
                 && collect($filas)->firstWhere('id', $auxiliar->id)['editable'] === true)
             ->where('roles', fn ($roles) => collect($roles)->firstWhere('nombre', 'Administrador')['asignable'] === false));
     }

@@ -2,6 +2,7 @@ import { EstadoBadge } from '@/components/admin/piezas';
 import { Building2, LayoutGrid, MapPinned, UsersRound } from '@/components/iconos';
 import { MarcoLinea } from '@/components/linea/marco-linea';
 import { SERVICIOS } from '@/lib/portafolio';
+import { usePuede } from '@/hooks/use-puede';
 import { Link } from '@inertiajs/react';
 
 interface Empresa {
@@ -33,6 +34,15 @@ const claseEnlace = 'text-primary focus-visible:ring-ring rounded-sm font-semibo
 export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeUsuarios }: Props) {
     const servicio = SERVICIOS.find((s) => s.id === linea.slug);
     const totalPersonas = personal.reduce((suma, p) => suma + p.total, 0);
+    // Lo que su rol le deja registrar mientras la línea no tiene tablero
+    const puede = usePuede();
+    const registrables = [
+        puede('empresas.crear') && 'empresas',
+        puede('sedes.crear') && 'sedes',
+        puede('sucursales.crear') && 'sucursales',
+        puede('usuarios.crear') && 'personal',
+    ].filter(Boolean) as string[];
+    const listaRegistrables = registrables.length > 1 ? `${registrables.slice(0, -1).join(', ')} y ${registrables.at(-1)}` : registrables[0];
 
     return (
         <MarcoLinea slug={linea.slug} nombre={linea.nombre} titulo={linea.nombre}>
@@ -110,10 +120,12 @@ export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeU
                             Cuando definamos cómo controla esta línea su operación (turnos, novedades, insumos, evidencias…), aquí tendrá su tablero por empresa,
                             como el de servicios logísticos.
                         </p>
-                        <p className="text-muted-foreground mt-3 flex items-center gap-2 text-xs">
-                            <MapPinned className="size-4" aria-hidden="true" />
-                            Mientras tanto ya puedes registrar sus empresas, sedes, sucursales y personal.
-                        </p>
+                        {listaRegistrables && (
+                            <p className="text-muted-foreground mt-3 flex items-center gap-2 text-xs">
+                                <MapPinned className="size-4" aria-hidden="true" />
+                                Mientras tanto ya puedes registrar sus {listaRegistrables}.
+                            </p>
+                        )}
                     </section>
                 </div>
             </div>

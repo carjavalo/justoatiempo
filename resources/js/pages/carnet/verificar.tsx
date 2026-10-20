@@ -1,6 +1,6 @@
 import { Iniciales } from '@/components/admin/piezas';
 import { EnlaceVolver } from '@/components/enlace-volver';
-import { AlertTriangle, CheckCircle2, FileText, XCircle } from '@/components/iconos';
+import { AlertTriangle, Building2, CheckCircle2, FileText, MapPinned, Store, XCircle } from '@/components/iconos';
 import LogoMarca from '@/components/logo-marca';
 import { cn } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
@@ -11,7 +11,7 @@ interface Vigente {
     cedula: string | null;
     cargo: string;
     email: string;
-    /** Empresa cliente donde trabaja; sin empresa es personal propio de Justo a Tiempo. */
+    /** Empresa cliente donde presta el servicio (todos son personal de Justo a Tiempo); puede no tener. */
     empresa: string | null;
     sede: string | null;
     sucursal: string | null;
@@ -85,12 +85,14 @@ function NoVigente({ nombre }: { nombre: string }) {
 }
 
 function Datos({ persona: p }: { persona: Vigente }) {
-    // Dónde trabaja: la empresa cliente con su sede y sucursal, o la sucursal propia de Justo a Tiempo
-    const asignado = p.empresa ? [p.empresa, p.sede, p.sucursal].filter(Boolean).join(' · ') : p.sucursal;
+    // Dónde presta el servicio: lo primero que busca quien controla el ingreso
+    const asignacion = [
+        { titulo: 'Empresa', valor: p.empresa ?? 'Sin empresa asignada', icono: Building2, vacio: !p.empresa },
+        { titulo: 'Sede', valor: p.sede, icono: Store, vacio: false },
+        { titulo: 'Sucursal', valor: p.sucursal, icono: MapPinned, vacio: false },
+    ].filter((f) => f.valor);
     const filas = [
         { titulo: 'Cédula', valor: p.cedula ? `C.C. ${Number(p.cedula).toLocaleString('es-CO')}` : null },
-        { titulo: 'Empresa', valor: 'Justo a Tiempo SP S.A.S' },
-        { titulo: p.empresa ? 'Asignado a' : 'Sucursal', valor: asignado },
         { titulo: 'Línea de servicio', valor: p.linea },
         { titulo: 'Correo', valor: p.email },
     ].filter((f) => f.valor);
@@ -114,7 +116,28 @@ function Datos({ persona: p }: { persona: Vigente }) {
                 </div>
             </div>
 
-            <dl className="mt-6 divide-y rounded-2xl border">
+            <section aria-labelledby="titulo-asignacion" className="border-primary/25 bg-secondary/50 mt-6 rounded-2xl border p-4">
+                <h2 id="titulo-asignacion" className="text-xs font-bold tracking-[0.12em] uppercase">
+                    Presta el servicio en
+                </h2>
+                <dl className="mt-3 grid gap-3">
+                    {asignacion.map(({ titulo, valor, icono: Icono, vacio }) => (
+                        <div key={titulo} className="flex items-center gap-3">
+                            <span className="bg-brand-navy-deep flex size-10 shrink-0 items-center justify-center rounded-xl">
+                                <Icono className="text-brand-coral-on-dark size-5" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                                <dt className="text-muted-foreground text-xs">{titulo}</dt>
+                                <dd className={cn('text-lg leading-tight font-extrabold break-words', vacio && 'text-muted-foreground text-base font-semibold')}>
+                                    {valor}
+                                </dd>
+                            </div>
+                        </div>
+                    ))}
+                </dl>
+            </section>
+
+            <dl className="mt-4 divide-y rounded-2xl border">
                 {filas.map((f) => (
                     <div key={f.titulo} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 px-4 py-3 text-sm">
                         <dt className="text-muted-foreground">{f.titulo}</dt>
