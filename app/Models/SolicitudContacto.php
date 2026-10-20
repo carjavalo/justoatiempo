@@ -33,6 +33,9 @@ class SolicitudContacto extends Model
     {
         $configurados = array_values(array_filter(array_map('trim', explode(',', (string) config('mail.contacto')))));
 
-        return $configurados ?: User::where('rol', Rol::Admin)->where('activo', true)->orderBy('id')->pluck('email')->all();
+        // Sin correo configurado: las personas activas cuyo rol atiende las solicitudes
+        return $configurados ?: User::where('activo', true)
+            ->whereHas('rolUsuario', fn ($q) => $q->whereJsonContains('permisos', 'solicitudes.atender'))
+            ->orderBy('id')->pluck('email')->all();
     }
 }

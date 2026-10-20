@@ -8,10 +8,10 @@ import { useRef, useState } from 'react';
 interface Props {
     nombre: string;
     activo: boolean;
-    /** URL del PATCH que cambia el estado. Sin URL no se ofrece (p. ej. el propio usuario). */
+    /** URL del PATCH que cambia el estado. Sin URL no se ofrece (p. ej. el propio usuario, o sin permiso). */
     urlEstado?: string;
-    /** Recibe el botón de acciones para devolverle el foco al cerrar el formulario. */
-    onEditar: (origen: HTMLElement | null) => void;
+    /** Recibe el botón de acciones para devolverle el foco al cerrar el formulario. Sin él (sin permiso), no se ofrece. */
+    onEditar?: (origen: HTMLElement | null) => void;
     /** Qué pasa al desactivar y cómo revertirlo, para la confirmación. */
     consecuencia: string;
     /** Páginas propias del registro (p. ej. el carnet de un usuario), antes de las acciones. */
@@ -19,8 +19,8 @@ interface Props {
 }
 
 /**
- * Acciones de una fila: editar y activar/desactivar. Desactivar pide confirmación porque
- * cambia el acceso de otras personas; activar es inmediato.
+ * Acciones de una fila: editar y activar/desactivar (las que el rol permite). Desactivar pide confirmación porque
+ * cambia el acceso de otras personas; activar es inmediato. Sin ninguna acción posible no se muestra el menú.
  */
 export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia, enlaces = [] }: Props) {
     const [confirmando, setConfirmando] = useState(false);
@@ -44,6 +44,8 @@ export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia
         );
     };
 
+    if (!onEditar && !urlEstado && enlaces.length === 0) return null;
+
     return (
         <>
             <DropdownMenu modal={false}>
@@ -62,10 +64,12 @@ export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia
                             </Link>
                         </DropdownMenuItem>
                     ))}
-                    <DropdownMenuItem onSelect={() => onEditar(boton.current)} className="gap-2">
-                        <Pencil className="size-4" aria-hidden="true" />
-                        Editar
-                    </DropdownMenuItem>
+                    {onEditar && (
+                        <DropdownMenuItem onSelect={() => onEditar(boton.current)} className="gap-2">
+                            <Pencil className="size-4" aria-hidden="true" />
+                            Editar
+                        </DropdownMenuItem>
+                    )}
                     {urlEstado &&
                         (activo ? (
                             <DropdownMenuItem onSelect={() => setConfirmando(true)} className="text-critical focus:text-critical gap-2">

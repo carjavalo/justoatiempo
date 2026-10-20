@@ -5,13 +5,14 @@ import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 
+/** Solo llega lo que su rol le deja ver. */
 interface Resumen {
-    usuarios: { total: number; activos: number };
-    empresas: { total: number; activas: number };
-    sedes: { total: number; activas: number };
-    sucursales: { total: number; activas: number; propias: number };
-    solicitudes: { total: number; pendientes: number };
-    roles: { total: number; activos: number };
+    usuarios?: { total: number; activos: number };
+    empresas?: { total: number; activas: number };
+    sedes?: { total: number; activas: number };
+    sucursales?: { total: number; activas: number; propias: number };
+    solicitudes?: { total: number; pendientes: number };
+    roles?: { total: number; activos: number };
 }
 
 interface LineaPanel {
@@ -25,7 +26,8 @@ interface LineaPanel {
 interface Props {
     resumen?: Resumen;
     lineas?: LineaPanel[];
-    asignacion?: { empresa: string | null; sede: string | null; sucursal: string | null };
+    /** Sin nada que administrar ni línea que ver; sinTablero: tiene línea, pero su rol no abre su tablero. */
+    asignacion?: { empresa: string | null; sede: string | null; sucursal: string | null; sinTablero: boolean };
 }
 
 const formatoFecha = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -38,8 +40,8 @@ function saludo(): string {
 const plural = (n: number, uno: string, varios: string) => `${n.toLocaleString('es-CO')} ${n === 1 ? uno : varios}`;
 
 /**
- * Inicio del administrador: la administración (usuarios, empresas, sedes y sucursales) y las líneas de servicio.
- * Quien no es administrador entra directo a su línea; aquí solo llega si aún no tiene una.
+ * Inicio: los módulos de la administración que su rol le deja ver y las líneas de servicio que ve. Quien no
+ * administra nada entra directo a su línea; aquí solo llega si aún no tiene una (o su rol no abre su tablero).
  */
 export default function Panel({ resumen, lineas, asignacion }: Props) {
     const { auth } = usePage<SharedData>().props;
@@ -62,8 +64,8 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 
                 {resumen ? (
                     <>
-                        <OpcionesAdmin resumen={resumen} />
-                        {lineas && <LineasServicio lineas={lineas} />}
+                        {Object.keys(resumen).length > 0 && <OpcionesAdmin resumen={resumen} />}
+                        {lineas && lineas.length > 0 && <LineasServicio lineas={lineas} />}
                     </>
                 ) : (
                     <SinOpciones asignacion={asignacion} />
@@ -75,8 +77,9 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 
 function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
     const { usuarios, roles, empresas, sedes, sucursales, solicitudes } = resumen;
-    const opciones: { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string; pendiente?: boolean }[] = [
-        {
+    type Opcion = { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string; pendiente?: boolean };
+    const todas: (Opcion | undefined)[] = [
+        usuarios && {
             id: 'usuarios',
             titulo: 'Usuarios',
             texto: 'Crea accesos y asigna a cada persona su rol, su línea de servicio y dónde trabaja.',
@@ -84,15 +87,15 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             icono: UsersRound,
             dato: usuarios.total ? plural(usuarios.activos, 'usuario activo', 'usuarios activos') : 'Aún no hay usuarios',
         },
-        {
+        roles && {
             id: 'roles',
             titulo: 'Roles',
-            texto: 'Los roles dentro de la empresa (auxiliar, conductor, supervisor…) y lo que cada uno puede hacer en la plataforma.',
+            texto: 'Los roles dentro de la empresa (auxiliar, conductor, supervisor…) y lo que cada uno puede ver y hacer.',
             href: route('roles.index'),
             icono: UserCheck,
             dato: plural(roles.activos, 'rol activo', 'roles activos'),
         },
-        {
+        empresas && {
             id: 'empresas',
             titulo: 'Empresas',
             texto: 'Las empresas clientes (como Ditranza), con su NIT, su contacto y las líneas que reciben.',
@@ -100,7 +103,7 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             icono: Building2,
             dato: empresas.total ? plural(empresas.activas, 'empresa activa', 'empresas activas') : 'Aún no hay empresas',
         },
-        {
+        sedes && {
             id: 'sedes',
             titulo: 'Sedes',
             texto: 'Las sedes de cada empresa (como TuGo y Sodimac, de Ditranza), con su meta de efectividad.',
@@ -108,7 +111,7 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             icono: Store,
             dato: sedes.total ? plural(sedes.activas, 'sede activa', 'sedes activas') : 'Aún no hay sedes',
         },
-        {
+        sucursales && {
             id: 'sucursales',
             titulo: 'Sucursales',
             texto: 'Los puntos de cada sede (como Cali Sur o Cañasgordas) y los propios de Justo a Tiempo.',
@@ -118,7 +121,7 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                 ? `${plural(sucursales.activas, 'activa', 'activas')}${sucursales.propias ? ` · ${plural(sucursales.propias, 'propia', 'propias')}` : ''}`
                 : 'Aún no hay sucursales',
         },
-        {
+        solicitudes && {
             id: 'solicitudes',
             titulo: 'Solicitudes de cotización',
             texto: 'Lo que escriben los clientes desde el formulario «Hablemos de su operación» del sitio web.',
@@ -132,6 +135,7 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             pendiente: solicitudes.pendientes > 0,
         },
     ];
+    const opciones = todas.filter((o): o is Opcion => Boolean(o));
 
     return (
         <section aria-labelledby="titulo-opciones" className="flex flex-col gap-5">
@@ -188,7 +192,7 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                 ))}
             </ul>
 
-            {empresas.total === 0 && (
+            {empresas?.total === 0 && (
                 <p className="bg-secondary/60 text-secondary-foreground flex items-start gap-3 rounded-2xl px-5 py-4 text-sm">
                     <Lightbulb className="text-brand-coral-ink mt-0.5 size-5 shrink-0" aria-hidden="true" />
                     <span>
@@ -287,10 +291,21 @@ function SinOpciones({ asignacion }: { asignacion?: Props['asignacion'] }) {
                 <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
                     <LayoutGrid className="size-7" aria-hidden="true" />
                 </span>
-                <h2 className="mt-4 text-lg font-extrabold tracking-tight">Aún no tienes una línea de servicio asignada</h2>
-                <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
-                    Cuando el administrador te asigne la línea en la que trabajas, al ingresar entrarás directo a ella.
-                </p>
+                {asignacion?.sinTablero ? (
+                    <>
+                        <h2 className="mt-4 text-lg font-extrabold tracking-tight">Tu rol aún no tiene módulos asignados</h2>
+                        <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
+                            Por ahora puedes ver tu carnet desde el menú de tu usuario. Si necesitas más acceso, pídeselo a quien administra los roles.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <h2 className="mt-4 text-lg font-extrabold tracking-tight">Aún no tienes una línea de servicio asignada</h2>
+                        <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
+                            Cuando el administrador te asigne la línea en la que trabajas, al ingresar entrarás directo a ella.
+                        </p>
+                    </>
+                )}
             </section>
         </div>
     );

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\Rol;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
 use App\Models\Empresa;
@@ -12,6 +11,7 @@ use App\Models\Sede;
 use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Carnet;
+use App\Support\Permisos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,7 +37,7 @@ class UsuarioController extends Controller
         ]);
 
         $usuarios = User::query()
-            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre', 'rolUsuario:id,nombre'])
+            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre', 'rolUsuario:id,nombre,permisos,alcance,base,nivel'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('cedula', 'like', $like));
@@ -63,10 +63,10 @@ class UsuarioController extends Controller
                 'cedula' => $u->cedula,
                 'cargo' => $u->cargo,
                 'email' => $u->email,
-                // Nivel de acceso (admin, coordinador, auxiliar) y el rol dentro de la empresa
-                'rol' => $u->rol->value,
+                // Su rol dentro de la empresa; sin línea, si su rol las ve todas
                 'rolId' => $u->rol_id,
                 'rolNombre' => $u->nombreRol(),
+                'todasLasLineas' => $u->rolPermite(Permisos::TODAS_LAS_LINEAS),
                 'empresaId' => $u->empresa_id,
                 'empresa' => $u->empresa?->nombre,
                 'sedeId' => $u->sede_id,
@@ -81,6 +81,8 @@ class UsuarioController extends Controller
                 'activo' => $u->activo,
                 'ultimoAcceso' => $u->ultimo_acceso_en?->toIso8601String(),
                 'esUsted' => $u->is($request->user()),
+                // Solo se edita o desactiva a quien tiene, como mucho, los mismos permisos que uno
+                'editable' => $request->user()->cubreA($u),
             ]);
 
         return Inertia::render('usuarios/index', [
@@ -102,13 +104,14 @@ class UsuarioController extends Controller
                 'sucursal' => isset($filtros['sucursal']) ? Sucursal::withTrashed()->whereKey($filtros['sucursal'])->value('nombre') : null,
                 'linea' => isset($filtros['linea']) ? LineaServicio::whereKey($filtros['linea'])->value('nombre') : null,
             ],
-            // Roles de la empresa con el nivel de acceso de cada uno: el formulario sabe si es administrador
+            // Roles de la empresa con lo que permite cada uno; solo se asignan los que el propio rol cubre
             'roles' => RolUsuario::orderBy('nombre')->get()->map(fn (RolUsuario $r) => [
                 'id' => $r->id,
                 'nombre' => $r->nombre,
-                'nivel' => $r->nivel->value,
-                'nivelLabel' => $r->nivel->label(),
-                'nivelDescripcion' => $r->nivel->descripcion(),
+                'resumen' => $r->resumen(),
+                'alcance' => Permisos::alcances()[$r->alcance] ?? '',
+                'todasLasLineas' => $r->permite(Permisos::TODAS_LAS_LINEAS),
+                'asignable' => (bool) $request->user()->rolUsuario?->cubre($r),
                 'activo' => $r->activo,
             ]),
             // Cada empresa con las líneas que recibe: el formulario solo ofrece las de la línea elegida
@@ -232,6 +235,9 @@ class UsuarioController extends Controller
 
         if ($usuario->is($request->user())) {
             return back()->with('error', 'No puedes desactivar tu propio usuario.');
+        }
+        if (! $request->user()->cubreA($usuario)) {
+            return back()->with('error', "{$usuario->name} tiene permisos que tu rol no tiene: no puedes cambiar su acceso.");
         }
 
         $usuario->update(['activo' => $activo]);

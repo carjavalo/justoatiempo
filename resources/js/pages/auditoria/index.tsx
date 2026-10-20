@@ -5,6 +5,7 @@ import { FormularioAuditoria } from '@/components/auditoria/formulario';
 import { type FiltrosAuditoria, type Jornada, type OrdenCola, type OrdenDetalle, type Resumen, type TipoNovedad } from '@/components/auditoria/tipos';
 import { ClipboardCheck, Search } from '@/components/iconos';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
+import { usePuede } from '@/hooks/use-puede';
 import { Selector } from '@/components/selector';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const claseSelect =
     'border-input bg-card h-9 rounded-lg border px-2.5 text-sm transition-[color,border-color,box-shadow] focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25';
 
 export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, seleccionada, siguiente, tiposNovedad }: Props) {
+    const puede = usePuede();
     const [busqueda, setBusqueda] = useState(filtros.q ?? '');
 
     const filtrar = (cambios: Partial<FiltrosAuditoria>) => {
@@ -158,7 +160,8 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                 </div>
             </div>
 
-            <CargaLote fecha={filtros.fecha} />
+            {/* Subir el lote de PDF de la jornada pide el permiso de subir evidencias */}
+            {puede('auditoria.subir') && <CargaLote fecha={filtros.fecha} />}
 
             <div className="grid gap-5 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] lg:items-start">
                 <div className="lg:sticky lg:top-20">

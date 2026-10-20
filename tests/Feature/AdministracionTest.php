@@ -410,7 +410,7 @@ class AdministracionTest extends TestCase
     {
         $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", [
             ...$this->edicion($this->admin), 'rol_id' => $this->rolBase(Rol::Auxiliar), 'linea_id' => LineaServicio::logistica()->id,
-        ])->assertSessionHasErrors(['rol_id' => 'No puedes quitarte el acceso de administrador. Pídeselo a otro administrador.']);
+        ])->assertSessionHasErrors(['rol_id' => 'No puedes cambiarte a un rol sin los permisos para editar usuarios y roles. Pídeselo a otra persona.']);
         $this->assertSame(Rol::Admin, $this->admin->fresh()->rol);
 
         $this->actingAs($this->admin)->patch("/usuarios/{$this->admin->id}/estado", ['activo' => false])->assertSessionHas('error');
@@ -465,15 +465,18 @@ class AdministracionTest extends TestCase
         $propio = User::factory()->coordinador()->create();
 
         foreach (['/cargas', '/auditoria'] as $url) {
-            $this->actingAs($deEmpresa)->get($url)->assertForbidden();
+            $this->actingAs($deEmpresa)->get($url)->assertForbidden()
+                // El aviso habla de su asignación: todos son personal de Justo a Tiempo
+                ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta sección reúne la operación de todas las empresas: no está disponible para quien presta el servicio en una sola.'));
             $this->actingAs($propio)->get($url)->assertOk();
         }
 
         // El tablero de la línea sí lo ve, pero solo con su empresa y sin las herramientas
         $this->actingAs($deEmpresa)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('puedeOperar', false)->where('alcanceFijo', 'Ditranza'));
+            // Sus herramientas (cargas, auditoría) reúnen todas las empresas: no le aplican
+            ->assertInertia(fn (Assert $p) => $p->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver'))->where('alcanceFijo', 'Ditranza'));
         $this->actingAs($propio)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('puedeOperar', true)->where('alcanceFijo', null));
+            ->assertInertia(fn (Assert $p) => $p->where('auth.permisos', fn ($permisos) => collect($permisos)->contains('cargas.ver'))->where('alcanceFijo', null));
     }
 
     public function test_un_inactivo_que_envia_un_patch_es_redirigido_con_303(): void

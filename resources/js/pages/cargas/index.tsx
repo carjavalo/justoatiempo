@@ -1,6 +1,7 @@
 import { EstadoCargaBadge, type EstadoCarga } from '@/components/cargas/piezas';
 import { Panel } from '@/components/dashboard/piezas';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
+import { usePuede } from '@/hooks/use-puede';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -38,6 +39,7 @@ const formatoFechaHora = new Intl.DateTimeFormat('es-CO', { day: 'numeric', mont
 
 export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<FilaCarga>; jornadaPendiente: string | null }) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
+    const puede = usePuede();
     const [processing, setProcessing] = useState(false);
     const [progreso, setProgreso] = useState(0);
     const [arrastrando, setArrastrando] = useState(false);
@@ -78,7 +80,9 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
         <MarcoLinea slug={LINEA_LOGISTICA} titulo="Cargas Drivin" seccion="cargas" pestanas>
                 {/* El título lo da la pestaña activa ("Cargas Drivin") */}
                 <p className="text-muted-foreground -mt-2 max-w-2xl text-sm">
-                    Sube la preliquidación exportada de Drivin. El sistema la revisa contigo antes de importar y arma el informe diario de cada sede y sucursal.
+                    {puede('cargas.subir')
+                        ? 'Sube la preliquidación exportada de Drivin. El sistema la revisa contigo antes de importar y arma el informe diario de cada sede y sucursal.'
+                        : 'Las preliquidaciones de Drivin que se han subido, con el resultado de cada una.'}
                 </p>
 
                 {jornadaPendiente && (
@@ -90,66 +94,68 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                     </div>
                 )}
 
-                {/* Zona de carga: el input es accesible por teclado; la etiqueta es la zona visible */}
-                <div>
-                    <input
-                        ref={input}
-                        id="archivo"
-                        type="file"
-                        accept={EXTENSIONES}
-                        className="peer sr-only"
-                        disabled={processing}
-                        aria-describedby="archivo-ayuda archivo-error"
-                        onChange={(e) => subir(e.target.files?.[0])}
-                    />
-                    <label
-                        htmlFor="archivo"
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            setArrastrando(true);
-                        }}
-                        onDragLeave={() => setArrastrando(false)}
-                        onDrop={soltar}
-                        className={cn(
-                            'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors',
-                            'peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
-                            'hover:border-primary/50 hover:bg-secondary/40',
-                            arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
-                            processing && 'pointer-events-none',
-                            errors.archivo && 'border-critical/60',
-                        )}
-                    >
-                        {processing ? (
-                            <>
-                                <LoaderCircle className="text-primary size-10 motion-safe:animate-spin" aria-hidden="true" />
-                                <span className="text-base font-bold">Leyendo {nombre}…</span>
-                                <span className="bg-muted h-1.5 w-full max-w-xs overflow-hidden rounded-full" role="progressbar" aria-label="Progreso de la subida" aria-valuenow={progreso} aria-valuemin={0} aria-valuemax={100}>
-                                    <span className="bg-primary block h-full rounded-full transition-[width]" style={{ width: `${Math.max(progreso, 5)}%` }} />
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
-                                    <UploadCloud className="size-7" aria-hidden="true" />
-                                </span>
-                                <span className="text-base font-bold">
-                                    Arrastra aquí la preliquidación o <span className="text-primary underline underline-offset-4">elige el archivo</span>
-                                </span>
-                                <span id="archivo-ayuda" className="text-muted-foreground text-xs">
-                                    Excel (.xlsx, .xls) o CSV exportado de Drivin · máximo 10 MB
-                                </span>
-                            </>
-                        )}
-                    </label>
-                    <div id="archivo-error" aria-live="polite">
-                        {errors.archivo && (
-                            <p className="text-critical mt-3 flex items-center gap-2 text-sm font-medium">
-                                <XCircle className="size-4 shrink-0" aria-hidden="true" />
-                                {errors.archivo}
-                            </p>
-                        )}
+                {/* Zona de carga (solo con permiso de subir): el input es accesible por teclado; la etiqueta es la zona visible */}
+                {puede('cargas.subir') && (
+                    <div>
+                        <input
+                            ref={input}
+                            id="archivo"
+                            type="file"
+                            accept={EXTENSIONES}
+                            className="peer sr-only"
+                            disabled={processing}
+                            aria-describedby="archivo-ayuda archivo-error"
+                            onChange={(e) => subir(e.target.files?.[0])}
+                        />
+                        <label
+                            htmlFor="archivo"
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                setArrastrando(true);
+                            }}
+                            onDragLeave={() => setArrastrando(false)}
+                            onDrop={soltar}
+                            className={cn(
+                                'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors',
+                                'peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
+                                'hover:border-primary/50 hover:bg-secondary/40',
+                                arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
+                                processing && 'pointer-events-none',
+                                errors.archivo && 'border-critical/60',
+                            )}
+                        >
+                            {processing ? (
+                                <>
+                                    <LoaderCircle className="text-primary size-10 motion-safe:animate-spin" aria-hidden="true" />
+                                    <span className="text-base font-bold">Leyendo {nombre}…</span>
+                                    <span className="bg-muted h-1.5 w-full max-w-xs overflow-hidden rounded-full" role="progressbar" aria-label="Progreso de la subida" aria-valuenow={progreso} aria-valuemin={0} aria-valuemax={100}>
+                                        <span className="bg-primary block h-full rounded-full transition-[width]" style={{ width: `${Math.max(progreso, 5)}%` }} />
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
+                                        <UploadCloud className="size-7" aria-hidden="true" />
+                                    </span>
+                                    <span className="text-base font-bold">
+                                        Arrastra aquí la preliquidación o <span className="text-primary underline underline-offset-4">elige el archivo</span>
+                                    </span>
+                                    <span id="archivo-ayuda" className="text-muted-foreground text-xs">
+                                        Excel (.xlsx, .xls) o CSV exportado de Drivin · máximo 10 MB
+                                    </span>
+                                </>
+                            )}
+                        </label>
+                        <div id="archivo-error" aria-live="polite">
+                            {errors.archivo && (
+                                <p className="text-critical mt-3 flex items-center gap-2 text-sm font-medium">
+                                    <XCircle className="size-4 shrink-0" aria-hidden="true" />
+                                    {errors.archivo}
+                                </p>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 <Panel titulo="Historial de cargas" descripcion={cargas.total ? `${fmt.numero(cargas.total)} ${cargas.total === 1 ? 'carga' : 'cargas'} en total` : undefined} cuerpoClassName="px-0 pb-2">
                     {cargas.data.length === 0 ? (

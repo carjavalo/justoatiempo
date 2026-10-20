@@ -3,6 +3,7 @@ import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
+import { usePuede } from '@/hooks/use-puede';
 import { fmt } from '@/lib/formato';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
@@ -64,6 +65,9 @@ interface Props {
 }
 
 export default function Revision({ carga, errorLectura, lectura, campos, analisis, sedes }: Props) {
+    const puede = usePuede();
+    // Ajustar la revisión es parte de subir la carga: sin ese permiso solo se consulta
+    const soloConsulta = !puede('cargas.subir');
     const [guardando, setGuardando] = useState(false);
 
     useEffect(() => {
@@ -122,11 +126,11 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                         )}
 
                         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-                            <MapeoColumnas lectura={lectura} campos={campos} faltantes={analisis.columnasFaltantes} disabled={guardando} onCambio={(mapeo) => ajustar({ mapeo })} onHoja={(hoja) => ajustar({ hoja })} />
+                            <MapeoColumnas lectura={lectura} campos={campos} faltantes={analisis.columnasFaltantes} disabled={guardando || soloConsulta} onCambio={(mapeo) => ajustar({ mapeo })} onHoja={(hoja) => ajustar({ hoja })} />
                             <SedePorDefecto
                                 sedes={sedes ?? []}
                                 opciones={carga.opciones ?? { sede_id: null, sucursal_id: null }}
-                                disabled={guardando}
+                                disabled={guardando || soloConsulta}
                                 onCambio={(sede_id, sucursal_id) => ajustar({ sede_id, sucursal_id })}
                             />
                         </div>
@@ -420,6 +424,7 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
 
 /** Acciones fijas al pie: el resumen de lo que va a pasar junto al botón que lo hace. */
 function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; analisis?: Analisis; guardando: boolean }) {
+    const puede = usePuede();
     const [importando, setImportando] = useState(false);
     const ordenes = analisis?.totales.ordenes ?? 0;
     const omitidas = analisis?.filasConError ?? 0;
@@ -449,31 +454,33 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
                         'No se puede importar este archivo.'
                     )}
                 </p>
-                <div className="flex items-center gap-2">
-                    <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" className="text-critical hover:bg-critical-soft hover:text-critical rounded-lg font-semibold" disabled={importando}>
-                                <Trash2 className="size-4" aria-hidden="true" />
-                                Descartar
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogTitle>¿Descartar esta carga?</DialogTitle>
-                            <DialogDescription>Se borra el archivo subido y no se importa ninguna orden. Puedes volver a subirlo cuando quieras.</DialogDescription>
-                            <DialogFooter className="gap-2">
-                                <DialogClose asChild>
-                                    <Button variant="outline" className="rounded-lg">
-                                        Cancelar
-                                    </Button>
-                                </DialogClose>
-                                <Button variant="destructive" className="rounded-lg" onClick={descartar}>
-                                    Sí, descartar
+                <div className="flex items-center gap-2 empty:hidden">
+                    {puede('cargas.subir') && (
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="ghost" className="text-critical hover:bg-critical-soft hover:text-critical rounded-lg font-semibold" disabled={importando}>
+                                    <Trash2 className="size-4" aria-hidden="true" />
+                                    Descartar
                                 </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogTitle>¿Descartar esta carga?</DialogTitle>
+                                <DialogDescription>Se borra el archivo subido y no se importa ninguna orden. Puedes volver a subirlo cuando quieras.</DialogDescription>
+                                <DialogFooter className="gap-2">
+                                    <DialogClose asChild>
+                                        <Button variant="outline" className="rounded-lg">
+                                            Cancelar
+                                        </Button>
+                                    </DialogClose>
+                                    <Button variant="destructive" className="rounded-lg" onClick={descartar}>
+                                        Sí, descartar
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
 
-                    {omitidas > 0 && !bloqueado ? (
+                    {!puede('cargas.confirmar') ? null : omitidas > 0 && !bloqueado ? (
                         <Dialog>
                             <DialogTrigger asChild>
                                 <Button className="h-10 rounded-lg px-5 font-semibold" disabled={guardando || importando}>

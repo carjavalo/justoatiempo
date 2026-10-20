@@ -116,9 +116,19 @@ export function SinResultados({ texto }: { texto: string }) {
     return <p className="bg-card text-muted-foreground rounded-2xl border px-6 py-10 text-center text-sm">{texto}</p>;
 }
 
-/** Conteo que lleva a la lista filtrada: un destino más específico que el del panel, no lo repite. */
-export function ConteoEnlace({ n, uno, varios, ninguno, de, href }: { n: number; uno: string; varios: string; ninguno: string; de: string; href: string }) {
+/**
+ * Conteo que lleva a la lista filtrada: un destino más específico que el del panel, no lo repite. Sin `href`
+ * (el rol no abre esa lista) es solo el número.
+ */
+export function ConteoEnlace({ n, uno, varios, ninguno, de, href }: { n: number; uno: string; varios: string; ninguno: string; de: string; href?: string }) {
     if (n === 0) return <span className="text-muted-foreground text-xs">{ninguno}</span>;
+    if (!href) {
+        return (
+            <span className="font-semibold whitespace-nowrap">
+                {n} {n === 1 ? uno : varios}
+            </span>
+        );
+    }
     return (
         <Link href={href} className="text-primary focus-visible:ring-ring rounded-sm font-semibold whitespace-nowrap underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
             {n} {n === 1 ? uno : varios}

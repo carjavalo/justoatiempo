@@ -70,7 +70,7 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('lineas/logistica')
-                ->where('puedeOperar', true)
+                ->where('auth.permisos', fn ($permisos) => collect($permisos)->contains('cargas.ver'))
                 ->where('vista', 'gerencial')
                 ->where('kpis.asignadas', 9)
                 ->where('kpis.aprobadas', 6)
@@ -88,7 +88,7 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('vista', 'auxiliar')
-                ->where('puedeOperar', false)
+                ->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver'))
                 ->where('kpis.asignadas', 8)
                 ->where('kpis.efectividad', 62.5)
                 ->has('ranking', 1)

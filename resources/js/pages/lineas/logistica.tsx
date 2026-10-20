@@ -7,6 +7,7 @@ import { RankingAuxiliares } from '@/components/dashboard/ranking-auxiliares';
 import { type DashboardProps } from '@/components/dashboard/tipos';
 import { AlertTriangle, Building2, CalendarDays, PackageSearch } from '@/components/iconos';
 import { MarcoLinea } from '@/components/linea/marco-linea';
+import { usePuede } from '@/hooks/use-puede';
 import { Selector } from '@/components/selector';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
@@ -21,7 +22,6 @@ function saludo() {
 
 type Props = DashboardProps & {
     linea: { slug: string; nombre: string };
-    puedeOperar: boolean;
     /** A lo que está limitada la persona, lo más específico: "TuGo · Cali Sur", "TuGo" o "Ditranza". */
     alcanceFijo: string | null;
 };
@@ -31,7 +31,6 @@ export default function TableroLogistica(props: Props) {
     const { auth } = usePage<SharedData>().props;
     const {
         linea,
-        puedeOperar,
         alcanceFijo,
         filtros,
         vista,
@@ -50,8 +49,9 @@ export default function TableroLogistica(props: Props) {
     } = props;
     const [cargando, setCargando] = useState(false);
     const gerencial = vista === 'gerencial';
+    const puede = usePuede();
     // Para quien trabaja en la línea, este tablero es su inicio: se le saluda
-    const esSuInicio = auth.user.rol !== 'admin';
+    const esSuInicio = auth.user.inicio.url === new URL(route('lineas.show', linea.slug)).pathname;
 
     useEffect(() => {
         const quitarInicio = router.on('start', () => setCargando(true));
@@ -86,7 +86,7 @@ export default function TableroLogistica(props: Props) {
             nombre={linea.nombre}
             titulo={gerencial ? linea.nombre : 'Mi desempeño'}
             seccion="tablero"
-            pestanas={puedeOperar}
+            pestanas
             antetitulo={esSuInicio ? `${saludo()}, ${auth.user.name.split(' ')[0]}` : 'Línea de servicio'}
             acciones={
                 <div className="flex flex-wrap items-center gap-2">
@@ -169,7 +169,7 @@ export default function TableroLogistica(props: Props) {
                         </span>
                         <h2 className="mt-4 text-lg font-bold">Aún no hay entregas en este periodo</h2>
                         <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                            {puedeOperar
+                            {puede('cargas.subir')
                                 ? 'Carga la preliquidación de Drivin en «Cargas Drivin» para que el sistema consolide el informe diario y calcule los indicadores.'
                                 : gerencial
                                   ? 'Cuando se cargue la preliquidación de Drivin de esta operación, verás aquí sus indicadores.'

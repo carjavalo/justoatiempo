@@ -18,6 +18,7 @@ import { MapPin, MapPinned, Plus } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,7 @@ const CIUDADES = [
 const nombreSede = (s: Sede) => [s.nombre, s.empresa].filter(Boolean).join(' · ') + (s.activo ? '' : ' (inactiva)');
 
 export default function Sucursales({ sucursales, total, filtros, sedes }: Props) {
+    const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('sucursales.index'), filtros);
     const [abierto, setAbierto] = useState(false);
     const [editando, setEditando] = useState<FilaSucursal | null>(null);
@@ -138,7 +140,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                 <EncabezadoModulo
                     titulo="Sucursales"
                     descripcion="Los lugares donde se presta el servicio: las sucursales de cada sede (Cali Sur, Cañasgordas…) y las propias de Justo a Tiempo."
-                    accion={total > 0 && botonNueva('Nueva sucursal')}
+                    accion={total > 0 && puede('sucursales.crear') && botonNueva('Nueva sucursal')}
                 />
 
                 {total === 0 ? (
@@ -146,7 +148,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                         icono={MapPinned}
                         titulo="Aún no hay sucursales registradas"
                         texto="Registra la primera sucursal; después podrás asignarle personal en Usuarios."
-                        accion={botonNueva('Registrar la primera sucursal')}
+                        accion={puede('sucursales.crear') && botonNueva('Registrar la primera sucursal')}
                     />
                 ) : (
                     <>
@@ -264,7 +266,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                                                     varios="usuarios"
                                                     ninguno="Ninguno"
                                                     de={`la sucursal ${s.nombre}`}
-                                                    href={route('usuarios.index', { sucursal: s.id })}
+                                                    href={puede('usuarios.ver') ? route('usuarios.index', { sucursal: s.id }) : undefined}
                                                 />
                                             </td>
                                             <td className={claseTd}>
@@ -274,8 +276,8 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                                                 <AccionesFila
                                                     nombre={`la sucursal ${s.nombre}`}
                                                     activo={s.activo}
-                                                    urlEstado={route('sucursales.estado', s.id)}
-                                                    onEditar={(boton) => abrir(s, boton)}
+                                                    urlEstado={puede('sucursales.estado') ? route('sucursales.estado', s.id) : undefined}
+                                                    onEditar={puede('sucursales.editar') ? (boton) => abrir(s, boton) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevos usuarios; ${s.usuarios === 1 ? 'el usuario que tiene se conserva' : s.usuarios > 1 ? `los ${s.usuarios} usuarios que tiene se conservan` : 'no tiene usuarios asignados'}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>

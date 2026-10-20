@@ -18,6 +18,7 @@ import { Plus, Store } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
@@ -60,6 +61,7 @@ const formatoMeta = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 })
  * efectividad pactada y sus sucursales.
  */
 export default function Sedes({ sedes, total, filtros, empresas }: Props) {
+    const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('sedes.index'), filtros);
     const [abierto, setAbierto] = useState(false);
     const [editando, setEditando] = useState<FilaSede | null>(null);
@@ -110,7 +112,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                 <EncabezadoModulo
                     titulo="Sedes"
                     descripcion="Las sedes de cada empresa (por ejemplo, TuGo y Sodimac, de Ditranza), con su meta de efectividad."
-                    accion={total > 0 && botonNueva('Nueva sede')}
+                    accion={total > 0 && puede('sedes.crear') && botonNueva('Nueva sede')}
                 />
 
                 {total === 0 ? (
@@ -118,7 +120,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                         icono={Store}
                         titulo="Aún no hay sedes registradas"
                         texto="Registra la primera sede; después podrás crear sus sucursales."
-                        accion={botonNueva('Registrar la primera sede')}
+                        accion={puede('sedes.crear') && botonNueva('Registrar la primera sede')}
                     />
                 ) : (
                     <>
@@ -223,7 +225,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                     varios="sucursales"
                                                     ninguno="Ninguna"
                                                     de={`la sede ${s.nombre}`}
-                                                    href={route('sucursales.index', { sede: s.id })}
+                                                    href={puede('sucursales.ver') ? route('sucursales.index', { sede: s.id }) : undefined}
                                                 />
                                             </td>
                                             <td className={claseTd}>
@@ -233,7 +235,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                     varios="usuarios"
                                                     ninguno="Ninguno"
                                                     de={`la sede ${s.nombre}`}
-                                                    href={route('usuarios.index', { sede: s.id })}
+                                                    href={puede('usuarios.ver') ? route('usuarios.index', { sede: s.id }) : undefined}
                                                 />
                                             </td>
                                             <td className={claseTd}>
@@ -243,8 +245,8 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                 <AccionesFila
                                                     nombre={`la sede ${s.nombre}`}
                                                     activo={s.activo}
-                                                    urlEstado={route('sedes.estado', s.id)}
-                                                    onEditar={(boton) => abrir(s, boton)}
+                                                    urlEstado={puede('sedes.estado') ? route('sedes.estado', s.id) : undefined}
+                                                    onEditar={puede('sedes.editar') ? (boton) => abrir(s, boton) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevas sucursales ni usuarios; ${s.sucursales === 1 ? 'su sucursal se conserva' : s.sucursales > 1 ? `sus ${s.sucursales} sucursales se conservan` : 'no tiene sucursales'}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>

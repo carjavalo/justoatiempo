@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\Rol;
 use App\Notifications\RestablecerContrasena;
+use App\Support\Permisos;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -164,8 +165,7 @@ class User extends Authenticatable
         return $this->belongsTo(Sucursal::class);
     }
 
-    /** Línea de servicio en la que trabaja (los administradores no tienen: ven todas). */
-    /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con su nivel de acceso a la plataforma. */
+    /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con sus permisos en la plataforma. */
     public function rolUsuario(): BelongsTo
     {
         return $this->belongsTo(RolUsuario::class, 'rol_id');
@@ -177,23 +177,92 @@ class User extends Authenticatable
         return $this->rolUsuario?->nombre ?? $this->rol->label();
     }
 
+    /** Línea de servicio en la que trabaja (sin línea, si su rol ve todas). */
     public function linea(): BelongsTo
     {
         return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
     }
 
-    public function puedeVerLinea(LineaServicio $linea): bool
+    /** Alcance de lo que ve de la operación, según su rol (App\Support\Permisos). */
+    public function alcance(): string
     {
-        return $this->esAdmin() || $this->linea_servicio_id === $linea->id;
+        return $this->rolUsuario?->alcance ?? Permisos::ALCANCE_PROPIO;
+    }
+
+    /** Si su rol, tal cual, tiene el permiso (sin mirar su asignación). */
+    public function rolPermite(string $permiso): bool
+    {
+        return (bool) $this->rolUsuario?->permite($permiso);
     }
 
     /**
-     * Límites de lo que ve quien no es administrador: si está asignado a una empresa solo ve esa
-     * empresa, y dentro de ella su sede y su sucursal si las tiene.
+     * Lo que de verdad puede hacer: los permisos de su rol, menos las herramientas que no le aplican. Quien ve solo
+     * su empresa no abre las que reúnen todas las empresas, y las de logística son solo de quien trabaja en ella.
+     *
+     * @return list<string>
+     */
+    public function permisos(): array
+    {
+        return array_values(array_filter(
+            $this->rolUsuario?->permisos ?? [],
+            fn (string $permiso) => $this->motivoSinPermiso($permiso) === null,
+        ));
+    }
+
+    public function puede(string $permiso): bool
+    {
+        return in_array($permiso, $this->permisos(), true);
+    }
+
+    /** Si puede al menos uno de los permisos. */
+    public function puedeAlguno(string ...$permisos): bool
+    {
+        return array_intersect($permisos, $this->permisos()) !== [];
+    }
+
+    /** Por qué no puede usar un permiso (null si sí puede): para que el aviso diga la causa real. */
+    public function motivoSinPermiso(string $permiso): ?string
+    {
+        if (! $this->rolPermite($permiso)) {
+            return 'Tu rol no tiene permiso para entrar a esta sección.';
+        }
+
+        $modulo = strstr($permiso, '.', true);
+        if (in_array($modulo, Permisos::MEZCLAN_EMPRESAS, true) && $this->empresaFija() !== null) {
+            return 'Esta sección reúne la operación de todas las empresas: no está disponible para quien presta el servicio en una sola.';
+        }
+        if (in_array($modulo, Permisos::DE_LOGISTICA, true) && ! $this->rolPermite(Permisos::TODAS_LAS_LINEAS)
+            && $this->linea?->modulo !== LineaServicio::LOGISTICA) {
+            return 'Esta herramienta es de otra línea de servicio.';
+        }
+
+        return null;
+    }
+
+    public function puedeVerLinea(LineaServicio $linea): bool
+    {
+        return $this->puede('tablero.ver') && ($this->puede(Permisos::TODAS_LAS_LINEAS) || $this->linea_servicio_id === $linea->id);
+    }
+
+    /** Si su rol abre algún módulo de la administración (usuarios, roles, empresas…). */
+    public function administraAlgo(): bool
+    {
+        foreach (array_keys(Permisos::CATALOGO[0]['modulos']) as $modulo) {
+            if ($this->puede("{$modulo}.ver")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Límites de lo que ve de la operación: con alcance "su asignación" (o "solo lo suyo") y una empresa asignada,
+     * solo esa empresa, y dentro de ella su sede y su sucursal si las tiene.
      */
     public function empresaFija(): ?int
     {
-        return $this->esAdmin() ? null : $this->empresa_id;
+        return $this->alcance() === Permisos::ALCANCE_TODO ? null : $this->empresa_id;
     }
 
     /** Sede y sucursal solo limitan dentro de una empresa: la sucursal propia del personal de JaT es su ubicación. */
@@ -207,28 +276,34 @@ class User extends Authenticatable
         return $this->empresaFija() === null ? null : $this->sucursal_id;
     }
 
-    /** Página de inicio: el panel para el administrador; para los demás, su línea. */
+    /** Si en el tablero solo ve su propio desempeño. */
+    public function soloLoSuyo(): bool
+    {
+        return $this->alcance() === Permisos::ALCANCE_PROPIO;
+    }
+
+    /** Página de inicio: el panel si administra algo o ve todas las líneas; si no, su línea (si puede verla). */
     public function inicio(): array
     {
-        if (! $this->esAdmin() && $this->linea) {
+        if (! $this->administraAlgo() && ! $this->puede(Permisos::TODAS_LAS_LINEAS) && $this->linea && $this->puedeVerLinea($this->linea)) {
             return ['titulo' => $this->linea->nombre, 'volver' => "Volver a {$this->linea->nombre}", 'url' => route('lineas.show', $this->linea, false)];
         }
 
         return ['titulo' => 'Panel', 'volver' => 'Volver al panel', 'url' => route('panel', [], false)];
     }
 
-    public function tieneRol(Rol ...$roles): bool
+    /**
+     * Si puede tocar a esta persona (editarla, desactivarla): solo a quien tiene, como mucho, sus mismos permisos.
+     * Así nadie toma la cuenta de alguien con más acceso que el suyo.
+     */
+    public function cubreA(User $otro): bool
     {
-        return in_array($this->rol, $roles, true);
+        return $this->is($otro) || ($this->rolUsuario !== null && $otro->rolUsuario !== null && $this->rolUsuario->cubre($otro->rolUsuario));
     }
 
+    /** Nivel de agrupación (administrador, coordinador o auxiliar); no da acceso: eso lo dan los permisos. */
     public function esAdmin(): bool
     {
         return $this->rol === Rol::Admin;
-    }
-
-    public function puedeGestionarOperacion(): bool
-    {
-        return $this->tieneRol(Rol::Admin, Rol::Coordinador);
     }
 }

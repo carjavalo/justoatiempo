@@ -1,10 +1,8 @@
 <?php
 
 use App\Http\Middleware\CerrarSesionInactiva;
-use App\Http\Middleware\EnsureLinea;
-use App\Http\Middleware\EnsureRol;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\SoloPersonalPropio;
+use App\Http\Middleware\TienePermiso;
 use App\Http\Middleware\VistaPreviaPublica;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
@@ -37,10 +35,9 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Cada sección pide un permiso del rol de la persona (App\Support\Permisos)
         $middleware->alias([
-            'rol' => EnsureRol::class,
-            'personal' => SoloPersonalPropio::class,
-            'linea' => EnsureLinea::class,
+            'permiso' => TienePermiso::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

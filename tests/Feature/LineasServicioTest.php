@@ -124,14 +124,15 @@ class LineasServicioTest extends TestCase
 
         $this->actingAs($this->admin)->get('/lineas/aseo-general')
             ->assertInertia(fn (Assert $p) => $p->component('lineas/linea')
-                ->where('esAdmin', true)
+                ->where('puedeEmpresas', true)
+                ->where('puedeUsuarios', true)
                 ->has('empresas', 1)
                 ->where('empresas.0.nombre', 'Bodegas del Valle')
                 ->where('empresas.0.sedes', 1)
                 ->where('empresas.0.sucursales', 1)
                 ->where('empresas.0.personas', 1)
-                ->where('personal.0.total', 1)
-                ->where('personal.1.total', 2));
+                // Por rol de la empresa, de más a menos personas
+                ->where('personal', [['rol' => 'Auxiliar operativo', 'total' => 2], ['rol' => 'Coordinador / Supervisor', 'total' => 1]]));
     }
 
     // --- Tablero de logística por sede -------------------------------------------------
@@ -178,7 +179,7 @@ class LineasServicioTest extends TestCase
         // Asignado a la sucursal: solo su sucursal
         $deSucursal = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id, 'sucursal_id' => $caliSur->id]);
         $this->actingAs($deSucursal)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'TuGo · Cali Sur')->where('puedeOperar', false));
+            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'TuGo · Cali Sur')->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver')));
     }
 
     public function test_con_alcance_fijo_no_se_ven_acciones_ni_cargas_de_otras_operaciones(): void
@@ -205,7 +206,7 @@ class LineasServicioTest extends TestCase
 
         // La sucursal propia es su ubicación, no un filtro de la operación
         $this->actingAs($coordinador)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 4)->where('alcanceFijo', null)->where('puedeOperar', true));
+            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 4)->where('alcanceFijo', null)->where('auth.permisos', fn ($permisos) => collect($permisos)->contains('cargas.ver')));
     }
 
     public function test_una_sede_desactivada_conserva_su_historial_en_el_tablero(): void
@@ -275,7 +276,7 @@ class LineasServicioTest extends TestCase
             ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio.']);
         // "Todas las líneas" es solo para administradores
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id, 'linea_id' => 'todas'])
-            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio en la que trabaja: "Todas" es solo para administradores.']);
+            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio en la que trabaja: "Todas" es solo para roles que ven todas las líneas.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'linea_id' => $this->aseo->id, 'empresa_id' => $empresa->id])
             ->assertSessionHasErrors(['empresa_id' => 'Esta empresa no recibe la línea de servicio elegida.']);
 

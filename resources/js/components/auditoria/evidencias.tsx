@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { usePuede } from '@/hooks/use-puede';
 import { TIPOS_FOTO, type TipoEvidencia } from '@/lib/protocolo';
 import { subirEnTandas } from '@/lib/subida';
 import { cn } from '@/lib/utils';
@@ -179,6 +180,9 @@ function VisorPdf({ evidencia }: { evidencia: EvidenciaOrden }) {
 }
 
 export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: number; evidencias: EvidenciaOrden[]; deshabilitado: boolean }) {
+    // Cada acción con su permiso: clasificar es revisar; subir y eliminar evidencias, los suyos
+    const puede = usePuede();
+    const puedeEliminar = puede('auditoria.eliminar');
     const pdfs = evidencias.filter((e) => e.esPdf);
     // Fotos en el orden del protocolo: fachada, sellado, destapado, remesa, rótulo y sin clasificar
     const orden = (t: string) => TIPOS_FOTO.findIndex((x) => x.valor === t);
@@ -211,7 +215,7 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                                     <span className="sr-only">Descargar {p.nombre}</span>
                                 </a>
                             </Button>
-                            <EliminarEvidencia evidencia={p} deshabilitado={deshabilitado} />
+                            {puedeEliminar && <EliminarEvidencia evidencia={p} deshabilitado={deshabilitado} />}
                         </div>
                     </div>
                 ))}
@@ -232,16 +236,16 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                                 </button>
                                 <div className="flex items-center gap-1 p-2">
                                     <div className="min-w-0 flex-1">
-                                        <TipoFoto evidencia={f} deshabilitado={deshabilitado} />
+                                        <TipoFoto evidencia={f} deshabilitado={deshabilitado || !puede('auditoria.revisar')} />
                                     </div>
-                                    <EliminarEvidencia evidencia={f} deshabilitado={deshabilitado} />
+                                    {puedeEliminar && <EliminarEvidencia evidencia={f} deshabilitado={deshabilitado} />}
                                 </div>
                             </li>
                         ))}
                     </ul>
                 )}
 
-                {!deshabilitado && <AgregarEvidencias ordenId={ordenId} deshabilitado={deshabilitado} />}
+                {!deshabilitado && puede('auditoria.subir') && <AgregarEvidencias ordenId={ordenId} deshabilitado={deshabilitado} />}
             </div>
 
             <Ampliacion fotos={fotos} indice={ampliada} onCambio={setAmpliada} onCerrar={() => setAmpliada(null)} />

@@ -152,7 +152,8 @@ class CargaController extends Controller
             'errores' => $carga->errores ?? [],
             'informes' => $informes,
             'puedeAnular' => $carga->estado !== EstadoCarga::Anulada
-                && ! $informes->contains(fn ($i) => $i['estado'] === 'cerrado'),
+                && ! $informes->contains(fn ($i) => $i['estado'] === 'cerrado')
+                && request()->user()->puede('cargas.anular'),
         ]);
     }
 

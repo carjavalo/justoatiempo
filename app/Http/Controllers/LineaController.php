@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Rol;
 use App\Models\LineaServicio;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,7 +13,9 @@ class LineaController extends Controller
     public function show(Request $request, LineaServicio $linea): Response
     {
         $user = $request->user();
-        abort_unless($user->puedeVerLinea($linea), 403, 'No trabajas en esta línea de servicio.');
+        abort_unless($user->puedeVerLinea($linea), 403, $user->puede('tablero.ver')
+            ? 'No trabajas en esta línea de servicio.'
+            : 'Tu rol no tiene permiso para ver el tablero de la línea.');
 
         if ($linea->esLogistica()) {
             return app(DashboardController::class)->mostrar($request, $linea);
@@ -31,9 +32,12 @@ class LineaController extends Controller
             ->orderBy('nombre')
             ->get(['empresas.id', 'nombre', 'activo']);
 
-        $activos = fn () => $linea->usuarios()->where('activo', true)
-            ->when($empresaFija, fn ($q) => $q->where('empresa_id', $empresaFija));
-        $personal = $activos()->selectRaw('rol, count(*) as total')->groupBy('rol')->pluck('total', 'rol');
+        $activos = fn () => $linea->usuarios()->where('users.activo', true)
+            ->when($empresaFija, fn ($q) => $q->where('users.empresa_id', $empresaFija));
+        // El personal por rol de la empresa ("Conductor", "Auxiliar operativo"…), de más a menos personas
+        $personal = $activos()->join('roles', 'roles.id', '=', 'users.rol_id')
+            ->selectRaw('roles.nombre as rol, count(*) as total')->groupBy('roles.nombre')
+            ->orderByDesc('total')->orderBy('roles.nombre')->toBase()->get();
         $porEmpresa = $activos()->whereNotNull('empresa_id')->selectRaw('empresa_id, count(*) as total')->groupBy('empresa_id')->pluck('total', 'empresa_id');
 
         return Inertia::render('lineas/linea', [
@@ -46,8 +50,10 @@ class LineaController extends Controller
                 'sucursales' => $e->sucursales_count,
                 'personas' => (int) ($porEmpresa[$e->id] ?? 0),
             ]),
-            'personal' => array_map(fn (Rol $r) => ['rol' => $r->label(), 'total' => (int) ($personal[$r->value] ?? 0)], [Rol::Coordinador, Rol::Auxiliar]),
-            'esAdmin' => $user->esAdmin(),
+            'personal' => $personal->map(fn ($p) => ['rol' => $p->rol, 'total' => (int) $p->total]),
+            // Enlaces a la administración, si su rol la abre
+            'puedeEmpresas' => $user->puede('empresas.editar'),
+            'puedeUsuarios' => $user->puede('usuarios.ver'),
         ]);
     }
 }

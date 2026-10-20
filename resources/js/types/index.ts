@@ -2,6 +2,8 @@ export type Rol = 'admin' | 'coordinador' | 'auxiliar';
 
 export interface Auth {
     user: User;
+    /** Lo que puede hacer ("usuarios.ver", "cargas.subir"…): los permisos de su rol que le aplican. */
+    permisos: string[];
 }
 
 /** Destino del enlace "Volver" de una página: el nivel anterior. */
@@ -38,9 +40,8 @@ export interface User {
     segundo_apellido: string | null;
     email: string;
     avatar?: string;
-    rol: Rol;
+    /** Su rol dentro de la empresa ("Conductor"). */
     rol_label: string;
-    /** Inicio de la persona: el panel (administrador) o la línea en la que trabaja. */
     /** Primera página de quien ingresa (el panel o su línea) y el texto del enlace para volver a ella. */
     inicio: { titulo: string; volver: string; url: string };
     linea: { slug: string; nombre: string } | null;

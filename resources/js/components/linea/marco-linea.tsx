@@ -1,4 +1,5 @@
 import { ClipboardCheck, Layers, LayoutGrid, type TipoIcono, UploadCloud } from '@/components/iconos';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { SERVICIOS } from '@/lib/portafolio';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
@@ -8,10 +9,10 @@ import { type ReactNode } from 'react';
 
 export type SeccionLogistica = 'tablero' | 'cargas' | 'auditoria';
 
-const PESTANAS_LOGISTICA: { id: SeccionLogistica; texto: string; icono: TipoIcono; href: (slug: string) => string }[] = [
-    { id: 'tablero', texto: 'Tablero', icono: LayoutGrid, href: (slug) => route('lineas.show', slug) },
-    { id: 'cargas', texto: 'Cargas Drivin', icono: UploadCloud, href: () => route('cargas.index') },
-    { id: 'auditoria', texto: 'Auditoría POD', icono: ClipboardCheck, href: () => route('auditoria.index') },
+const PESTANAS_LOGISTICA: { id: SeccionLogistica; texto: string; icono: TipoIcono; href: (slug: string) => string; permiso: string }[] = [
+    { id: 'tablero', texto: 'Tablero', icono: LayoutGrid, href: (slug) => route('lineas.show', slug), permiso: 'tablero.ver' },
+    { id: 'cargas', texto: 'Cargas Drivin', icono: UploadCloud, href: () => route('cargas.index'), permiso: 'cargas.ver' },
+    { id: 'auditoria', texto: 'Auditoría POD', icono: ClipboardCheck, href: () => route('auditoria.index'), permiso: 'auditoria.ver' },
 ];
 
 /** La línea de las herramientas de Drivin (sus páginas no reciben la línea desde el servidor). */
@@ -30,6 +31,7 @@ interface Props {
      * no muestra las pestañas: su "Volver" ya lleva a la de su sección.
      */
     paginaDeLaPestana?: boolean;
+    /** Si la página es de la línea de logística: muestra las pestañas que el rol permite (si son más de una). */
     pestanas?: boolean;
     /** Texto pequeño sobre el nombre de la línea. */
     antetitulo?: string;
@@ -57,6 +59,7 @@ export function MarcoLinea({
     children,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
+    const puede = usePuede();
     const servicio = SERVICIOS.find((s) => s.id === slug);
     const Icono = servicio?.icono ?? Layers;
     const nombreLinea = nombre ?? servicio?.nombre ?? 'Línea de servicio';
@@ -71,7 +74,9 @@ export function MarcoLinea({
         : esInicio
           ? false
           : undefined;
-    const verPestanas = pestanas && paginaDeLaPestana;
+    // Solo las herramientas que su rol abre; con una sola, no hay entre qué cambiar
+    const pestanasVisibles = PESTANAS_LOGISTICA.filter((p) => puede(p.permiso));
+    const verPestanas = pestanas && paginaDeLaPestana && pestanasVisibles.length > 1;
 
     return (
         <AppLayout volver={volver}>
@@ -103,7 +108,7 @@ export function MarcoLinea({
                 {verPestanas && (
                     <nav aria-label={`Herramientas de ${nombreLinea}`} className="-mt-1 border-b">
                         <ul role="list" className="-mb-px flex gap-1 overflow-x-auto">
-                            {PESTANAS_LOGISTICA.map(({ id, texto, icono: IconoPestana, href }) => {
+                            {pestanasVisibles.map(({ id, texto, icono: IconoPestana, href }) => {
                                 const activa = id === seccion;
                                 return (
                                     <li key={id} className="shrink-0">

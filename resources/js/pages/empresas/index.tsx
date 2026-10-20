@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { digitoVerificacion, formatearNit, partesNit } from '@/lib/nit';
@@ -56,6 +57,7 @@ function seConserva(n: number, uno: string, varios: string): string {
 }
 
 export default function Empresas({ empresas, total, filtros, lineas }: Props) {
+    const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('empresas.index'), filtros);
     const [abierto, setAbierto] = useState(false);
     const [editando, setEditando] = useState<FilaEmpresa | null>(null);
@@ -107,14 +109,14 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
 
             <div className={contenedorModulo}>
                 {/* Sin empresas, la acción vive en el estado vacío: un solo botón para crear */}
-                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditranza), con su contacto y las líneas de servicio que reciben." accion={total > 0 && botonNueva('Nueva empresa')} />
+                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditranza), con su contacto y las líneas de servicio que reciben." accion={total > 0 && puede('empresas.crear') && botonNueva('Nueva empresa')} />
 
                 {total === 0 ? (
                     <EstadoVacio
                         icono={Building2}
                         titulo="Aún no hay empresas registradas"
                         texto="Registra cada empresa cliente con su razón social, NIT y contacto. Después podrás crear sus sedes y asignarles usuarios."
-                        accion={botonNueva('Registrar la primera empresa')}
+                        accion={puede('empresas.crear') && botonNueva('Registrar la primera empresa')}
                     />
                 ) : (
                     <>
@@ -215,10 +217,10 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                                 )}
                                             </td>
                                             <td className={claseTd}>
-                                                <ConteoEnlace n={e.sedes} uno="sede" varios="sedes" ninguno="Ninguna" de={e.nombre} href={route('sedes.index', { empresa: e.id })} />
+                                                <ConteoEnlace n={e.sedes} uno="sede" varios="sedes" ninguno="Ninguna" de={e.nombre} href={puede('sedes.ver') ? route('sedes.index', { empresa: e.id }) : undefined} />
                                             </td>
                                             <td className={claseTd}>
-                                                <ConteoEnlace n={e.usuarios} uno="usuario" varios="usuarios" ninguno="Ninguno" de={e.nombre} href={route('usuarios.index', { empresa: e.id })} />
+                                                <ConteoEnlace n={e.usuarios} uno="usuario" varios="usuarios" ninguno="Ninguno" de={e.nombre} href={puede('usuarios.ver') ? route('usuarios.index', { empresa: e.id }) : undefined} />
                                             </td>
                                             <td className={claseTd}>
                                                 <EstadoBadge activo={e.activo} femenino />
@@ -227,8 +229,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                                 <AccionesFila
                                                     nombre={e.nombre}
                                                     activo={e.activo}
-                                                    urlEstado={route('empresas.estado', e.id)}
-                                                    onEditar={(boton) => abrir(e, boton)}
+                                                    urlEstado={puede('empresas.estado') ? route('empresas.estado', e.id) : undefined}
+                                                    onEditar={puede('empresas.editar') ? (boton) => abrir(e, boton) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevas sedes ni usuarios. ${mayuscula(seConserva(e.sedes, 'sede', 'sedes'))} y ${seConserva(e.usuarios, 'usuario', 'usuarios')}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>

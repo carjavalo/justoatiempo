@@ -16,8 +16,11 @@ interface Empresa {
 interface Props {
     linea: { id: number; slug: string; nombre: string };
     empresas: Empresa[];
+    /** Personas activas de la línea por rol de la empresa ("Conductor", "Auxiliar operativo"…). */
     personal: { rol: string; total: number }[];
-    esAdmin: boolean;
+    /** Si su rol edita empresas (para asignarles la línea) y ve los usuarios. */
+    puedeEmpresas: boolean;
+    puedeUsuarios: boolean;
 }
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -27,7 +30,7 @@ const claseEnlace = 'text-primary focus-visible:ring-ring rounded-sm font-semibo
  * Línea de servicio que aún no tiene tablero propio: muestra a quién se le presta (empresas, sedes y sucursales)
  * y con qué personal. El tablero se agrega cuando se defina cómo controla su operación.
  */
-export default function Linea({ linea, empresas, personal, esAdmin }: Props) {
+export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeUsuarios }: Props) {
     const servicio = SERVICIOS.find((s) => s.id === linea.slug);
     const totalPersonas = personal.reduce((suma, p) => suma + p.total, 0);
 
@@ -43,7 +46,7 @@ export default function Linea({ linea, empresas, personal, esAdmin }: Props) {
                             <Building2 className="text-primary size-5" aria-hidden="true" />
                             Empresas
                         </h2>
-                        {esAdmin && (
+                        {puedeEmpresas && (
                             <Link href={route('empresas.index')} className={`${claseEnlace} text-sm`}>
                                 Asignar empresas
                             </Link>
@@ -51,7 +54,7 @@ export default function Linea({ linea, empresas, personal, esAdmin }: Props) {
                     </header>
                     {empresas.length === 0 ? (
                         <p className="text-muted-foreground px-5 py-8 text-sm">
-                            Ninguna empresa recibe esta línea todavía.{esAdmin && ' Márcala en el formulario de la empresa, en «Líneas de servicio que recibe».'}
+                            Ninguna empresa recibe esta línea todavía.{puedeEmpresas && ' Márcala en el formulario de la empresa, en «Líneas de servicio que recibe».'}
                         </p>
                     ) : (
                         <ul role="list" className="divide-y">
@@ -78,16 +81,19 @@ export default function Linea({ linea, empresas, personal, esAdmin }: Props) {
                                 <UsersRound className="text-primary size-5" aria-hidden="true" />
                                 Personal
                             </h2>
-                            {esAdmin && totalPersonas > 0 && (
+                            {puedeUsuarios && totalPersonas > 0 && (
                                 <Link href={route('usuarios.index', { linea: linea.id })} className={`${claseEnlace} text-sm`}>
                                     Ver personas
                                 </Link>
                             )}
                         </div>
-                        <dl className="mt-4 grid grid-cols-2 gap-3">
+                        {personal.length === 0 && <p className="text-muted-foreground mt-3 text-sm">Aún no hay personas activas en esta línea.</p>}
+                        <dl className="mt-4 grid grid-cols-2 gap-3 empty:hidden">
                             {personal.map((p) => (
                                 <div key={p.rol} className="bg-muted/60 rounded-xl px-4 py-3">
-                                    <dt className="text-muted-foreground text-xs">{p.rol}</dt>
+                                    <dt className="text-muted-foreground truncate text-xs" title={p.rol}>
+                                        {p.rol}
+                                    </dt>
                                     <dd className="text-2xl font-extrabold tabular-nums">{p.total}</dd>
                                 </div>
                             ))}

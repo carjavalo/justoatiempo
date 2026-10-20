@@ -1,4 +1,5 @@
 import { BotonEnviar } from '@/components/boton-enviar';
+import { usePuede } from '@/hooks/use-puede';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { evaluar, MIN_DESTAPADO, MIN_SELLADO, type Checklist } from '@/lib/protocolo';
@@ -120,7 +121,10 @@ export function FormularioAuditoria({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [evaluacion.novedad, evaluacion.concepto]);
 
-    const bloqueado = orden.informeCerrado;
+    const puede = usePuede();
+    // Solo lectura si el informe ya cerró o si su rol consulta las auditorías sin revisarlas
+    const sinPermiso = !puede('auditoria.revisar');
+    const bloqueado = orden.informeCerrado || sinPermiso;
     const sinEvidencia = data.sin_evidencia;
     const cambiar = <K extends keyof Checklist>(campo: K, valor: Checklist[K]) => setData(campo, valor as never);
 
@@ -148,7 +152,9 @@ export function FormularioAuditoria({
             {bloqueado && (
                 <p className="bg-muted text-muted-foreground mb-4 flex items-center gap-2 rounded-lg p-3 text-sm">
                     <Lock className="size-4 shrink-0" aria-hidden="true" />
-                    El informe de esta jornada ya está cerrado: la auditoría es de solo lectura.
+                    {orden.informeCerrado
+                        ? 'El informe de esta jornada ya está cerrado: la auditoría es de solo lectura.'
+                        : 'Tu rol puede consultar las auditorías, pero no revisarlas.'}
                 </p>
             )}
 

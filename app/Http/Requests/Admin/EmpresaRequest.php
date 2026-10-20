@@ -15,9 +15,10 @@ class EmpresaRequest extends FormRequest
 {
     use LimpiaTexto;
 
+    /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
     {
-        return (bool) $this->user()?->esAdmin();
+        return (bool) $this->user()?->puede($this->route('empresa') ? 'empresas.editar' : 'empresas.crear');
     }
 
     protected function prepareForValidation(): void

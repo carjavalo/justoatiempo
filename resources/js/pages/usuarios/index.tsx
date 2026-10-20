@@ -21,11 +21,12 @@ import { PasswordInput } from '@/components/password-input';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { fechaHoraCompleta, haceCuanto } from '@/lib/formato';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
-import { type Paginado, type Rol } from '@/types';
+import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -38,11 +39,13 @@ interface FilaUsuario {
     cedula: string | null;
     cargo: string | null;
     email: string;
-    /** Nivel de acceso del rol (admin, coordinador, auxiliar). */
-    rol: Rol;
     rolId: number | null;
     /** Rol dentro de la empresa (auxiliar, conductor…). */
     rolNombre: string;
+    /** Su rol ve todas las líneas (sin línea asignada, las tiene todas). */
+    todasLasLineas: boolean;
+    /** Si quien mira puede editarla o desactivarla: solo a quien tiene, como mucho, sus mismos permisos. */
+    editable: boolean;
     empresaId: number | null;
     empresa: string | null;
     sedeId: number | null;
@@ -73,7 +76,8 @@ interface Props {
     filtros: { q: string; rol: string; estado: string; empresa: string; sede: string; sucursal: string; linea: string };
     contexto: { empresa: string | null; sede: string | null; sucursal: string | null };
     /** Roles de la empresa, cada uno con su nivel de acceso en la plataforma. */
-    roles: { id: number; nombre: string; nivel: Rol; nivelLabel: string; nivelDescripcion: string; activo: boolean }[];
+    /** asignable: el rol de quien edita lo cubre (nadie da más acceso del que tiene). */
+    roles: { id: number; nombre: string; resumen: string; alcance: string; todasLasLineas: boolean; asignable: boolean; activo: boolean }[];
     /** Cada empresa con las líneas de servicio que recibe. */
     empresas: (Opcion & { lineas: number[] })[];
     sedes: (Opcion & { empresaId: number })[];
@@ -120,8 +124,6 @@ const ORDEN_CAMPOS = [
 /** Línea de un administrador que las tiene todas (se guarda sin línea). */
 const TODAS = 'todas';
 
-const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
-
 /** Contraseña aleatoria legible (sin 0/O ni 1/l/I) con mayúsculas, minúsculas, números y un símbolo. */
 function generarContrasena(): string {
     const grupos = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnpqrstuvwxyz', '23456789', '#$%&*+?'];
@@ -136,6 +138,7 @@ function generarContrasena(): string {
 }
 
 export default function Usuarios({ usuarios, total, filtros, contexto, roles, empresas, sedes, sucursales, lineas }: Props) {
+    const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('usuarios.index'), filtros);
     const [abierto, setAbierto] = useState(false);
     const [editando, setEditando] = useState<FilaUsuario | null>(null);
@@ -162,7 +165,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       cargo: usuario.cargo ?? '',
                       email: usuario.email,
                       rol_id: usuario.rolId ? String(usuario.rolId) : '',
-                      linea_id: usuario.lineaId ? String(usuario.lineaId) : usuario.rol === 'admin' ? TODAS : '',
+                      linea_id: usuario.lineaId ? String(usuario.lineaId) : usuario.todasLasLineas ? TODAS : '',
                       empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
                       sede_id: usuario.sedeId ? String(usuario.sedeId) : '',
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
@@ -180,16 +183,20 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
 
     const asignacionDesdeFiltros = () => {
         // Si la lista viene filtrada por línea (desde la página de una línea), el usuario nuevo trabaja en ella
-        const linea = lineas.some((l) => String(l.id) === valores.linea) ? { linea_id: valores.linea } : {};
+        const lineaFiltro = lineas.find((l) => String(l.id) === valores.linea);
+        const linea = lineaFiltro ? { linea_id: String(lineaFiltro.id) } : {};
         const sucursal = sucursales.find((u) => String(u.id) === valores.sucursal && u.activo);
         const sede = sedes.find((x) => (sucursal ? x.id === sucursal.sedeId : String(x.id) === valores.sede) && x.activo);
-        const empresa = empresas.find((e) => (sede ? e.id === sede.empresaId : String(e.id) === valores.empresa) && e.activo);
+        // La empresa solo se llena si está activa y recibe la línea del filtro (si no, el formulario no la ofrece)
+        const empresa = empresas.find(
+            (e) => (sede ? e.id === sede.empresaId : String(e.id) === valores.empresa) && e.activo && (!lineaFiltro || e.lineas.includes(lineaFiltro.id)),
+        );
         return {
             ...linea,
             ...(empresa && { empresa_id: String(empresa.id) }),
             ...(sede && empresa && { sede_id: String(sede.id) }),
-            // Una sucursal propia solo aplica sin empresa; una de sede, con su sede
-            ...(sucursal && (sucursal.sedeId === null ? !empresa : sede) && { sucursal_id: String(sucursal.id) }),
+            // Una sucursal propia solo aplica sin empresa; una de sede, con su sede y su empresa
+            ...(sucursal && (sucursal.sedeId === null ? !empresa : sede && empresa) && { sucursal_id: String(sucursal.id) }),
         };
     };
 
@@ -203,11 +210,11 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         else form.put(route('usuarios.update', editando.id), opciones);
     };
 
-    // El rol dice qué puede hacer en la plataforma: un administrador puede tener todas las líneas
+    // El rol dice qué puede hacer en la plataforma; si ve todas las líneas, la persona puede tenerlas todas
     const rolElegido = roles.find((r) => String(r.id) === form.data.rol_id);
-    const esAdmin = rolElegido?.nivel === 'admin';
-    // Se ofrecen los roles activos y, al editar, el que ya tiene aunque esté inactivo
-    const rolesFormulario = roles.filter((r) => r.activo || r.id === editando?.rolId);
+    const todasLasLineas = Boolean(rolElegido?.todasLasLineas);
+    // Se ofrecen los roles activos que el propio rol cubre y, al editar, el que ya tiene
+    const rolesFormulario = roles.filter((r) => (r.activo && r.asignable) || r.id === editando?.rolId);
 
     // Cascada línea → empresa → sede → sucursal: la empresa (donde presta el servicio) debe recibir la línea, la
     // sede es de la empresa y la sucursal, de la sede. Sin empresa no hay sede: solo las sucursales propias de Justo a Tiempo.
@@ -233,9 +240,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
     };
 
     const cambiarRol = (valor: string) => {
-        const admin = roles.find((r) => String(r.id) === valor)?.nivel === 'admin';
-        // "Todas las líneas" es solo para administradores: al dejar de serlo hay que elegir una
-        const linea = admin ? form.data.linea_id || TODAS : form.data.linea_id === TODAS ? '' : form.data.linea_id;
+        const todas = Boolean(roles.find((r) => String(r.id) === valor)?.todasLasLineas);
+        // "Todas las líneas" es solo para roles que las ven todas: con otro rol hay que elegir una
+        const linea = todas ? form.data.linea_id || TODAS : form.data.linea_id === TODAS ? '' : form.data.linea_id;
         form.setData((d) => ({ ...d, rol_id: valor, linea_id: linea }));
     };
     const cambiarLinea = (valor: string) => {
@@ -279,7 +286,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                 <EncabezadoModulo
                     titulo="Usuarios"
                     descripcion="Quién puede ingresar a la plataforma, con qué rol, en qué línea y dónde trabaja (empresa, sede y sucursal)."
-                    accion={total > 0 && botonNuevo('Nuevo usuario')}
+                    accion={total > 0 && puede('usuarios.crear') && botonNuevo('Nuevo usuario')}
                 />
 
                 {total === 0 ? (
@@ -287,7 +294,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         icono={UsersRound}
                         titulo="Aún no hay usuarios"
                         texto="Crea el acceso de cada persona con su rol, su línea y dónde trabaja."
-                        accion={botonNuevo('Crear el primer usuario')}
+                        accion={puede('usuarios.crear') && botonNuevo('Crear el primer usuario')}
                     />
                 ) : (
                     <>
@@ -441,7 +448,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                         {u.linea}
                                                     </p>
                                                 ) : (
-                                                    <span className="text-muted-foreground text-xs">{u.rol === 'admin' ? 'Todas' : 'Sin línea asignada'}</span>
+                                                    <span className="text-muted-foreground text-xs">{u.todasLasLineas ? 'Todas' : 'Sin línea asignada'}</span>
                                                 )}
                                             </td>
                                             <td className={claseTd}>
@@ -485,9 +492,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                 <AccionesFila
                                                     nombre={u.nombre}
                                                     activo={u.activo}
-                                                    // Nadie se desactiva a sí mismo
-                                                    urlEstado={u.esUsted ? undefined : route('usuarios.estado', u.id)}
-                                                    onEditar={(boton) => abrir(u, boton)}
+                                                    // Nadie se desactiva a sí mismo, ni toca a quien tiene más permisos que él
+                                                    urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
+                                                    onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
                                                     consecuencia="Perderá el acceso de inmediato, incluso si tiene la sesión abierta. Podrás devolverle el acceso cuando quieras."
                                                     enlaces={[{ texto: 'Ver carnet', href: route('usuarios.carnet', u.id), icono: IdCard }]}
                                                 />
@@ -595,8 +602,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     requerido
                     ayuda={
                         rolElegido
-                            ? `Accede como ${rolElegido.nivelLabel.toLowerCase()}: ${minuscula(rolElegido.nivelDescripcion)}`
-                            : 'Su rol dentro de la empresa. Los roles se crean en la sección Roles.'
+                            ? `${rolElegido.resumen} · ${rolElegido.alcance}. Sus permisos se cambian en la sección Roles.`
+                            : 'Su rol dentro de la empresa. Los roles y sus permisos se crean en la sección Roles.'
                     }
                     error={form.errors.rol_id}
                 >
@@ -608,8 +615,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         opciones={rolesFormulario.map((r) => ({
                             valor: String(r.id),
                             texto: r.activo ? r.nombre : `${r.nombre} (inactivo)`,
-                            // Con su acceso, salvo que el nombre ya lo diga (los roles base)
-                            detalle: r.nombre === r.nivelLabel ? undefined : `Accede como ${r.nivelLabel.toLowerCase()}`,
+                            // Lo que permite, en corto
+                            detalle: r.resumen,
                         }))}
                     />
                 </Campo>
@@ -618,7 +625,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     id="linea_id"
                     etiqueta="Línea de servicio"
                     requerido
-                    ayuda={esAdmin ? 'Como administrador puede tenerlas todas, o la línea en la que trabaja.' : 'Al ingresar entrará directo a esta línea.'}
+                    ayuda={todasLasLineas ? 'Su rol ve todas las líneas: puede tenerlas todas o la línea en la que trabaja.' : 'Al ingresar entrará directo a esta línea.'}
                     error={form.errors.linea_id}
                 >
                     <Selector
@@ -628,7 +635,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         placeholder="Elige la línea en la que trabaja"
                         // "Todas" está siempre en la lista (si apareciera junto con su elección, la lista no la tomaría)
                         opciones={[
-                            { valor: TODAS, texto: 'Todas las líneas', detalle: esAdmin ? undefined : 'Solo para administradores', deshabilitada: !esAdmin },
+                            { valor: TODAS, texto: 'Todas las líneas', detalle: todasLasLineas ? undefined : 'Solo para roles que ven todas', deshabilitada: !todasLasLineas },
                             ...lineas.map((l) => ({ valor: String(l.id), texto: l.nombre })),
                         ]}
                     />

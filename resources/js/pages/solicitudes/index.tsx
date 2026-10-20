@@ -2,6 +2,7 @@ import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/componen
 import { contenedorModulo, EncabezadoModulo, EstadoVacio, Iniciales, Paginacion, SinResultados } from '@/components/admin/piezas';
 import { Bandeja, Check, Mail, Phone, Undo2 } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
+import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { fechaHoraCompleta, haceCuanto } from '@/lib/formato';
 import { cn } from '@/lib/utils';
@@ -113,6 +114,7 @@ export default function Solicitudes({ solicitudes, total, pendientes, filtros }:
 }
 
 function TarjetaSolicitud({ solicitud: s }: { solicitud: Solicitud }) {
+    const puede = usePuede();
     const [procesando, setProcesando] = useState(false);
     const titulo = `solicitud-${s.id}`;
 
@@ -205,24 +207,27 @@ function TarjetaSolicitud({ solicitud: s }: { solicitud: Solicitud }) {
                     </div>
                 </dl>
 
-                <div className={cn('mt-5 flex flex-wrap items-center gap-3 border-t pt-4', s.atendida ? 'justify-between' : 'justify-end')}>
+                <div className={cn('mt-5 flex flex-wrap items-center gap-3 border-t pt-4 empty:hidden', s.atendida ? 'justify-between' : 'justify-end')}>
                     {s.atendida && s.atendidaEn && (
                         <p className="text-muted-foreground text-xs">
                             Atendida por {s.atendidaPor ?? 'un usuario que ya no existe'} el {fechaHoraCompleta.format(new Date(s.atendidaEn))}
                         </p>
                     )}
-                    <Button
-                        type="button"
-                        variant={s.atendida ? 'outline' : 'default'}
-                        onClick={cambiarAtencion}
-                        aria-disabled={procesando || undefined}
-                        aria-describedby={titulo}
-                        data-accion-solicitud={s.id}
-                        className="h-9 rounded-lg px-3.5 font-semibold aria-disabled:cursor-wait aria-disabled:opacity-70"
-                    >
-                        {s.atendida ? <Undo2 className="size-4" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
-                        {s.atendida ? 'Volver a pendientes' : 'Marcar como atendida'}
-                    </Button>
+                    {/* Marcarla pide su permiso; sin él, la tarjeta solo se consulta */}
+                    {puede('solicitudes.atender') && (
+                        <Button
+                            type="button"
+                            variant={s.atendida ? 'outline' : 'default'}
+                            onClick={cambiarAtencion}
+                            aria-disabled={procesando || undefined}
+                            aria-describedby={titulo}
+                            data-accion-solicitud={s.id}
+                            className="h-9 rounded-lg px-3.5 font-semibold aria-disabled:cursor-wait aria-disabled:opacity-70"
+                        >
+                            {s.atendida ? <Undo2 className="size-4" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
+                            {s.atendida ? 'Volver a pendientes' : 'Marcar como atendida'}
+                        </Button>
+                    )}
                 </div>
             </article>
         </li>

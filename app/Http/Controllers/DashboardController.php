@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
-use App\Enums\Rol;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\Carga;
@@ -33,7 +32,8 @@ class DashboardController extends Controller
     public function mostrar(Request $request, LineaServicio $linea): Response
     {
         $user = $request->user();
-        $esAuxiliar = $user->rol === Rol::Auxiliar;
+        // Con alcance "solo lo suyo" (p. ej. el auxiliar) el tablero muestra únicamente su desempeño
+        $esAuxiliar = $user->soloLoSuyo();
         $empleadoId = $esAuxiliar ? ($user->empleado_id ?? 0) : null;
 
         // Alcance: las sedes de las empresas que reciben la línea. Quien está asignado a una empresa queda
@@ -81,8 +81,6 @@ class DashboardController extends Controller
 
         return Inertia::render('lineas/logistica', [
             'linea' => ['slug' => $linea->slug, 'nombre' => $linea->nombre],
-            // Las herramientas (cargas, auditoría) mezclan empresas: solo para el personal propio
-            'puedeOperar' => $user->puedeGestionarOperacion() && $empresaFija === null,
             // Lo más específico a lo que está asignado: "TuGo · Cali Sur", "TuGo" o "Ditranza"
             'alcanceFijo' => $this->alcanceFijo($user),
             'filtros' => [

@@ -2,13 +2,13 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Enums\Rol;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\RolUsuario;
 use App\Models\Sede;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Support\Permisos;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,12 +19,17 @@ class UsuarioRequest extends FormRequest
 {
     use LimpiaTexto;
 
-    /** Línea elegida para un administrador que ve todas (se guarda sin línea). */
+    /** Línea elegida para quien ve todas (su rol lo permite; se guarda sin línea). */
     public const TODAS = 'todas';
 
+    /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
     {
-        return (bool) $this->user()?->esAdmin();
+        $usuario = $this->route('usuario');
+
+        // Nadie edita a alguien con más acceso que el suyo (podría tomar su cuenta cambiándole la contraseña)
+        return (bool) $this->user()?->puede($usuario ? 'usuarios.editar' : 'usuarios.crear')
+            && (! $usuario || $this->user()->cubreA($usuario));
     }
 
     protected function prepareForValidation(): void
@@ -75,7 +80,7 @@ class UsuarioRequest extends FormRequest
         ];
     }
 
-    /** Una línea que exista, o "todas" (solo administradores; se revisa después). */
+    /** Una línea que exista, o "todas" (solo si el rol ve todas; se revisa después). */
     private function idOTodas(): Closure
     {
         return function (string $atributo, mixed $valor, Closure $falla) {
@@ -95,7 +100,7 @@ class UsuarioRequest extends FormRequest
             /** @var User|null $usuario */
             $usuario = $this->route('usuario');
             $rol = RolUsuario::find($this->integer('rol_id'));
-            $esAdmin = $rol->nivel === Rol::Admin;
+            $miRol = $this->user()->rolUsuario;
             $empresaId = $this->empresaId();
             $sedeId = $this->integer('sede_id') ?: null;
             $sucursalId = $this->integer('sucursal_id') ?: null;
@@ -105,14 +110,22 @@ class UsuarioRequest extends FormRequest
                 $validator->errors()->add('rol_id', 'Este rol está inactivo: actívalo en Roles antes de asignarlo.');
             }
 
-            // Nadie se quita a sí mismo el acceso de administrador: la plataforma podría quedar sin quien la gestione
-            if ($usuario?->is($this->user()) && ! $esAdmin) {
-                $validator->errors()->add('rol_id', 'No puedes quitarte el acceso de administrador. Pídeselo a otro administrador.');
+            // Solo se asignan roles con, como mucho, los permisos del propio (nadie da más acceso del que tiene)
+            if ($rol->id !== $usuario?->rol_id && ! $miRol?->cubre($rol)) {
+                $validator->errors()->add('rol_id', 'Este rol tiene permisos que el tuyo no tiene: no puedes asignarlo.');
             }
 
-            // "Todas las líneas" es solo para quien administra; los demás trabajan en una
-            if (! $esAdmin && $lineaId === null) {
-                $validator->errors()->add('linea_id', 'Elige la línea de servicio en la que trabaja: "Todas" es solo para administradores.');
+            // Nadie se quita a sí mismo lo que necesita para corregir usuarios y roles
+            if ($usuario?->is($this->user())) {
+                $quitados = array_diff(array_intersect(Permisos::IMPRESCINDIBLES, $miRol?->permisos ?? []), $rol->permisos ?? []);
+                if ($quitados !== []) {
+                    $validator->errors()->add('rol_id', 'No puedes cambiarte a un rol sin los permisos para editar usuarios y roles. Pídeselo a otra persona.');
+                }
+            }
+
+            // "Todas las líneas" es solo para roles que las ven todas; los demás trabajan en una
+            if ($lineaId === null && ! $rol->permite(Permisos::TODAS_LAS_LINEAS)) {
+                $validator->errors()->add('linea_id', 'Elige la línea de servicio en la que trabaja: "Todas" es solo para roles que ven todas las líneas.');
             }
             if ($lineaId && $empresaId && ! Empresa::whereKey($empresaId)->whereHas('lineas', fn ($q) => $q->whereKey($lineaId))->exists()) {
                 $validator->errors()->add('empresa_id', 'Esta empresa no recibe la línea de servicio elegida.');
