@@ -165,7 +165,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                         {sedes.data.length === 0 ? (
                             <SinResultados texto="Ninguna sede coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Sedes">
+                            <Tabla titulo="Sedes" columnas={['31%', '23%', '14%', '13%', '11%', '3.5rem']}>
                                 <thead className="text-muted-foreground border-b">
                                     <tr>
                                         <th scope="col" className={claseTh}>
@@ -200,7 +200,9 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                         <Store className="size-4" />
                                                     </span>
                                                     <div className="min-w-0">
-                                                        <p className="text-foreground truncate font-semibold">{s.nombre}</p>
+                                                        <p className="text-foreground truncate font-semibold" title={s.nombre}>
+                                                            {s.nombre}
+                                                        </p>
                                                         <p className="text-muted-foreground truncate text-xs">
                                                             {[s.codigo && `Drivin: ${s.codigo}`, `Meta ${formatoMeta.format(s.meta)} %`]
                                                                 .filter(Boolean)
@@ -209,7 +211,11 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                                                     </div>
                                                 </div>
                                             </th>
-                                            <td className={claseTd}>{s.empresa}</td>
+                                            <td className={claseTd}>
+                                                <p className="truncate" title={s.empresa ?? undefined}>
+                                                    {s.empresa}
+                                                </p>
+                                            </td>
                                             <td className={claseTd}>
                                                 <ConteoEnlace
                                                     n={s.sucursales}

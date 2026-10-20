@@ -1,9 +1,9 @@
+import { IdCard, LogOut, Settings } from '@/components/iconos';
 import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { type User } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { LogOut, Settings } from '@/components/iconos';
 
 interface UserMenuContentProps {
     user: User;
@@ -15,7 +15,12 @@ interface UserMenuContentProps {
  */
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
-    const enMiCuenta = usePage().url.startsWith('/settings');
+    const { url } = usePage();
+    // Lo que ya está en pantalla no se repite en el menú: en Mi cuenta, sus pestañas llevan a cada sección
+    const opciones = [
+        !url.startsWith('/mi-carnet') && { texto: 'Mi carnet', href: route('mi-carnet'), icono: IdCard },
+        !url.startsWith('/settings') && { texto: 'Mi cuenta', href: route('profile.edit'), icono: Settings },
+    ].filter((o) => o !== false);
 
     return (
         <>
@@ -26,16 +31,17 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                 <p className="text-muted-foreground hidden truncate px-2 py-1.5 text-xs sm:block">{user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {/* En Mi cuenta, sus pestañas ya llevan a cada sección */}
-            {!enMiCuenta && (
+            {opciones.length > 0 && (
                 <>
                     <DropdownMenuGroup>
-                        <DropdownMenuItem asChild>
-                            <Link className="block w-full" href={route('profile.edit')} as="button" prefetch onClick={cleanup}>
-                                <Settings className="mr-2" aria-hidden="true" />
-                                Mi cuenta
-                            </Link>
-                        </DropdownMenuItem>
+                        {opciones.map(({ texto, href, icono: Icono }) => (
+                            <DropdownMenuItem key={href} asChild>
+                                <Link className="block w-full" href={href} as="button" prefetch onClick={cleanup}>
+                                    <Icono className="mr-2" aria-hidden="true" />
+                                    {texto}
+                                </Link>
+                            </DropdownMenuItem>
+                        ))}
                     </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                 </>

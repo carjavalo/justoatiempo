@@ -41,6 +41,8 @@ class User extends Authenticatable
         'sucursal_id',
         'linea_servicio_id',
         'foto_path',
+        'arl_path',
+        'arl_subida_en',
         'empleado_id',
         'activo',
         'ultimo_acceso_en',
@@ -54,8 +56,9 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        // Ruta interna del archivo: la foto se entrega solo por la ruta de la administración
+        // Rutas internas de los archivos: la foto y la ARL se entregan solo por sus rutas propias
         'foto_path',
+        'arl_path',
         // Código del QR del carnet: va en el carnet, no en las respuestas de la plataforma
         'carnet_codigo',
     ];
@@ -73,6 +76,7 @@ class User extends Authenticatable
             'rol' => Rol::class,
             'activo' => 'boolean',
             'ultimo_acceso_en' => 'datetime',
+            'arl_subida_en' => 'datetime',
         ];
     }
 

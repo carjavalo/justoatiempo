@@ -1,5 +1,6 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
+import { CampoDocumento } from '@/components/admin/campo-documento';
 import { CampoImagen } from '@/components/admin/campo-imagen';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
@@ -48,6 +49,9 @@ interface FilaUsuario {
     sucursal: string | null;
     /** Dirección de la foto (solo para la administración), si tiene. */
     foto: string | null;
+    /** Dirección del certificado de ARL (solo para la administración), si tiene. */
+    arl: string | null;
+    arlEsPdf: boolean;
     lineaId: number | null;
     linea: string | null;
     activo: boolean;
@@ -89,6 +93,8 @@ const VACIO = {
     sucursal_id: '',
     foto: null as File | null,
     quitar_foto: false,
+    arl: null as File | null,
+    quitar_arl: false,
     password: '',
 };
 const ORDEN_CAMPOS = [
@@ -104,6 +110,7 @@ const ORDEN_CAMPOS = [
     'sede_id',
     'sucursal_id',
     'foto',
+    'arl',
     'password',
 ];
 
@@ -153,6 +160,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
                       foto: null,
                       quitar_foto: false,
+                      arl: null,
+                      quitar_arl: false,
                       password: '',
                   }
                 : // Si la lista viene filtrada por empresa, sede o sucursal, el usuario nuevo nace ahí
@@ -179,7 +188,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
     const guardar = () => {
         const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
         // Con una imagen al editar, el envío va como formulario con archivos, que PHP solo lee en POST: se marca como edición
-        const conArchivoAlEditar = Boolean(editando && form.data.foto);
+        const conArchivoAlEditar = Boolean(editando && (form.data.foto || form.data.arl));
         form.transform((d) => (conArchivoAlEditar ? { ...d, _method: 'put' } : d));
         if (!editando) form.post(route('usuarios.store'), opciones);
         else if (conArchivoAlEditar) form.post(route('usuarios.update', editando.id), opciones);
@@ -336,7 +345,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         {usuarios.data.length === 0 ? (
                             <SinResultados texto="Ningún usuario coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[980px]">
+                            <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[980px]" columnas={['28%', '14%', '17%', '17%', '9%', '11%', '3.5rem']}>
                                 <thead className="text-muted-foreground border-b">
                                     <tr>
                                         <th scope="col" className={claseTh}>
@@ -383,35 +392,47 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                     )}
                                                     <div className="min-w-0">
                                                         <p className="text-foreground flex items-center gap-2 font-semibold">
-                                                            <span className="truncate">{u.nombre}</span>
+                                                            <span className="truncate" title={u.nombre}>
+                                                                {u.nombre}
+                                                            </span>
                                                             {u.esUsted && (
                                                                 <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[0.68rem] font-semibold">
                                                                     Tú
                                                                 </span>
                                                             )}
                                                         </p>
-                                                        <p className="text-muted-foreground truncate text-xs">{u.email}</p>
+                                                        <p className="text-muted-foreground truncate text-xs" title={u.email}>
+                                                            {u.email}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </th>
-                                            <td className={cn(claseTd, 'whitespace-nowrap')}>{u.rolLabel}</td>
-                                            <td className={cn(claseTd, 'max-w-52')}>
+                                            <td className={claseTd}>
+                                                <p className="truncate" title={u.rolLabel}>
+                                                    {u.rolLabel}
+                                                </p>
+                                            </td>
+                                            <td className={claseTd}>
                                                 {u.rol === 'admin' ? (
                                                     <span className="text-muted-foreground text-xs">Todas</span>
                                                 ) : (
-                                                    <p className="truncate">{u.linea ?? 'Sin línea asignada'}</p>
+                                                    <p className="truncate" title={u.linea ?? undefined}>
+                                                        {u.linea ?? 'Sin línea asignada'}
+                                                    </p>
                                                 )}
                                             </td>
                                             <td className={claseTd}>
-                                                <p className="text-foreground">{u.empresa ?? 'Justo a Tiempo SP'}</p>
-                                                <p className="text-muted-foreground text-xs">
+                                                <p className="text-foreground truncate" title={u.empresa ?? 'Justo a Tiempo SP'}>
+                                                    {u.empresa ?? 'Justo a Tiempo SP'}
+                                                </p>
+                                                <p className="text-muted-foreground truncate text-xs" title={[u.sede, u.sucursal].filter(Boolean).join(' · ') || undefined}>
                                                     {[u.sede, u.sucursal].filter(Boolean).join(' · ') || 'Sin sucursal asignada'}
                                                 </p>
                                             </td>
                                             <td className={claseTd}>
                                                 <EstadoBadge activo={u.activo} />
                                             </td>
-                                            <td className={cn(claseTd, 'text-xs whitespace-nowrap')}>
+                                            <td className={cn(claseTd, 'text-xs')}>
                                                 {u.ultimoAcceso ? (
                                                     <time
                                                         dateTime={u.ultimoAcceso}
@@ -697,6 +718,20 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     descripcion={`Foto de ${editando?.nombre ?? ([form.data.nombres, form.data.primer_apellido].filter(Boolean).join(' ') || 'la persona')}`}
                     onArchivo={(archivo) => form.setData('foto', archivo)}
                     onQuitar={(quitar) => form.setData('quitar_foto', quitar)}
+                />
+
+                <CampoDocumento
+                    id="arl"
+                    etiqueta="Certificado de ARL"
+                    ayuda="PDF o imagen. Se muestra a quien escanee el QR del carnet."
+                    error={form.errors.arl}
+                    archivo={form.data.arl}
+                    actual={editando?.arl ?? null}
+                    actualEsPdf={editando?.arlEsPdf ?? false}
+                    quitar={form.data.quitar_arl}
+                    nombre="la ARL"
+                    onArchivo={(archivo) => form.setData('arl', archivo)}
+                    onQuitar={(quitar) => form.setData('quitar_arl', quitar)}
                 />
 
                 <Campo

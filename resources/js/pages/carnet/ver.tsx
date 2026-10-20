@@ -1,5 +1,5 @@
 import { contenedorModulo, EncabezadoModulo } from '@/components/admin/piezas';
-import { AlertTriangle, Download, LoaderCircle } from '@/components/iconos';
+import { AlertTriangle, ArrowUpRight, Download, FileText, LoaderCircle } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { cedulaLegible, dibujarCarnet, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
@@ -11,13 +11,21 @@ interface Persona extends DatosCarnet {
     nombreCompleto: string;
     tieneCargo: boolean;
     activo: boolean;
+    /** Dirección del certificado de ARL para quien mira, si está cargado. */
+    arl: string | null;
+}
+
+interface Props {
+    persona: Persona;
+    /** Es el carnet de quien está mirando (Mi carnet); si no, lo mira la administración. */
+    propio: boolean;
 }
 
 /**
- * El carnet de una persona, armado por la plataforma con su foto y sus datos sobre el diseño de la empresa.
- * Se ve aquí y se descarga como imagen.
+ * Un carnet, armado por la plataforma con la foto y los datos de la persona sobre el diseño de la empresa. Lo ve
+ * cada persona (el suyo, en Mi carnet) y la administración (el de cualquiera); se descarga como imagen.
  */
-export default function Carnet({ persona }: { persona: Persona }) {
+export default function VerCarnet({ persona, propio }: Props) {
     const lienzo = useRef<HTMLCanvasElement>(null);
     const [recursos, setRecursos] = useState<RecursosCarnet | null>(null);
     const [error, setError] = useState(false);
@@ -47,7 +55,7 @@ export default function Carnet({ persona }: { persona: Persona }) {
             enlace.href = URL.createObjectURL(archivo);
             enlace.download = `carnet-${persona.nombreCompleto
                 .normalize('NFD')
-                .replace(/[̀-ͯ]/g, '')
+                .replace(/\p{Diacritic}/gu, '')
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')}.png`;
             enlace.click();
@@ -55,7 +63,13 @@ export default function Carnet({ persona }: { persona: Persona }) {
         }, 'image/png');
     };
 
-    const faltan = [!persona.foto && 'la foto', !persona.cedula && 'la cédula', !persona.tieneCargo && 'el cargo'].filter(Boolean) as string[];
+    const faltan = [
+        !persona.foto && 'la foto',
+        !persona.cedula && 'la cédula',
+        !persona.tieneCargo && 'el cargo',
+        !persona.arl && 'el certificado de ARL',
+    ].filter(Boolean) as string[];
+    const titulo = propio ? 'Mi carnet' : `Carnet de ${persona.nombreCompleto}`;
     const descripcion = [
         `Carnet de ${persona.nombreCompleto}`,
         persona.cargo,
@@ -67,13 +81,18 @@ export default function Carnet({ persona }: { persona: Persona }) {
         .join(', ');
 
     return (
-        <AppLayout volver={{ texto: 'Volver a usuarios', href: route('usuarios.index') }}>
-            <Head title={`Carnet de ${persona.nombreCompleto}`} />
+        // La administración vuelve a la lista de usuarios; cada persona, a su inicio (el regreso de siempre)
+        <AppLayout volver={propio ? undefined : { texto: 'Volver a usuarios', href: route('usuarios.index') }}>
+            <Head title={titulo} />
 
             <div className={contenedorModulo}>
                 <EncabezadoModulo
-                    titulo={`Carnet de ${persona.nombreCompleto}`}
-                    descripcion="Se arma solo con la foto y los datos del usuario sobre el diseño de la empresa. El QR lleva a la verificación del carnet."
+                    titulo={titulo}
+                    descripcion={
+                        propio
+                            ? 'Tu carnet de Justo a Tiempo SP S.A.S. Descárgalo para imprimirlo o mostrarlo desde el celular; su QR confirma que estás vigente.'
+                            : 'Se arma solo con la foto y los datos del usuario sobre el diseño de la empresa. El QR lleva a la verificación del carnet.'
+                    }
                     accion={
                         <Button onClick={descargar} disabled={!recursos} className="h-10 rounded-lg px-4 font-semibold">
                             <Download className="size-4" aria-hidden="true" />
@@ -85,16 +104,24 @@ export default function Carnet({ persona }: { persona: Persona }) {
                 {faltan.length > 0 && (
                     <div className="bg-warning-soft text-warning flex items-start gap-3 rounded-2xl px-5 py-4 text-sm">
                         <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                        <p className="text-foreground">
-                            <strong className="font-semibold">Para que el carnet quede completo, falta {lista(faltan)}.</strong> Puedes agregarlo en{' '}
-                            <Link
-                                href={route('usuarios.index', { q: persona.email })}
-                                className="text-primary font-semibold underline underline-offset-4"
-                            >
-                                Usuarios, editando a {persona.nombreCompleto}
-                            </Link>
-                            .
-                        </p>
+                        {propio ? (
+                            <p className="text-foreground">
+                                <strong className="font-semibold">A tu carnet le falta {lista(faltan)}.</strong> Pídele al administrador de la
+                                plataforma que lo complete.
+                            </p>
+                        ) : (
+                            <p className="text-foreground">
+                                <strong className="font-semibold">Para que el carnet quede completo, falta {lista(faltan)}.</strong> Puedes agregarlo
+                                en{' '}
+                                <Link
+                                    href={route('usuarios.index', { q: persona.email })}
+                                    className="text-primary font-semibold underline underline-offset-4"
+                                >
+                                    Usuarios, editando a {persona.nombreCompleto}
+                                </Link>
+                                .
+                            </p>
+                        )}
                     </div>
                 )}
 
@@ -120,6 +147,32 @@ export default function Carnet({ persona }: { persona: Persona }) {
                             )}
                         </div>
                     )}
+                </div>
+
+                {/* Lo que acompaña al carnet: la ARL y lo que ve quien escanea el QR */}
+                <div className="mx-auto flex w-full max-w-[560px] flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+                    {persona.arl && (
+                        <a
+                            href={persona.arl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            <FileText className="size-4" aria-hidden="true" />
+                            Ver certificado de ARL
+                            <span className="sr-only"> (se abre en otra pestaña)</span>
+                        </a>
+                    )}
+                    <a
+                        href={persona.qr}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        <ArrowUpRight className="size-4" aria-hidden="true" />
+                        Ver lo que muestra el QR
+                        <span className="sr-only"> (se abre en otra pestaña)</span>
+                    </a>
                 </div>
             </div>
         </AppLayout>

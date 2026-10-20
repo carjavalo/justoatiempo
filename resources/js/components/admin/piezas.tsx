@@ -34,13 +34,24 @@ export function EstadoBadge({ activo, femenino = false }: { activo: boolean; fem
     );
 }
 
-/** Tabla con desplazamiento horizontal accesible por teclado en pantallas angostas. */
-export function Tabla({ titulo, children, minimo = 'min-w-[720px]' }: { titulo: string; children: ReactNode; minimo?: string }) {
+/**
+ * Tabla con desplazamiento horizontal accesible por teclado en pantallas angostas. Con `columnas`, cada columna
+ * tiene su ancho fijo: un texto largo (un nombre de muchas palabras) se recorta con "…" en su columna en vez
+ * de ensanchar la tabla y apretar a las demás. El texto completo queda en `title` y para los lectores de pantalla.
+ */
+export function Tabla({ titulo, children, minimo = 'min-w-[720px]', columnas }: { titulo: string; children: ReactNode; minimo?: string; columnas?: string[] }) {
     return (
         <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <div className="focus-visible:ring-ring relative overflow-x-auto focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset" tabIndex={0} role="region" aria-label={`${titulo}, desplazable`}>
-                <table className={cn('w-full text-left text-sm', minimo)}>
+                <table className={cn('w-full text-left text-sm', columnas && 'table-fixed', minimo)}>
                     <caption className="sr-only">{titulo}</caption>
+                    {columnas && (
+                        <colgroup>
+                            {columnas.map((ancho, i) => (
+                                <col key={i} style={{ width: ancho }} />
+                            ))}
+                        </colgroup>
+                    )}
                     {children}
                 </table>
             </div>

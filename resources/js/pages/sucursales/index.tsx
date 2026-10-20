@@ -196,7 +196,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                         {sucursales.data.length === 0 ? (
                             <SinResultados texto="Ninguna sucursal coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Sucursales">
+                            <Tabla titulo="Sucursales" columnas={['37%', '27%', '15%', '12%', '3.5rem']}>
                                 <thead className="text-muted-foreground border-b">
                                     <tr>
                                         <th scope="col" className={claseTh}>
@@ -228,7 +228,9 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                                                         <MapPin className="size-4" />
                                                     </span>
                                                     <div className="min-w-0">
-                                                        <p className="text-foreground truncate font-semibold">{s.nombre}</p>
+                                                        <p className="text-foreground truncate font-semibold" title={s.nombre}>
+                                                            {s.nombre}
+                                                        </p>
                                                         <p className="text-muted-foreground truncate text-xs">
                                                             {[s.ciudad, s.direccion, s.aliasDrivin && `Plan Drivin: ${s.aliasDrivin}`]
                                                                 .filter(Boolean)
@@ -240,8 +242,14 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                                             <td className={claseTd}>
                                                 {s.sede ? (
                                                     <>
-                                                        <p className="text-foreground">{s.sede}</p>
-                                                        {s.empresa && <p className="text-muted-foreground text-xs">{s.empresa}</p>}
+                                                        <p className="text-foreground truncate" title={s.sede}>
+                                                            {s.sede}
+                                                        </p>
+                                                        {s.empresa && (
+                                                            <p className="text-muted-foreground truncate text-xs" title={s.empresa}>
+                                                                {s.empresa}
+                                                            </p>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     <span className="bg-brand-coral-soft text-brand-coral-ink rounded-full px-2.5 py-0.5 text-xs font-semibold">

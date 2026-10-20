@@ -142,7 +142,7 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                         {empresas.data.length === 0 ? (
                             <SinResultados texto="Ninguna empresa coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Empresas clientes">
+                            <Tabla titulo="Empresas clientes" columnas={['25%', '22%', '20%', '9%', '10%', '9%', '3.5rem']}>
                                 <thead className="text-muted-foreground border-b">
                                     <tr>
                                         <th scope="col" className={claseTh}>
@@ -175,18 +175,20 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                                 <div className="flex items-center gap-3">
                                                     <Iniciales texto={e.nombre} />
                                                     <div className="min-w-0">
-                                                        <p className="text-foreground truncate font-semibold">{e.nombre}</p>
+                                                        <p className="text-foreground truncate font-semibold" title={e.nombre}>
+                                                            {e.nombre}
+                                                        </p>
                                                         <p className="text-muted-foreground text-xs">{e.nit ? `NIT ${formatearNit(e.nit)}` : 'Sin NIT'}</p>
                                                     </div>
                                                 </div>
                                             </th>
-                                            <td className={cn(claseTd, 'max-w-56 text-xs leading-relaxed')}>
+                                            <td className={cn(claseTd, 'text-xs leading-relaxed')}>
                                                 {e.lineas.length === 0 ? (
                                                     <span className="text-muted-foreground">Ninguna</span>
                                                 ) : (
                                                     <ul role="list">
                                                         {nombresLineas(e.lineas).map((n) => (
-                                                            <li key={n} className="truncate">
+                                                            <li key={n} className="truncate" title={n}>
                                                                 {n}
                                                             </li>
                                                         ))}
@@ -196,8 +198,16 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                             <td className={claseTd}>
                                                 {e.contactoNombre || e.contactoEmail || e.contactoTelefono ? (
                                                     <div className="min-w-0 text-xs leading-relaxed">
-                                                        {e.contactoNombre && <p className="text-foreground text-sm font-medium">{e.contactoNombre}</p>}
-                                                        {e.contactoEmail && <p className="truncate">{e.contactoEmail}</p>}
+                                                        {e.contactoNombre && (
+                                                            <p className="text-foreground truncate text-sm font-medium" title={e.contactoNombre}>
+                                                                {e.contactoNombre}
+                                                            </p>
+                                                        )}
+                                                        {e.contactoEmail && (
+                                                            <p className="truncate" title={e.contactoEmail}>
+                                                                {e.contactoEmail}
+                                                            </p>
+                                                        )}
                                                         {e.contactoTelefono && <p>{e.contactoTelefono}</p>}
                                                     </div>
                                                 ) : (

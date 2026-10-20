@@ -10,6 +10,7 @@ use App\Http\Controllers\CargaController;
 use App\Http\Controllers\CarnetController;
 use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\LineaController;
+use App\Http\Controllers\MiCarnetController;
 use App\Http\Controllers\PanelController;
 use App\Models\LineaServicio;
 use Illuminate\Support\Facades\Route;
@@ -20,12 +21,21 @@ Route::get('/', function () {
     return Inertia::render('welcome', ['servicios' => ContactoController::SERVICIOS]);
 })->name('home');
 Route::post('contacto', [ContactoController::class, 'store'])->middleware('throttle:5,1')->name('contacto.store');
-// Lo que se abre al escanear el QR de un carnet
-Route::get('carnet/{codigo}', [CarnetController::class, 'verificar'])->where('codigo', '[A-Za-z0-9]{12}')->middleware('throttle:30,1')->name('carnet.verificar');
+// Lo que se abre al escanear el QR de un carnet: la información de la persona y su certificado de ARL
+Route::prefix('carnet/{codigo}')->where(['codigo' => '[A-Za-z0-9]{12}'])->middleware('throttle:60,1')->group(function () {
+    Route::get('/', [CarnetController::class, 'verificar'])->name('carnet.verificar');
+    Route::get('foto', [CarnetController::class, 'foto'])->name('carnet.foto');
+    Route::get('arl', [CarnetController::class, 'arl'])->name('carnet.arl');
+});
 
 Route::middleware(['auth'])->group(function () {
     // Inicio después de ingresar: opciones de administración
     Route::get('panel', PanelController::class)->name('panel');
+
+    // Cada persona ve y descarga su propio carnet
+    Route::get('mi-carnet', [MiCarnetController::class, 'show'])->name('mi-carnet');
+    Route::get('mi-carnet/foto', [MiCarnetController::class, 'foto'])->name('mi-carnet.foto');
+    Route::get('mi-carnet/arl', [MiCarnetController::class, 'arl'])->name('mi-carnet.arl');
     Route::redirect('dashboard', 'panel'); // enlaces guardados de la versión anterior
 
     Route::middleware('rol:admin')->group(function () {
@@ -33,6 +43,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
         Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->name('usuarios.update');
         Route::get('usuarios/{usuario}/foto', [UsuarioController::class, 'foto'])->name('usuarios.foto');
+        Route::get('usuarios/{usuario}/arl', [UsuarioController::class, 'arl'])->name('usuarios.arl');
         Route::get('usuarios/{usuario}/carnet', [UsuarioController::class, 'carnet'])->name('usuarios.carnet');
         Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'estado'])->name('usuarios.estado');
 

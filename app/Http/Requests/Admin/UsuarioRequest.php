@@ -61,6 +61,9 @@ class UsuarioRequest extends FormRequest
             // Foto para el carnet: opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
             'foto' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
             'quitar_foto' => ['nullable', 'boolean'],
+            // Certificado de ARL: imagen (las fotos se reducen en el navegador) o PDF
+            'arl' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:10240'],
+            'quitar_arl' => ['nullable', 'boolean'],
         ];
     }
 
@@ -140,12 +143,15 @@ class UsuarioRequest extends FormRequest
             'foto.mimes' => 'La foto debe ser una imagen JPG, PNG o WebP.',
             'foto.max' => 'La foto no puede pesar más de 8 MB.',
             'foto.uploaded' => 'No se pudo subir la foto. Intenta con una más liviana.',
+            'arl.mimes' => 'La ARL debe ser un PDF o una imagen JPG, PNG o WebP.',
+            'arl.max' => 'El archivo de la ARL no puede pesar más de 10 MB.',
+            'arl.uploaded' => 'No se pudo subir la ARL. Intenta con un archivo más liviano.',
         ];
     }
 
     public function attributes(): array
     {
-        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto'];
+        return ['linea_id' => 'la línea de servicio', 'nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol' => 'el rol', 'empresa_id' => 'la empresa', 'sede_id' => 'la sede', 'sucursal_id' => 'la sucursal', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL'];
     }
 
     /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
