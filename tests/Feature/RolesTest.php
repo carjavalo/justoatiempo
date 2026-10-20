@@ -32,7 +32,7 @@ class RolesTest extends TestCase
     {
         return [
             'nombres' => 'Carlos', 'primer_apellido' => 'Ruiz', 'email' => 'carlos@example.com', 'cargo' => 'Conductor',
-            'rol_id' => $rolId, 'empresa_id' => 'propia', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
+            'rol_id' => $rolId, 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
         ];
     }
 

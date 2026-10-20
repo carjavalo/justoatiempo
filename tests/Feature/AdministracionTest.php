@@ -317,17 +317,17 @@ class AdministracionTest extends TestCase
 
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $falabella->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede no pertenece a la empresa elegida.']);
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => 'propia', 'sede_id' => $tugo->id])
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sede_id' => $tugo->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede es de una empresa: elige primero esa empresa.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $tugo->id, 'sucursal_id' => $acopi->id])
             ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal no pertenece a la sede elegida.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sucursal_id' => $caliSur->id])
             ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es de una sede: elige primero esa sede.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sucursal_id' => $oficina->id])
-            ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es propia de Justo a Tiempo: no se asigna a personal de una empresa.']);
+            ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es propia de Justo a Tiempo: no se asigna a quien presta el servicio en una empresa.']);
 
-        // El personal propio va en una sucursal propia
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => 'propia', 'sucursal_id' => $oficina->id])->assertSessionHasNoErrors();
+        // Sin empresa asignada, solo cabe una sucursal propia
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sucursal_id' => $oficina->id])->assertSessionHasNoErrors();
         $ana = User::where('email', 'ana@example.com')->sole();
         $this->assertSame([null, $oficina->id], [$ana->empresa_id, $ana->sucursal_id]);
     }
@@ -347,22 +347,41 @@ class AdministracionTest extends TestCase
         $this->actingAs($otra)->get('/cargas')->assertOk();
     }
 
-    public function test_sin_rol_empresa_linea_ni_cargo_no_se_crea_el_usuario(): void
+    public function test_sin_rol_linea_ni_cargo_no_se_crea_el_usuario(): void
     {
         $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1'])
             ->assertSessionHasErrors([
                 'rol_id' => 'Elige el rol.',
-                'empresa_id' => 'Elige la empresa: una cliente o Justo a Tiempo SP (personal propio).',
                 'linea_id' => 'Elige la línea de servicio.',
                 'cargo' => 'Escribe el cargo: va en el carnet.',
-            ]);
+            ])
+            // La empresa es opcional: sin ella queda sin empresa asignada
+            ->assertSessionDoesntHaveErrors('empresa_id');
         $this->assertDatabaseMissing('users', ['email' => 'ana@example.com']);
 
-        // Valores que no existen
+        // Valores que no existen (Justo a Tiempo no es una de las empresas: todos son su personal)
         $this->actingAs($this->admin)->post('/usuarios', [
             'nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1', 'cargo' => 'Auxiliar',
-            'rol_id' => 999, 'empresa_id' => 'otra', 'linea_id' => 999,
+            'rol_id' => 999, 'empresa_id' => 'propia', 'linea_id' => 999,
         ])->assertSessionHasErrors(['rol_id', 'empresa_id' => 'Elige una empresa de la lista.', 'linea_id' => 'Elige una línea de la lista.']);
+        $this->actingAs($this->admin)->post('/usuarios', [
+            'nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1', 'cargo' => 'Auxiliar',
+            'rol_id' => $this->rolBase(Rol::Auxiliar), 'empresa_id' => 999, 'linea_id' => LineaServicio::logistica()->id,
+        ])->assertSessionHasErrors(['empresa_id' => 'Elige una empresa de la lista.']);
+    }
+
+    public function test_sin_empresa_el_usuario_queda_sin_empresa_asignada(): void
+    {
+        $this->actingAs($this->admin)->post('/usuarios', [
+            'nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1', 'cargo' => 'Auxiliar',
+            'rol_id' => $this->rolBase(Rol::Auxiliar), 'empresa_id' => '', 'linea_id' => LineaServicio::logistica()->id,
+        ])->assertSessionHasNoErrors();
+
+        $ana = User::where('email', 'ana@example.com')->sole();
+        $this->assertSame([null, null, null], [$ana->empresa_id, $ana->sede_id, $ana->sucursal_id]);
+
+        $this->actingAs($this->admin)->get('/usuarios?q=ana@example.com')
+            ->assertInertia(fn (Assert $p) => $p->where('usuarios.data.0.empresa', null)->where('usuarios.data.0.empresaId', null));
     }
 
     public function test_valida_correo_repetido_rol_y_contrasena(): void
@@ -435,7 +454,7 @@ class AdministracionTest extends TestCase
     {
         return [
             'nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'cargo' => $usuario->cargo ?? 'Auxiliar',
-            'rol_id' => $usuario->rol_id, 'empresa_id' => $usuario->empresa_id ?? 'propia', 'linea_id' => $usuario->linea_servicio_id ?? 'todas',
+            'rol_id' => $usuario->rol_id, 'empresa_id' => $usuario->empresa_id ?? '', 'linea_id' => $usuario->linea_servicio_id ?? 'todas',
         ];
     }
 

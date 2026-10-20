@@ -35,7 +35,7 @@ class CarnetUsuarioTest extends TestCase
     {
         return [
             'nombres' => 'Johnny', 'primer_apellido' => 'Correa', 'email' => 'johnny@example.com', 'rol_id' => $this->rolBase(Rol::Coordinador),
-            'cargo' => 'Coordinador', 'empresa_id' => 'propia', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
+            'cargo' => 'Coordinador', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
         ];
     }
 

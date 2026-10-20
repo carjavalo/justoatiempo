@@ -286,7 +286,7 @@ class LineasServicioTest extends TestCase
 
     public function test_el_administrador_puede_tener_todas_las_lineas_o_una(): void
     {
-        $datos = ['primer_apellido' => 'Admin', 'rol_id' => $this->rolBase(Rol::Admin), 'cargo' => 'Gerente', 'empresa_id' => 'propia', 'password' => 'Clave-segura-1'];
+        $datos = ['primer_apellido' => 'Admin', 'rol_id' => $this->rolBase(Rol::Admin), 'cargo' => 'Gerente', 'password' => 'Clave-segura-1'];
 
         $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Todas', 'email' => 'todas@example.com', 'linea_id' => 'todas'])->assertSessionHasNoErrors();
         $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Aseo', 'email' => 'aseo@example.com', 'linea_id' => $this->aseo->id])->assertSessionHasNoErrors();

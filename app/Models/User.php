@@ -146,7 +146,7 @@ class User extends Authenticatable
         return $this->belongsTo(Empleado::class);
     }
 
-    /** Empresa donde trabaja; sin empresa es personal propio de Justo a Tiempo. */
+    /** Empresa cliente donde presta el servicio (todos son personal de Justo a Tiempo); puede no tener. */
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);

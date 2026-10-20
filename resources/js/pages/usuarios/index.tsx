@@ -117,8 +117,7 @@ const ORDEN_CAMPOS = [
     'password',
 ];
 
-/** Opciones especiales: personal propio de Justo a Tiempo (sin empresa cliente) y administrador con todas las líneas. */
-const PROPIA = 'propia';
+/** Línea de un administrador que las tiene todas (se guarda sin línea). */
 const TODAS = 'todas';
 
 const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
@@ -164,7 +163,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       email: usuario.email,
                       rol_id: usuario.rolId ? String(usuario.rolId) : '',
                       linea_id: usuario.lineaId ? String(usuario.lineaId) : usuario.rol === 'admin' ? TODAS : '',
-                      empresa_id: usuario.empresaId ? String(usuario.empresaId) : PROPIA,
+                      empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
                       sede_id: usuario.sedeId ? String(usuario.sedeId) : '',
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
                       foto: null,
@@ -185,14 +184,12 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         const sucursal = sucursales.find((u) => String(u.id) === valores.sucursal && u.activo);
         const sede = sedes.find((x) => (sucursal ? x.id === sucursal.sedeId : String(x.id) === valores.sede) && x.activo);
         const empresa = empresas.find((e) => (sede ? e.id === sede.empresaId : String(e.id) === valores.empresa) && e.activo);
-        // Una sucursal propia es del personal propio; una de sede, de la empresa de esa sede
-        const propia = !empresa && sucursal?.sedeId === null;
         return {
             ...linea,
             ...(empresa && { empresa_id: String(empresa.id) }),
-            ...(propia && { empresa_id: PROPIA }),
             ...(sede && empresa && { sede_id: String(sede.id) }),
-            ...(sucursal && (propia || sede) && { sucursal_id: String(sucursal.id) }),
+            // Una sucursal propia solo aplica sin empresa; una de sede, con su sede
+            ...(sucursal && (sucursal.sedeId === null ? !empresa : sede) && { sucursal_id: String(sucursal.id) }),
         };
     };
 
@@ -212,26 +209,25 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
     // Se ofrecen los roles activos y, al editar, el que ya tiene aunque esté inactivo
     const rolesFormulario = roles.filter((r) => r.activo || r.id === editando?.rolId);
 
-    // Cascada línea → empresa → sede → sucursal: la empresa debe recibir la línea, la sede es de la empresa
-    // y la sucursal, de la sede. El personal propio de Justo a Tiempo no tiene sede: sus sucursales son las propias.
+    // Cascada línea → empresa → sede → sucursal: la empresa (donde presta el servicio) debe recibir la línea, la
+    // sede es de la empresa y la sucursal, de la sede. Sin empresa no hay sede: solo las sucursales propias de Justo a Tiempo.
     const lineaId = form.data.linea_id && form.data.linea_id !== TODAS ? Number(form.data.linea_id) : null;
-    const esPropia = form.data.empresa_id === PROPIA;
-    const empresaId = form.data.empresa_id && !esPropia ? Number(form.data.empresa_id) : null;
+    const empresaId = form.data.empresa_id ? Number(form.data.empresa_id) : null;
     const sedeId = form.data.sede_id ? Number(form.data.sede_id) : null;
     const empresaElegida = empresas.find((e) => e.id === empresaId);
     const sedeElegida = sedes.find((x) => x.id === sedeId);
     const empresasFormulario = empresas.filter((e) => (e.activo || e.id === empresaId) && (!lineaId || e.lineas.includes(lineaId)));
     const sedesFormulario = empresaId ? sedes.filter((x) => x.empresaId === empresaId && (x.activo || x.id === sedeId)) : [];
     const sucursalesFormulario =
-        esPropia || sedeId ? sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id)) : [];
+        empresaId && !sedeId ? [] : sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id));
     const lineaElegida = lineas.find((l) => l.id === lineaId);
 
     /** Lo que sigue valiendo de la sede y la sucursal al cambiar la empresa o la sede. */
-    const conservar = (empresa: number | null, propia: boolean, sede: number | null) => {
+    const conservar = (empresa: number | null, sede: number | null) => {
         const sedeSigue = sede !== null && sedes.some((x) => x.id === sede && x.empresaId === empresa);
         const sedeFinal = sedeSigue ? sede : null;
         const sucursalSigue = sucursales.some(
-            (u) => String(u.id) === form.data.sucursal_id && u.sedeId === sedeFinal && (sedeFinal !== null || propia),
+            (u) => String(u.id) === form.data.sucursal_id && u.sedeId === sedeFinal && (sedeFinal !== null || empresa === null),
         );
         return { sede_id: sedeFinal ? String(sedeFinal) : '', sucursal_id: sucursalSigue ? form.data.sucursal_id : '' };
     };
@@ -248,11 +244,10 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         form.setData((d) => ({ ...d, linea_id: valor, ...(empresaSigue ? {} : { empresa_id: '', sede_id: '', sucursal_id: '' }) }));
     };
     const cambiarEmpresa = (valor: string) => {
-        const propia = valor === PROPIA;
-        form.setData((d) => ({ ...d, empresa_id: valor, ...conservar(propia ? null : Number(valor), propia, sedeId) }));
+        form.setData((d) => ({ ...d, empresa_id: valor, ...conservar(valor ? Number(valor) : null, sedeId) }));
     };
     const cambiarSede = (valor: string) => {
-        form.setData((d) => ({ ...d, ...conservar(empresaId, esPropia, valor ? Number(valor) : null) }));
+        form.setData((d) => ({ ...d, ...conservar(empresaId, valor ? Number(valor) : null) }));
     };
 
     const generar = () => {
@@ -450,12 +445,25 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                 )}
                                             </td>
                                             <td className={claseTd}>
-                                                <p className="text-foreground truncate" title={u.empresa ?? 'Justo a Tiempo SP'}>
-                                                    {u.empresa ?? 'Justo a Tiempo SP'}
-                                                </p>
-                                                <p className="text-muted-foreground truncate text-xs" title={[u.sede, u.sucursal].filter(Boolean).join(' · ') || undefined}>
-                                                    {[u.sede, u.sucursal].filter(Boolean).join(' · ') || 'Sin sucursal asignada'}
-                                                </p>
+                                                {u.empresa ? (
+                                                    <>
+                                                        <p className="text-foreground truncate" title={u.empresa}>
+                                                            {u.empresa}
+                                                        </p>
+                                                        <p className="text-muted-foreground truncate text-xs" title={[u.sede, u.sucursal].filter(Boolean).join(' · ') || undefined}>
+                                                            {[u.sede, u.sucursal].filter(Boolean).join(' · ') || 'Sin sucursal asignada'}
+                                                        </p>
+                                                    </>
+                                                ) : u.sucursal ? (
+                                                    <>
+                                                        <p className="text-foreground truncate" title={u.sucursal}>
+                                                            {u.sucursal}
+                                                        </p>
+                                                        <p className="text-muted-foreground text-xs">Sucursal propia</p>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">Sin empresa asignada</span>
+                                                )}
                                             </td>
                                             <td className={claseTd}>
                                                 <EstadoBadge activo={u.activo} />
@@ -629,13 +637,12 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                 <Campo
                     id="empresa_id"
                     etiqueta="Empresa"
-                    requerido
                     ayuda={
                         lineaElegida
                             ? empresasFormulario.length > 0
-                                ? `Justo a Tiempo SP o una empresa que recibe ${lineaElegida.nombre.toLowerCase()}.`
-                                : `Ninguna empresa recibe ${lineaElegida.nombre.toLowerCase()} todavía: elige Justo a Tiempo SP.`
-                            : 'Justo a Tiempo SP para el personal propio, o la empresa cliente donde trabaja.'
+                                ? `Donde presta el servicio: empresas que reciben ${lineaElegida.nombre.toLowerCase()}.`
+                                : `Ninguna empresa recibe ${lineaElegida.nombre.toLowerCase()} todavía.`
+                            : 'La empresa donde presta el servicio.'
                     }
                     error={form.errors.empresa_id}
                 >
@@ -643,9 +650,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         {...propsCampo('empresa_id', form.errors.empresa_id, 'empresa_id-ayuda')}
                         valor={form.data.empresa_id}
                         onCambio={cambiarEmpresa}
-                        placeholder="Elige dónde trabaja"
                         opciones={[
-                            { valor: PROPIA, texto: 'Justo a Tiempo SP', detalle: 'Personal propio' },
+                            { valor: '', texto: 'Sin empresa asignada' },
                             ...empresasFormulario.map((e) => ({
                                 valor: String(e.id),
                                 texto: e.activo ? e.nombre : `${e.nombre} (inactiva)`,
@@ -659,13 +665,11 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         id="sede_id"
                         etiqueta="Sede"
                         ayuda={
-                            esPropia
-                                ? 'El personal propio no tiene sede.'
-                                : !empresaElegida
-                                  ? 'Elige primero la empresa.'
-                                  : sedesFormulario.length === 0
-                                    ? `${empresaElegida.nombre} aún no tiene sedes activas.`
-                                    : `Sedes de ${empresaElegida.nombre}.`
+                            !empresaElegida
+                                ? 'Elige primero la empresa.'
+                                : sedesFormulario.length === 0
+                                  ? `${empresaElegida.nombre} aún no tiene sedes activas.`
+                                  : `Sedes de ${empresaElegida.nombre}.`
                         }
                         error={form.errors.sede_id}
                     >
@@ -687,17 +691,16 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         id="sucursal_id"
                         etiqueta="Sucursal"
                         ayuda={
-                            !esPropia && !sedeElegida
-                                ? empresaElegida
-                                    ? 'Elige primero la sede.'
-                                    : 'Elige primero la empresa.'
-                                : sucursalesFormulario.length === 0
-                                  ? sedeElegida
+                            empresaElegida && !sedeElegida
+                                ? 'Elige primero la sede.'
+                                : sedeElegida
+                                  ? sucursalesFormulario.length === 0
                                       ? `${sedeElegida.nombre} aún no tiene sucursales activas.`
-                                      : 'Aún no hay sucursales propias activas.'
-                                  : sedeElegida
-                                    ? `Sucursales de ${sedeElegida.nombre}.`
-                                    : 'Sucursales propias de Justo a Tiempo.'
+                                      : `Sucursales de ${sedeElegida.nombre}.`
+                                  : // Sin empresa solo caben las sucursales propias de Justo a Tiempo, si las hay
+                                    sucursalesFormulario.length === 0
+                                    ? 'Elige primero la empresa.'
+                                    : 'Sin empresa: sucursales propias de Justo a Tiempo.'
                         }
                         error={form.errors.sucursal_id}
                     >

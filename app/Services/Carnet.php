@@ -56,7 +56,7 @@ class Carnet
             'cedula' => $usuario->cedula,
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'email' => $usuario->email,
-            // Empresa cliente donde trabaja; sin empresa es personal propio de Justo a Tiempo
+            // Empresa cliente donde presta el servicio (todos son de Justo a Tiempo); puede no tener
             'empresa' => $usuario->empresa?->nombre,
             'sede' => $usuario->sede?->nombre,
             'sucursal' => $usuario->sucursal?->nombre,

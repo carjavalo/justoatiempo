@@ -269,7 +269,7 @@ function SinOpciones({ asignacion }: { asignacion?: Props['asignacion'] }) {
                 <dl className="mt-4 grid gap-3 text-sm">
                     <div>
                         <dt className="text-muted-foreground text-xs">Empresa</dt>
-                        <dd className="font-semibold">{asignacion?.empresa ?? 'Justo a Tiempo SP'}</dd>
+                        <dd className="font-semibold">{asignacion?.empresa ?? 'Sin empresa asignada'}</dd>
                     </div>
                     {asignacion?.sede && (
                         <div>

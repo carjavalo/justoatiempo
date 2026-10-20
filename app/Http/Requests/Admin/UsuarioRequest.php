@@ -19,9 +19,6 @@ class UsuarioRequest extends FormRequest
 {
     use LimpiaTexto;
 
-    /** Empresa elegida para el personal propio de Justo a Tiempo (se guarda sin empresa cliente). */
-    public const PROPIA = 'propia';
-
     /** Línea elegida para un administrador que ve todas (se guarda sin línea). */
     public const TODAS = 'todas';
 
@@ -58,14 +55,15 @@ class UsuarioRequest extends FormRequest
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
             'cedula' => ['nullable', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
-            // Sin rol, empresa, línea y cargo no se crea el usuario: son su lugar en la empresa y van en su carnet
+            // Sin rol, línea y cargo no se crea el usuario: son su lugar en la empresa y van en su carnet
             'cargo' => ['required', 'string', 'max:60'],
             'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
-            'empresa_id' => ['required', $this->propiaOExiste(fn (int $id) => Empresa::whereKey($id)->exists(), self::PROPIA, 'Elige una empresa de la lista.')],
+            // La empresa cliente donde presta el servicio; sin ella queda sin empresa asignada
+            'empresa_id' => ['nullable', 'integer', Rule::exists('empresas', 'id')->whereNull('deleted_at')],
             'sede_id' => ['nullable', 'integer', Rule::exists('sedes', 'id')->whereNull('deleted_at')],
             'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')->whereNull('deleted_at')],
-            'linea_id' => ['required', $this->propiaOExiste(fn (int $id) => LineaServicio::whereKey($id)->exists(), self::TODAS, 'Elige una línea de la lista.')],
+            'linea_id' => ['required', $this->idOTodas()],
             // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
             'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
             // Foto para el carnet: opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
@@ -77,12 +75,12 @@ class UsuarioRequest extends FormRequest
         ];
     }
 
-    /** Un id que exista, o la opción especial del campo ("propia", "todas"). */
-    private function propiaOExiste(Closure $existe, string $especial, string $mensaje): Closure
+    /** Una línea que exista, o "todas" (solo administradores; se revisa después). */
+    private function idOTodas(): Closure
     {
-        return function (string $atributo, mixed $valor, Closure $falla) use ($existe, $especial, $mensaje) {
-            if ($valor !== $especial && ! (is_numeric($valor) && $existe((int) $valor))) {
-                $falla($mensaje);
+        return function (string $atributo, mixed $valor, Closure $falla) {
+            if ($valor !== self::TODAS && ! (is_numeric($valor) && LineaServicio::whereKey((int) $valor)->exists())) {
+                $falla('Elige una línea de la lista.');
             }
         };
     }
@@ -145,7 +143,7 @@ class UsuarioRequest extends FormRequest
                         default => 'Esta sucursal es propia de Justo a Tiempo: quita la sede para asignarla.',
                     });
                 } elseif ($sucursal->sede_id === null && $empresaId) {
-                    $validator->errors()->add('sucursal_id', 'Esta sucursal es propia de Justo a Tiempo: no se asigna a personal de una empresa.');
+                    $validator->errors()->add('sucursal_id', 'Esta sucursal es propia de Justo a Tiempo: no se asigna a quien presta el servicio en una empresa.');
                 } elseif (! $sucursal->activo && $sucursalId !== $usuario?->sucursal_id) {
                     $validator->errors()->add('sucursal_id', 'Esta sucursal está inactiva: actívala antes de asignarle usuarios.');
                 }
@@ -153,10 +151,10 @@ class UsuarioRequest extends FormRequest
         }];
     }
 
-    /** La empresa cliente elegida; null si es personal propio de Justo a Tiempo. */
+    /** La empresa cliente elegida; null si queda sin empresa asignada. */
     private function empresaId(): ?int
     {
-        return $this->input('empresa_id') === self::PROPIA ? null : ($this->integer('empresa_id') ?: null);
+        return $this->integer('empresa_id') ?: null;
     }
 
     /** La línea elegida; null si es un administrador con todas las líneas. */
@@ -169,7 +167,8 @@ class UsuarioRequest extends FormRequest
     {
         return [
             'rol_id.required' => 'Elige el rol.',
-            'empresa_id.required' => 'Elige la empresa: una cliente o Justo a Tiempo SP (personal propio).',
+            'empresa_id.integer' => 'Elige una empresa de la lista.',
+            'empresa_id.exists' => 'Elige una empresa de la lista.',
             'linea_id.required' => 'Elige la línea de servicio.',
             'cargo.required' => 'Escribe el cargo: va en el carnet.',
             'email.unique' => 'Ya hay un usuario con este correo.',
