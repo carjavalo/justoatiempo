@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
+use App\Models\RolUsuario;
 use App\Models\Sede;
 use App\Models\Sucursal;
 use App\Models\User;
@@ -27,7 +28,7 @@ class UsuarioController extends Controller
     {
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
-            'rol' => ['nullable', Rule::enum(Rol::class)],
+            'rol' => ['nullable', 'integer'],
             'estado' => ['nullable', Rule::in(['activos', 'inactivos'])],
             'empresa' => ['nullable', 'integer'],
             'sede' => ['nullable', 'integer'],
@@ -36,12 +37,12 @@ class UsuarioController extends Controller
         ]);
 
         $usuarios = User::query()
-            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre'])
+            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'linea:id,nombre', 'rolUsuario:id,nombre'])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('name', 'like', $like)->orWhere('email', 'like', $like)->orWhere('cedula', 'like', $like));
             })
-            ->when($filtros['rol'] ?? null, fn (Builder $q, string $rol) => $q->where('rol', $rol))
+            ->when($filtros['rol'] ?? null, fn (Builder $q, int|string $rol) => $q->where('rol_id', (int) $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->where('empresa_id', $id))
             ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->where('sede_id', $id))
@@ -62,8 +63,10 @@ class UsuarioController extends Controller
                 'cedula' => $u->cedula,
                 'cargo' => $u->cargo,
                 'email' => $u->email,
+                // Nivel de acceso (admin, coordinador, auxiliar) y el rol dentro de la empresa
                 'rol' => $u->rol->value,
-                'rolLabel' => $u->rol->label(),
+                'rolId' => $u->rol_id,
+                'rolNombre' => $u->nombreRol(),
                 'empresaId' => $u->empresa_id,
                 'empresa' => $u->empresa?->nombre,
                 'sedeId' => $u->sede_id,
@@ -85,7 +88,7 @@ class UsuarioController extends Controller
             'total' => User::count(),
             'filtros' => [
                 'q' => $filtros['q'] ?? '',
-                'rol' => $filtros['rol'] ?? '',
+                'rol' => (string) ($filtros['rol'] ?? ''),
                 'estado' => $filtros['estado'] ?? '',
                 'empresa' => (string) ($filtros['empresa'] ?? ''),
                 'sede' => (string) ($filtros['sede'] ?? ''),
@@ -99,7 +102,15 @@ class UsuarioController extends Controller
                 'sucursal' => isset($filtros['sucursal']) ? Sucursal::withTrashed()->whereKey($filtros['sucursal'])->value('nombre') : null,
                 'linea' => isset($filtros['linea']) ? LineaServicio::whereKey($filtros['linea'])->value('nombre') : null,
             ],
-            'roles' => array_map(fn (Rol $r) => ['valor' => $r->value, 'label' => $r->label(), 'descripcion' => $r->descripcion()], Rol::cases()),
+            // Roles de la empresa con el nivel de acceso de cada uno: el formulario sabe si es administrador
+            'roles' => RolUsuario::orderBy('nombre')->get()->map(fn (RolUsuario $r) => [
+                'id' => $r->id,
+                'nombre' => $r->nombre,
+                'nivel' => $r->nivel->value,
+                'nivelLabel' => $r->nivel->label(),
+                'nivelDescripcion' => $r->nivel->descripcion(),
+                'activo' => $r->activo,
+            ]),
             // Cada empresa con las líneas que recibe: el formulario solo ofrece las de la línea elegida
             'empresas' => Empresa::with('lineas:id')->orderBy('nombre')->get(['id', 'nombre', 'activo'])->map(fn (Empresa $c) => [
                 'id' => $c->id,

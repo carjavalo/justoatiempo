@@ -36,6 +36,7 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
+        'rol_id',
         'empresa_id',
         'sede_id',
         'sucursal_id',
@@ -91,6 +92,15 @@ class User extends Authenticatable
         static::saving(function (User $user) {
             if (filled($user->nombres)) {
                 $user->name = self::nombreCompleto($user->nombres, $user->primer_apellido, $user->segundo_apellido);
+            }
+
+            // El nivel de acceso (lo que puede hacer en la plataforma) es siempre el de su rol. Sin rol elegido
+            // (p. ej. usuarios creados desde código), toma el rol base de su nivel.
+            if ($user->rol_id && $user->isDirty('rol_id')) {
+                $user->rol = RolUsuario::whereKey($user->rol_id)->value('nivel') ?? $user->rol;
+            } elseif (! $user->rol_id || $user->isDirty('rol')) {
+                $user->rol ??= Rol::Auxiliar;
+                $user->rol_id = RolUsuario::base($user->rol)?->id;
             }
         });
     }
@@ -155,6 +165,18 @@ class User extends Authenticatable
     }
 
     /** Línea de servicio en la que trabaja (los administradores no tienen: ven todas). */
+    /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con su nivel de acceso a la plataforma. */
+    public function rolUsuario(): BelongsTo
+    {
+        return $this->belongsTo(RolUsuario::class, 'rol_id');
+    }
+
+    /** El nombre de su rol para mostrar ("Conductor"); sin rol asignado, el de su nivel de acceso. */
+    public function nombreRol(): string
+    {
+        return $this->rolUsuario?->nombre ?? $this->rol->label();
+    }
+
     public function linea(): BelongsTo
     {
         return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');

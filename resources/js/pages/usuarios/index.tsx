@@ -17,7 +17,6 @@ import {
     Tabla,
 } from '@/components/admin/piezas';
 import { IdCard, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
-import InputError from '@/components/input-error';
 import { PasswordInput } from '@/components/password-input';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
@@ -39,8 +38,11 @@ interface FilaUsuario {
     cedula: string | null;
     cargo: string | null;
     email: string;
+    /** Nivel de acceso del rol (admin, coordinador, auxiliar). */
     rol: Rol;
-    rolLabel: string;
+    rolId: number | null;
+    /** Rol dentro de la empresa (auxiliar, conductor…). */
+    rolNombre: string;
     empresaId: number | null;
     empresa: string | null;
     sedeId: number | null;
@@ -70,7 +72,8 @@ interface Props {
     total: number;
     filtros: { q: string; rol: string; estado: string; empresa: string; sede: string; sucursal: string; linea: string };
     contexto: { empresa: string | null; sede: string | null; sucursal: string | null };
-    roles: { valor: Rol; label: string; descripcion: string }[];
+    /** Roles de la empresa, cada uno con su nivel de acceso en la plataforma. */
+    roles: { id: number; nombre: string; nivel: Rol; nivelLabel: string; nivelDescripcion: string; activo: boolean }[];
     /** Cada empresa con las líneas de servicio que recibe. */
     empresas: (Opcion & { lineas: number[] })[];
     sedes: (Opcion & { empresaId: number })[];
@@ -86,7 +89,7 @@ const VACIO = {
     cedula: '',
     cargo: '',
     email: '',
-    rol: '',
+    rol_id: '',
     linea_id: '',
     empresa_id: '',
     sede_id: '',
@@ -104,7 +107,7 @@ const ORDEN_CAMPOS = [
     'cedula',
     'cargo',
     'email',
-    'rol',
+    'rol_id',
     'linea_id',
     'empresa_id',
     'sede_id',
@@ -113,6 +116,12 @@ const ORDEN_CAMPOS = [
     'arl',
     'password',
 ];
+
+/** Opciones especiales: personal propio de Justo a Tiempo (sin empresa cliente) y administrador con todas las líneas. */
+const PROPIA = 'propia';
+const TODAS = 'todas';
+
+const minuscula = (texto: string) => texto.charAt(0).toLowerCase() + texto.slice(1);
 
 /** Contraseña aleatoria legible (sin 0/O ni 1/l/I) con mayúsculas, minúsculas, números y un símbolo. */
 function generarContrasena(): string {
@@ -153,9 +162,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                       cedula: usuario.cedula ?? '',
                       cargo: usuario.cargo ?? '',
                       email: usuario.email,
-                      rol: usuario.rol,
-                      linea_id: usuario.lineaId ? String(usuario.lineaId) : '',
-                      empresa_id: usuario.empresaId ? String(usuario.empresaId) : '',
+                      rol_id: usuario.rolId ? String(usuario.rolId) : '',
+                      linea_id: usuario.lineaId ? String(usuario.lineaId) : usuario.rol === 'admin' ? TODAS : '',
+                      empresa_id: usuario.empresaId ? String(usuario.empresaId) : PROPIA,
                       sede_id: usuario.sedeId ? String(usuario.sedeId) : '',
                       sucursal_id: usuario.sucursalId ? String(usuario.sucursalId) : '',
                       foto: null,
@@ -176,12 +185,14 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         const sucursal = sucursales.find((u) => String(u.id) === valores.sucursal && u.activo);
         const sede = sedes.find((x) => (sucursal ? x.id === sucursal.sedeId : String(x.id) === valores.sede) && x.activo);
         const empresa = empresas.find((e) => (sede ? e.id === sede.empresaId : String(e.id) === valores.empresa) && e.activo);
+        // Una sucursal propia es del personal propio; una de sede, de la empresa de esa sede
+        const propia = !empresa && sucursal?.sedeId === null;
         return {
             ...linea,
             ...(empresa && { empresa_id: String(empresa.id) }),
+            ...(propia && { empresa_id: PROPIA }),
             ...(sede && empresa && { sede_id: String(sede.id) }),
-            // Una sucursal propia solo aplica sin empresa; una de sede, con su sede
-            ...(sucursal && (sucursal.sedeId === null ? !empresa : sede) && { sucursal_id: String(sucursal.id) }),
+            ...(sucursal && (propia || sede) && { sucursal_id: String(sucursal.id) }),
         };
     };
 
@@ -195,41 +206,53 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
         else form.put(route('usuarios.update', editando.id), opciones);
     };
 
+    // El rol dice qué puede hacer en la plataforma: un administrador puede tener todas las líneas
+    const rolElegido = roles.find((r) => String(r.id) === form.data.rol_id);
+    const esAdmin = rolElegido?.nivel === 'admin';
+    // Se ofrecen los roles activos y, al editar, el que ya tiene aunque esté inactivo
+    const rolesFormulario = roles.filter((r) => r.activo || r.id === editando?.rolId);
+
     // Cascada línea → empresa → sede → sucursal: la empresa debe recibir la línea, la sede es de la empresa
-    // y la sucursal, de la sede. Sin empresa, las sucursales son las propias de Justo a Tiempo.
-    const esAdmin = form.data.rol === 'admin';
-    const lineaId = form.data.linea_id ? Number(form.data.linea_id) : null;
-    const empresaId = form.data.empresa_id ? Number(form.data.empresa_id) : null;
+    // y la sucursal, de la sede. El personal propio de Justo a Tiempo no tiene sede: sus sucursales son las propias.
+    const lineaId = form.data.linea_id && form.data.linea_id !== TODAS ? Number(form.data.linea_id) : null;
+    const esPropia = form.data.empresa_id === PROPIA;
+    const empresaId = form.data.empresa_id && !esPropia ? Number(form.data.empresa_id) : null;
     const sedeId = form.data.sede_id ? Number(form.data.sede_id) : null;
     const empresaElegida = empresas.find((e) => e.id === empresaId);
     const sedeElegida = sedes.find((x) => x.id === sedeId);
-    const empresasFormulario = empresas.filter((e) => (e.activo || e.id === empresaId) && (esAdmin || !lineaId || e.lineas.includes(lineaId)));
+    const empresasFormulario = empresas.filter((e) => (e.activo || e.id === empresaId) && (!lineaId || e.lineas.includes(lineaId)));
     const sedesFormulario = empresaId ? sedes.filter((x) => x.empresaId === empresaId && (x.activo || x.id === sedeId)) : [];
     const sucursalesFormulario =
-        empresaId && !sedeId ? [] : sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id));
+        esPropia || sedeId ? sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id)) : [];
     const lineaElegida = lineas.find((l) => l.id === lineaId);
 
     /** Lo que sigue valiendo de la sede y la sucursal al cambiar la empresa o la sede. */
-    const conservar = (empresa: number | null, sede: number | null) => {
+    const conservar = (empresa: number | null, propia: boolean, sede: number | null) => {
         const sedeSigue = sede !== null && sedes.some((x) => x.id === sede && x.empresaId === empresa);
         const sedeFinal = sedeSigue ? sede : null;
         const sucursalSigue = sucursales.some(
-            (u) => String(u.id) === form.data.sucursal_id && u.sedeId === sedeFinal && (sedeFinal !== null || empresa === null),
+            (u) => String(u.id) === form.data.sucursal_id && u.sedeId === sedeFinal && (sedeFinal !== null || propia),
         );
         return { sede_id: sedeFinal ? String(sedeFinal) : '', sucursal_id: sucursalSigue ? form.data.sucursal_id : '' };
     };
 
+    const cambiarRol = (valor: string) => {
+        const admin = roles.find((r) => String(r.id) === valor)?.nivel === 'admin';
+        // "Todas las líneas" es solo para administradores: al dejar de serlo hay que elegir una
+        const linea = admin ? form.data.linea_id || TODAS : form.data.linea_id === TODAS ? '' : form.data.linea_id;
+        form.setData((d) => ({ ...d, rol_id: valor, linea_id: linea }));
+    };
     const cambiarLinea = (valor: string) => {
-        const id = valor ? Number(valor) : null;
+        const id = valor && valor !== TODAS ? Number(valor) : null;
         const empresaSigue = !empresaElegida || !id || empresaElegida.lineas.includes(id);
         form.setData((d) => ({ ...d, linea_id: valor, ...(empresaSigue ? {} : { empresa_id: '', sede_id: '', sucursal_id: '' }) }));
     };
     const cambiarEmpresa = (valor: string) => {
-        const id = valor ? Number(valor) : null;
-        form.setData((d) => ({ ...d, empresa_id: valor, ...conservar(id, sedeId) }));
+        const propia = valor === PROPIA;
+        form.setData((d) => ({ ...d, empresa_id: valor, ...conservar(propia ? null : Number(valor), propia, sedeId) }));
     };
     const cambiarSede = (valor: string) => {
-        form.setData((d) => ({ ...d, ...conservar(empresaId, valor ? Number(valor) : null) }));
+        form.setData((d) => ({ ...d, ...conservar(empresaId, esPropia, valor ? Number(valor) : null) }));
     };
 
     const generar = () => {
@@ -296,7 +319,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                 etiqueta="Rol"
                                 valor={valores.rol}
                                 onCambio={(v) => cambiar('rol', v)}
-                                opciones={[{ valor: '', texto: 'Todos los roles' }, ...roles.map((r) => ({ valor: r.valor, texto: r.label }))]}
+                                opciones={[{ valor: '', texto: 'Todos los roles' }, ...roles.map((r) => ({ valor: String(r.id), texto: r.nombre }))]}
                             />
                             <FiltroLista
                                 id="filtro-linea"
@@ -408,17 +431,22 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                                                 </div>
                                             </th>
                                             <td className={claseTd}>
-                                                <p className="truncate" title={u.rolLabel}>
-                                                    {u.rolLabel}
+                                                <p className="truncate" title={u.rolNombre}>
+                                                    {u.rolNombre}
                                                 </p>
+                                                {u.cargo && u.cargo !== u.rolNombre && (
+                                                    <p className="text-muted-foreground truncate text-xs" title={u.cargo}>
+                                                        {u.cargo}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className={claseTd}>
-                                                {u.rol === 'admin' ? (
-                                                    <span className="text-muted-foreground text-xs">Todas</span>
-                                                ) : (
-                                                    <p className="truncate" title={u.linea ?? undefined}>
-                                                        {u.linea ?? 'Sin línea asignada'}
+                                                {u.linea ? (
+                                                    <p className="truncate" title={u.linea}>
+                                                        {u.linea}
                                                     </p>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">{u.rol === 'admin' ? 'Todas' : 'Sin línea asignada'}</span>
                                                 )}
                                             </td>
                                             <td className={claseTd}>
@@ -526,9 +554,10 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                             className="h-10 rounded-lg tabular-nums"
                         />
                     </Campo>
-                    <Campo id="cargo" etiqueta="Cargo" ayuda="Como aparece en el carnet." error={form.errors.cargo}>
+                    <Campo id="cargo" etiqueta="Cargo" requerido ayuda="Como aparece en el carnet." error={form.errors.cargo}>
                         <Input
                             {...propsCampo('cargo', form.errors.cargo, 'cargo-ayuda')}
+                            required
                             autoComplete="off"
                             placeholder="Ej.: Auxiliar logístico"
                             maxLength={60}
@@ -552,160 +581,142 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                     />
                 </Campo>
 
-                <fieldset className="grid gap-2" aria-describedby={form.errors.rol ? 'rol-error' : undefined}>
-                    <legend className="mb-1.5 text-sm leading-none font-medium">
-                        Rol <span aria-hidden="true">*</span>
-                    </legend>
-                    {roles.map((r, i) => {
-                        // El primero lleva el id "rol" para recibir el foco si el campo tiene error
-                        const id = i === 0 ? 'rol' : `rol-${r.valor}`;
-                        const elegido = form.data.rol === r.valor;
-                        return (
-                            <label
-                                key={r.valor}
-                                htmlFor={id}
-                                className={cn(
-                                    'has-[:focus-visible]:border-ring has-[:focus-visible]:ring-ring/25 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-[color,border-color,box-shadow] has-[:focus-visible]:ring-[3px]',
-                                    elegido ? 'border-primary bg-secondary/60' : 'hover:bg-muted/50',
-                                    form.errors.rol && !form.data.rol && 'border-critical/60',
-                                )}
-                            >
-                                <input
-                                    id={id}
-                                    type="radio"
-                                    name="rol"
-                                    value={r.valor}
-                                    checked={elegido}
-                                    onChange={() => form.setData('rol', r.valor)}
-                                    required
-                                    aria-invalid={form.errors.rol ? true : undefined}
-                                    // Nombre: solo el rol; la descripción se lee como descripción
-                                    aria-labelledby={`${id}-nombre`}
-                                    aria-describedby={`${id}-descripcion`}
-                                    className="accent-primary mt-0.5 size-4 shrink-0 outline-hidden"
-                                />
-                                <span>
-                                    <span id={`${id}-nombre`} className="block text-sm font-semibold">
-                                        {r.label}
-                                    </span>
-                                    <span id={`${id}-descripcion`} className="text-muted-foreground block text-xs">
-                                        {r.descripcion}
-                                    </span>
-                                </span>
-                            </label>
-                        );
-                    })}
-                    <InputError id="rol-error" message={form.errors.rol} />
-                </fieldset>
+                <Campo
+                    id="rol_id"
+                    etiqueta="Rol"
+                    requerido
+                    ayuda={
+                        rolElegido
+                            ? `Accede como ${rolElegido.nivelLabel.toLowerCase()}: ${minuscula(rolElegido.nivelDescripcion)}`
+                            : 'Su rol dentro de la empresa. Los roles se crean en la sección Roles.'
+                    }
+                    error={form.errors.rol_id}
+                >
+                    <Selector
+                        {...propsCampo('rol_id', form.errors.rol_id, 'rol_id-ayuda')}
+                        valor={form.data.rol_id}
+                        onCambio={cambiarRol}
+                        placeholder="Elige el rol"
+                        opciones={rolesFormulario.map((r) => ({
+                            valor: String(r.id),
+                            texto: r.activo ? r.nombre : `${r.nombre} (inactivo)`,
+                            // Con su acceso, salvo que el nombre ya lo diga (los roles base)
+                            detalle: r.nombre === r.nivelLabel ? undefined : `Accede como ${r.nivelLabel.toLowerCase()}`,
+                        }))}
+                    />
+                </Campo>
 
-                {/* Los administradores ven todas las líneas y toda la operación: no se les asigna línea ni lugar */}
-                {!esAdmin && (
+                <Campo
+                    id="linea_id"
+                    etiqueta="Línea de servicio"
+                    requerido
+                    ayuda={esAdmin ? 'Como administrador puede tenerlas todas, o la línea en la que trabaja.' : 'Al ingresar entrará directo a esta línea.'}
+                    error={form.errors.linea_id}
+                >
+                    <Selector
+                        {...propsCampo('linea_id', form.errors.linea_id, 'linea_id-ayuda')}
+                        valor={form.data.linea_id}
+                        onCambio={cambiarLinea}
+                        placeholder="Elige la línea en la que trabaja"
+                        // "Todas" está siempre en la lista (si apareciera junto con su elección, la lista no la tomaría)
+                        opciones={[
+                            { valor: TODAS, texto: 'Todas las líneas', detalle: esAdmin ? undefined : 'Solo para administradores', deshabilitada: !esAdmin },
+                            ...lineas.map((l) => ({ valor: String(l.id), texto: l.nombre })),
+                        ]}
+                    />
+                </Campo>
+
+                <Campo
+                    id="empresa_id"
+                    etiqueta="Empresa"
+                    requerido
+                    ayuda={
+                        lineaElegida
+                            ? empresasFormulario.length > 0
+                                ? `Justo a Tiempo SP o una empresa que recibe ${lineaElegida.nombre.toLowerCase()}.`
+                                : `Ninguna empresa recibe ${lineaElegida.nombre.toLowerCase()} todavía: elige Justo a Tiempo SP.`
+                            : 'Justo a Tiempo SP para el personal propio, o la empresa cliente donde trabaja.'
+                    }
+                    error={form.errors.empresa_id}
+                >
+                    <Selector
+                        {...propsCampo('empresa_id', form.errors.empresa_id, 'empresa_id-ayuda')}
+                        valor={form.data.empresa_id}
+                        onCambio={cambiarEmpresa}
+                        placeholder="Elige dónde trabaja"
+                        opciones={[
+                            { valor: PROPIA, texto: 'Justo a Tiempo SP', detalle: 'Personal propio' },
+                            ...empresasFormulario.map((e) => ({
+                                valor: String(e.id),
+                                texto: e.activo ? e.nombre : `${e.nombre} (inactiva)`,
+                            })),
+                        ]}
+                    />
+                </Campo>
+
+                <div className="grid gap-4 sm:grid-cols-2">
                     <Campo
-                        id="linea_id"
-                        etiqueta="Línea de servicio"
-                        requerido
-                        ayuda="Al ingresar entrará directo a esta línea."
-                        error={form.errors.linea_id}
+                        id="sede_id"
+                        etiqueta="Sede"
+                        ayuda={
+                            esPropia
+                                ? 'El personal propio no tiene sede.'
+                                : !empresaElegida
+                                  ? 'Elige primero la empresa.'
+                                  : sedesFormulario.length === 0
+                                    ? `${empresaElegida.nombre} aún no tiene sedes activas.`
+                                    : `Sedes de ${empresaElegida.nombre}.`
+                        }
+                        error={form.errors.sede_id}
                     >
                         <Selector
-                            {...propsCampo('linea_id', form.errors.linea_id, 'linea_id-ayuda')}
-                            valor={form.data.linea_id}
-                            onCambio={cambiarLinea}
-                            placeholder="Elige la línea en la que trabaja"
-                            opciones={lineas.map((l) => ({ valor: String(l.id), texto: l.nombre }))}
+                            {...propsCampo('sede_id', form.errors.sede_id, 'sede_id-ayuda')}
+                            valor={form.data.sede_id}
+                            onCambio={cambiarSede}
+                            disabled={sedesFormulario.length === 0}
+                            opciones={[
+                                { valor: '', texto: 'Sin sede asignada' },
+                                ...sedesFormulario.map((x) => ({
+                                    valor: String(x.id),
+                                    texto: x.activo ? x.nombre : `${x.nombre} (inactiva)`,
+                                })),
+                            ]}
                         />
                     </Campo>
-                )}
-
-                {!esAdmin && (
-                    <>
-                        <Campo
-                            id="empresa_id"
-                            etiqueta="Empresa"
-                            ayuda={
-                                lineaElegida && !esAdmin
-                                    ? empresasFormulario.length > 0
-                                        ? `Empresas que reciben ${lineaElegida.nombre.toLowerCase()}.`
-                                        : `Ninguna empresa recibe ${lineaElegida.nombre.toLowerCase()} todavía: queda como personal propio.`
-                                    : undefined
-                            }
-                            error={form.errors.empresa_id}
-                        >
-                            <Selector
-                                {...propsCampo('empresa_id', form.errors.empresa_id, lineaElegida ? 'empresa_id-ayuda' : undefined)}
-                                valor={form.data.empresa_id}
-                                onCambio={cambiarEmpresa}
-                                opciones={[
-                                    { valor: '', texto: 'Ninguna · personal propio' },
-                                    ...empresasFormulario.map((e) => ({
-                                        valor: String(e.id),
-                                        texto: e.activo ? e.nombre : `${e.nombre} (inactiva)`,
-                                    })),
-                                ]}
-                            />
-                        </Campo>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Campo
-                                id="sede_id"
-                                etiqueta="Sede"
-                                ayuda={
-                                    !empresaElegida
-                                        ? 'El personal propio no tiene sede.'
-                                        : sedesFormulario.length === 0
-                                          ? `${empresaElegida.nombre} aún no tiene sedes activas.`
-                                          : `Sedes de ${empresaElegida.nombre}.`
-                                }
-                                error={form.errors.sede_id}
-                            >
-                                <Selector
-                                    {...propsCampo('sede_id', form.errors.sede_id, 'sede_id-ayuda')}
-                                    valor={form.data.sede_id}
-                                    onCambio={cambiarSede}
-                                    disabled={sedesFormulario.length === 0}
-                                    opciones={[
-                                        { valor: '', texto: 'Sin sede asignada' },
-                                        ...sedesFormulario.map((x) => ({
-                                            valor: String(x.id),
-                                            texto: x.activo ? x.nombre : `${x.nombre} (inactiva)`,
-                                        })),
-                                    ]}
-                                />
-                            </Campo>
-                            <Campo
-                                id="sucursal_id"
-                                etiqueta="Sucursal"
-                                ayuda={
-                                    empresaElegida && !sedeElegida
-                                        ? 'Elige primero la sede.'
-                                        : sucursalesFormulario.length === 0
-                                          ? sedeElegida
-                                              ? `${sedeElegida.nombre} aún no tiene sucursales activas.`
-                                              : 'Aún no hay sucursales propias activas.'
-                                          : sedeElegida
-                                            ? `Sucursales de ${sedeElegida.nombre}.`
-                                            : 'Sucursales propias de Justo a Tiempo.'
-                                }
-                                error={form.errors.sucursal_id}
-                            >
-                                <Selector
-                                    {...propsCampo('sucursal_id', form.errors.sucursal_id, 'sucursal_id-ayuda')}
-                                    valor={form.data.sucursal_id}
-                                    onCambio={(v) => form.setData('sucursal_id', v)}
-                                    disabled={sucursalesFormulario.length === 0}
-                                    opciones={[
-                                        { valor: '', texto: 'Sin sucursal asignada' },
-                                        ...sucursalesFormulario.map((u) => ({
-                                            valor: String(u.id),
-                                            texto: u.activo ? u.nombre : `${u.nombre} (inactiva)`,
-                                            detalle: u.ciudad,
-                                        })),
-                                    ]}
-                                />
-                            </Campo>
-                        </div>
-                    </>
-                )}
+                    <Campo
+                        id="sucursal_id"
+                        etiqueta="Sucursal"
+                        ayuda={
+                            !esPropia && !sedeElegida
+                                ? empresaElegida
+                                    ? 'Elige primero la sede.'
+                                    : 'Elige primero la empresa.'
+                                : sucursalesFormulario.length === 0
+                                  ? sedeElegida
+                                      ? `${sedeElegida.nombre} aún no tiene sucursales activas.`
+                                      : 'Aún no hay sucursales propias activas.'
+                                  : sedeElegida
+                                    ? `Sucursales de ${sedeElegida.nombre}.`
+                                    : 'Sucursales propias de Justo a Tiempo.'
+                        }
+                        error={form.errors.sucursal_id}
+                    >
+                        <Selector
+                            {...propsCampo('sucursal_id', form.errors.sucursal_id, 'sucursal_id-ayuda')}
+                            valor={form.data.sucursal_id}
+                            onCambio={(v) => form.setData('sucursal_id', v)}
+                            disabled={sucursalesFormulario.length === 0}
+                            opciones={[
+                                { valor: '', texto: 'Sin sucursal asignada' },
+                                ...sucursalesFormulario.map((u) => ({
+                                    valor: String(u.id),
+                                    texto: u.activo ? u.nombre : `${u.nombre} (inactiva)`,
+                                    detalle: u.ciudad,
+                                })),
+                            ]}
+                        />
+                    </Campo>
+                </div>
 
                 <CampoImagen
                     id="foto"

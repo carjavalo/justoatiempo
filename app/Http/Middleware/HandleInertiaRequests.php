@@ -49,7 +49,8 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user ? [
                     ...$user->only(['id', 'name', 'nombres', 'primer_apellido', 'segundo_apellido', 'email', 'email_verified_at', 'created_at', 'updated_at', 'empleado_id']),
                     'rol' => $user->rol->value,
-                    'rol_label' => $user->rol->label(),
+                    // El rol dentro de la empresa ("Conductor"), no solo su nivel de acceso
+                    'rol_label' => $user->nombreRol(),
                     // Destino de la miga raíz: el panel o la línea en la que trabaja
                     'inicio' => $user->inicio(),
                     'linea' => $user->linea ? ['slug' => $user->linea->slug, 'nombre' => $user->linea->nombre] : null,

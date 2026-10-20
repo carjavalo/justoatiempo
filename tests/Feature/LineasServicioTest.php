@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\EstadoOrden;
+use App\Enums\Rol;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\Carga;
@@ -268,10 +269,13 @@ class LineasServicioTest extends TestCase
     public function test_el_personal_necesita_una_linea_que_su_empresa_reciba(): void
     {
         $empresa = $this->empresa();
-        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'];
+        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar), 'cargo' => 'Auxiliar', 'password' => 'Clave-segura-1'];
 
-        $this->actingAs($this->admin)->post('/usuarios', $base)
-            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio en la que trabaja.']);
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id])
+            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio.']);
+        // "Todas las líneas" es solo para administradores
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $empresa->id, 'linea_id' => 'todas'])
+            ->assertSessionHasErrors(['linea_id' => 'Elige la línea de servicio en la que trabaja: "Todas" es solo para administradores.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'linea_id' => $this->aseo->id, 'empresa_id' => $empresa->id])
             ->assertSessionHasErrors(['empresa_id' => 'Esta empresa no recibe la línea de servicio elegida.']);
 
@@ -280,14 +284,15 @@ class LineasServicioTest extends TestCase
         $this->assertSame($this->logistica->id, User::where('email', 'ana@example.com')->value('linea_servicio_id'));
     }
 
-    public function test_el_administrador_no_queda_en_una_linea(): void
+    public function test_el_administrador_puede_tener_todas_las_lineas_o_una(): void
     {
-        $this->actingAs($this->admin)->post('/usuarios', [
-            'nombres' => 'Otro', 'primer_apellido' => 'Admin', 'email' => 'otro@example.com', 'rol' => 'admin',
-            'linea_id' => $this->aseo->id, 'password' => 'Clave-segura-1',
-        ])->assertSessionHasNoErrors();
+        $datos = ['primer_apellido' => 'Admin', 'rol_id' => $this->rolBase(Rol::Admin), 'cargo' => 'Gerente', 'empresa_id' => 'propia', 'password' => 'Clave-segura-1'];
 
-        $this->assertNull(User::where('email', 'otro@example.com')->value('linea_servicio_id'));
+        $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Todas', 'email' => 'todas@example.com', 'linea_id' => 'todas'])->assertSessionHasNoErrors();
+        $this->actingAs($this->admin)->post('/usuarios', [...$datos, 'nombres' => 'Aseo', 'email' => 'aseo@example.com', 'linea_id' => $this->aseo->id])->assertSessionHasNoErrors();
+
+        $this->assertNull(User::where('email', 'todas@example.com')->value('linea_servicio_id'));
+        $this->assertSame($this->aseo->id, User::where('email', 'aseo@example.com')->value('linea_servicio_id'));
     }
 
     public function test_filtra_usuarios_por_linea(): void

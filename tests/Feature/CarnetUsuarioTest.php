@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Rol;
 use App\Models\LineaServicio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,8 +34,8 @@ class CarnetUsuarioTest extends TestCase
     private function datos(array $extra = []): array
     {
         return [
-            'nombres' => 'Johnny', 'primer_apellido' => 'Correa', 'email' => 'johnny@example.com', 'rol' => 'coordinador',
-            'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
+            'nombres' => 'Johnny', 'primer_apellido' => 'Correa', 'email' => 'johnny@example.com', 'rol_id' => $this->rolBase(Rol::Coordinador),
+            'cargo' => 'Coordinador', 'empresa_id' => 'propia', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1', ...$extra,
         ];
     }
 

@@ -24,8 +24,8 @@ class Carnet
                 ?: Str::after($usuario->name, ' '),
             'nombreCompleto' => $usuario->name,
             'cedula' => $usuario->cedula,
-            // Sin cargo escrito, el carnet lleva el rol en la plataforma
-            'cargo' => $usuario->cargo ?: $usuario->rol->label(),
+            // Sin cargo escrito (usuarios de antes de que fuera obligatorio), el carnet lleva su rol
+            'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'tieneCargo' => filled($usuario->cargo),
             'email' => $usuario->email,
             'foto' => $foto,
@@ -54,7 +54,7 @@ class Carnet
             'vigente' => true,
             'nombre' => $usuario->name,
             'cedula' => $usuario->cedula,
-            'cargo' => $usuario->cargo ?: $usuario->rol->label(),
+            'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'email' => $usuario->email,
             // Empresa cliente donde trabaja; sin empresa es personal propio de Justo a Tiempo
             'empresa' => $usuario->empresa?->nombre,

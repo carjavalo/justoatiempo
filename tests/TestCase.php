@@ -2,8 +2,10 @@
 
 namespace Tests;
 
+use App\Enums\Rol;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
+use App\Models\RolUsuario;
 use App\Models\Sede;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
@@ -16,6 +18,12 @@ abstract class TestCase extends BaseTestCase
         $empresa->lineas()->syncWithoutDetaching([LineaServicio::logistica()->id]);
 
         return $empresa;
+    }
+
+    /** Id del rol base de un nivel de acceso (Administrador, Coordinador / Supervisor, Auxiliar operativo). */
+    protected function rolBase(Rol $nivel): int
+    {
+        return RolUsuario::base($nivel)->id;
     }
 
     /** Sede (cliente de la empresa, como TuGo); por defecto, de Ditranza. */

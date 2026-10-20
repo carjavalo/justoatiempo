@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\EmpresaController;
+use App\Http\Controllers\Admin\RolController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\SolicitudController;
 use App\Http\Controllers\Admin\SucursalController;
@@ -46,6 +47,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('usuarios/{usuario}/arl', [UsuarioController::class, 'arl'])->name('usuarios.arl');
         Route::get('usuarios/{usuario}/carnet', [UsuarioController::class, 'carnet'])->name('usuarios.carnet');
         Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'estado'])->name('usuarios.estado');
+
+        // Roles dentro de la empresa (auxiliar, conductor…), cada uno con su nivel de acceso
+        Route::get('roles', [RolController::class, 'index'])->name('roles.index');
+        Route::post('roles', [RolController::class, 'store'])->name('roles.store');
+        Route::put('roles/{rol}', [RolController::class, 'update'])->name('roles.update');
+        Route::patch('roles/{rol}/estado', [RolController::class, 'estado'])->name('roles.estado');
 
         Route::get('empresas', [EmpresaController::class, 'index'])->name('empresas.index');
         Route::post('empresas', [EmpresaController::class, 'store'])->name('empresas.store');

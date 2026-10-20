@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Empresa;
 use App\Models\LineaServicio;
+use App\Models\RolUsuario;
 use App\Models\Sede;
 use App\Models\SolicitudContacto;
 use App\Models\Sucursal;
@@ -49,6 +50,7 @@ class PanelController extends Controller
                 'sedes' => ['total' => (int) $sedes->total, 'activas' => (int) $sedes->activas],
                 'sucursales' => ['total' => (int) $sucursales->total, 'activas' => (int) $sucursales->activas, 'propias' => (int) $sucursales->propias],
                 'solicitudes' => ['total' => SolicitudContacto::count(), 'pendientes' => SolicitudContacto::where('atendida', false)->count()],
+                'roles' => ['total' => RolUsuario::count(), 'activos' => RolUsuario::where('activo', true)->count()],
             ],
             'lineas' => LineaServicio::ordenadas()
                 ->withCount([

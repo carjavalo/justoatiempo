@@ -281,7 +281,8 @@ class AdministracionTest extends TestCase
             'primer_apellido' => 'Gómez',
             'segundo_apellido' => 'Ruiz',
             'email' => 'Laura@Example.com',
-            'rol' => 'coordinador',
+            'rol_id' => $this->rolBase(Rol::Coordinador),
+            'cargo' => 'Coordinadora de bodega',
             'linea_id' => $linea->id,
             'empresa_id' => $sede->empresa_id,
             'sede_id' => $sede->id,
@@ -295,6 +296,8 @@ class AdministracionTest extends TestCase
         $this->assertSame('Laura Sofía Gómez Ruiz', $usuario->name);
         $this->assertSame('Ruiz', $usuario->segundo_apellido);
         $this->assertSame(Rol::Coordinador, $usuario->rol);
+        $this->assertSame('Coordinador / Supervisor', $usuario->nombreRol());
+        $this->assertSame('Coordinadora de bodega', $usuario->cargo);
         $this->assertSame([$sede->empresa_id, $sede->id, $sucursal->id], [$usuario->empresa_id, $usuario->sede_id, $usuario->sucursal_id]);
         $this->assertSame($linea->id, $usuario->linea_servicio_id);
         $this->assertNotNull($usuario->email_verified_at);
@@ -309,12 +312,12 @@ class AdministracionTest extends TestCase
         $falabella = $this->sede('Falabella', [], $otraEmpresa);
         $acopi = $falabella->sucursales()->create(['nombre' => 'Acopi', 'ciudad' => 'Yumbo']);
         $oficina = Sucursal::create(['sede_id' => null, 'nombre' => 'Oficina', 'ciudad' => 'Cali']);
-        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol' => 'auxiliar', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1'];
+        $base = ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar), 'cargo' => 'Auxiliar', 'linea_id' => LineaServicio::logistica()->id, 'password' => 'Clave-segura-1'];
         $ditranza = $tugo->empresa_id;
 
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $falabella->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede no pertenece a la empresa elegida.']);
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sede_id' => $tugo->id])
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => 'propia', 'sede_id' => $tugo->id])
             ->assertSessionHasErrors(['sede_id' => 'Esta sede es de una empresa: elige primero esa empresa.']);
         $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => $ditranza, 'sede_id' => $tugo->id, 'sucursal_id' => $acopi->id])
             ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal no pertenece a la sede elegida.']);
@@ -324,33 +327,52 @@ class AdministracionTest extends TestCase
             ->assertSessionHasErrors(['sucursal_id' => 'Esta sucursal es propia de Justo a Tiempo: no se asigna a personal de una empresa.']);
 
         // El personal propio va en una sucursal propia
-        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'sucursal_id' => $oficina->id])->assertSessionHasNoErrors();
-        $this->assertSame($oficina->id, User::where('email', 'ana@example.com')->value('sucursal_id'));
+        $this->actingAs($this->admin)->post('/usuarios', [...$base, 'empresa_id' => 'propia', 'sucursal_id' => $oficina->id])->assertSessionHasNoErrors();
+        $ana = User::where('email', 'ana@example.com')->sole();
+        $this->assertSame([null, $oficina->id], [$ana->empresa_id, $ana->sucursal_id]);
     }
 
-    public function test_el_administrador_no_queda_asignado_a_una_empresa(): void
+    public function test_el_administrador_tambien_tiene_empresa_y_cargo(): void
     {
         $sede = $this->sede('TuGo');
 
         $this->actingAs($this->admin)->post('/usuarios', [
-            'nombres' => 'Otra', 'primer_apellido' => 'Admin', 'email' => 'otra@example.com', 'rol' => 'admin',
-            'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'password' => 'Clave-segura-1',
+            'nombres' => 'Otra', 'primer_apellido' => 'Admin', 'email' => 'otra@example.com', 'rol_id' => $this->rolBase(Rol::Admin),
+            'cargo' => 'Gerente', 'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'linea_id' => 'todas', 'password' => 'Clave-segura-1',
         ])->assertSessionHasNoErrors();
 
         $otra = User::where('email', 'otra@example.com')->sole();
-        $this->assertSame([null, null, null], [$otra->empresa_id, $otra->sede_id, $otra->sucursal_id]);
-        // Sigue entrando a las herramientas de la operación
+        $this->assertSame([$sede->empresa_id, $sede->id, null], [$otra->empresa_id, $otra->sede_id, $otra->linea_servicio_id]);
+        // Con empresa o sin ella, el administrador sigue entrando a las herramientas de la operación
         $this->actingAs($otra)->get('/cargas')->assertOk();
+    }
+
+    public function test_sin_rol_empresa_linea_ni_cargo_no_se_crea_el_usuario(): void
+    {
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1'])
+            ->assertSessionHasErrors([
+                'rol_id' => 'Elige el rol.',
+                'empresa_id' => 'Elige la empresa: una cliente o Justo a Tiempo SP (personal propio).',
+                'linea_id' => 'Elige la línea de servicio.',
+                'cargo' => 'Escribe el cargo: va en el carnet.',
+            ]);
+        $this->assertDatabaseMissing('users', ['email' => 'ana@example.com']);
+
+        // Valores que no existen
+        $this->actingAs($this->admin)->post('/usuarios', [
+            'nombres' => 'Ana', 'primer_apellido' => 'Torres', 'email' => 'ana@example.com', 'password' => 'Clave-segura-1', 'cargo' => 'Auxiliar',
+            'rol_id' => 999, 'empresa_id' => 'otra', 'linea_id' => 999,
+        ])->assertSessionHasErrors(['rol_id', 'empresa_id' => 'Elige una empresa de la lista.', 'linea_id' => 'Elige una línea de la lista.']);
     }
 
     public function test_valida_correo_repetido_rol_y_contrasena(): void
     {
-        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => strtoupper($this->admin->email), 'rol' => 'jefe', 'password' => 'corta'])
-            ->assertSessionHasErrors(['email', 'rol', 'password']);
-        $this->actingAs($this->admin)->post('/usuarios', ['email' => 'z@example.com', 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => strtoupper($this->admin->email), 'rol_id' => 'jefe', 'password' => 'corta'])
+            ->assertSessionHasErrors(['email', 'rol_id', 'password']);
+        $this->actingAs($this->admin)->post('/usuarios', ['email' => 'z@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar), 'password' => 'Clave-segura-1'])
             ->assertSessionHasErrors(['nombres', 'primer_apellido'])
             ->assertSessionDoesntHaveErrors('segundo_apellido');
-        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => 'x@example.com', 'rol' => 'auxiliar'])
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => 'x@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar)])
             ->assertSessionHasErrors('password');
     }
 
@@ -358,7 +380,7 @@ class AdministracionTest extends TestCase
     {
         $usuario = User::factory()->create(['password' => 'Original-123']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Nuevo', 'primer_apellido' => 'Nombre', 'email' => $usuario->email, 'rol' => 'auxiliar', 'linea_id' => $usuario->linea_servicio_id, 'password' => ''])
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", [...$this->edicion($usuario), 'nombres' => 'Nuevo', 'primer_apellido' => 'Nombre', 'password' => ''])
             ->assertSessionHasNoErrors();
 
         $this->assertSame('Nuevo Nombre', $usuario->fresh()->name);
@@ -367,8 +389,10 @@ class AdministracionTest extends TestCase
 
     public function test_el_administrador_no_se_quita_su_rol_ni_se_desactiva(): void
     {
-        $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", ['nombres' => 'Admin', 'primer_apellido' => 'Prueba', 'email' => $this->admin->email, 'rol' => 'auxiliar'])
-            ->assertSessionHasErrors('rol');
+        $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", [
+            ...$this->edicion($this->admin), 'rol_id' => $this->rolBase(Rol::Auxiliar), 'linea_id' => LineaServicio::logistica()->id,
+        ])->assertSessionHasErrors(['rol_id' => 'No puedes quitarte el acceso de administrador. Pídeselo a otro administrador.']);
+        $this->assertSame(Rol::Admin, $this->admin->fresh()->rol);
 
         $this->actingAs($this->admin)->patch("/usuarios/{$this->admin->id}/estado", ['activo' => false])->assertSessionHas('error');
         $this->assertTrue($this->admin->fresh()->activo);
@@ -399,11 +423,20 @@ class AdministracionTest extends TestCase
         DB::table('sessions')->insert(['id' => 'sesion-vieja', 'user_id' => $usuario->id, 'payload' => '', 'last_activity' => time()]);
 
         // Sin contraseña nueva, la sesión sigue
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'linea_id' => $usuario->linea_servicio_id]);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", $this->edicion($usuario))->assertSessionHasNoErrors();
         $this->assertDatabaseHas('sessions', ['id' => 'sesion-vieja']);
 
-        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", ['nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'rol' => 'coordinador', 'linea_id' => $usuario->linea_servicio_id, 'password' => 'Nueva-clave-9']);
+        $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", [...$this->edicion($usuario), 'password' => 'Nueva-clave-9'])->assertSessionHasNoErrors();
         $this->assertDatabaseMissing('sessions', ['id' => 'sesion-vieja']);
+    }
+
+    /** Lo que el formulario envía al editar a alguien sin cambiar nada. */
+    private function edicion(User $usuario): array
+    {
+        return [
+            'nombres' => 'Otro', 'primer_apellido' => 'Más', 'email' => $usuario->email, 'cargo' => $usuario->cargo ?? 'Auxiliar',
+            'rol_id' => $usuario->rol_id, 'empresa_id' => $usuario->empresa_id ?? 'propia', 'linea_id' => $usuario->linea_servicio_id ?? 'todas',
+        ];
     }
 
     public function test_el_personal_de_una_empresa_no_entra_a_los_modulos_de_operacion(): void
@@ -438,7 +471,7 @@ class AdministracionTest extends TestCase
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => ['a', 'b']])->assertSessionHasErrors('nombre');
         $this->actingAs($this->admin)->post('/sedes', ['nombre' => ['a'], 'meta_efectividad' => 95])->assertSessionHasErrors('nombre');
         $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'X', 'ciudad' => ['Cali']])->assertSessionHasErrors('ciudad');
-        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => ['a@b.co'], 'rol' => 'auxiliar', 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => ['a@b.co'], 'rol_id' => $this->rolBase(Rol::Auxiliar), 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
     }
 
     public function test_filtra_usuarios_por_sede_y_por_sucursal_desde_los_conteos(): void

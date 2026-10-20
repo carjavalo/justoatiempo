@@ -127,11 +127,14 @@ export function ConteoEnlace({ n, uno, varios, ninguno, de, href }: { n: number;
     );
 }
 
+const CONECTORES = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'o', 'u', 'a']);
+
 /** Ícono con iniciales para identificar filas de un vistazo (decorativo: el nombre va al lado). */
 export function Iniciales({ texto, className }: { texto: string; className?: string }) {
     const iniciales = texto
         .split(/\s+/)
-        .filter(Boolean)
+        // Solo palabras con contenido: "Coordinador / Supervisor" → CS (no "C/"), "Conductor de ruta" → CR
+        .filter((p) => /^[\p{L}\p{N}]/u.test(p) && !CONECTORES.has(p.toLowerCase()))
         .slice(0, 2)
         .map((p) => p[0])
         .join('')
