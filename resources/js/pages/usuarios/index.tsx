@@ -345,7 +345,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, em
                         {usuarios.data.length === 0 ? (
                             <SinResultados texto="Ningún usuario coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[980px]" columnas={['28%', '14%', '17%', '17%', '9%', '11%', '3.5rem']}>
+                            <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[980px]" columnas={['26%', '17%', '16%', '16.5%', '9%', '11%', '3.5rem']}>
                                 <thead className="text-muted-foreground border-b">
                                     <tr>
                                         <th scope="col" className={claseTh}>
