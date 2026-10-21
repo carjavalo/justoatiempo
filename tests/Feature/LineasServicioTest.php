@@ -7,7 +7,6 @@ use App\Enums\Rol;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\Carga;
-use App\Models\Empleado;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\Orden;
@@ -41,14 +40,14 @@ class LineasServicioTest extends TestCase
     {
         static $n = 0;
         $carga = Carga::create(['archivo_nombre' => "c{$n}.xlsx", 'archivo_path' => 'c', 'archivo_hash' => str_pad((string) $n, 64, 'a')]);
-        $empleado = Empleado::create(['cedula' => (string) (1000 + $n), 'nombres' => 'Auxiliar', 'apellidos' => (string) $n]);
+        $auxiliar = User::factory()->sinAcceso()->create(['cedula' => (string) (1000 + $n), 'nombres' => 'Auxiliar', 'primer_apellido' => (string) $n, 'linea_servicio_id' => null]);
         foreach (range(1, $cuantas) as $i) {
             Orden::create([
                 'carga_id' => $carga->id,
                 'fecha_operacion' => '2026-10-02',
                 'sede_id' => $sede->id,
                 'sucursal_id' => $sucursal?->id,
-                'empleado_id' => $empleado->id,
+                'auxiliar_id' => $auxiliar->id,
                 'codigo_orden' => "O{$n}-{$i}",
                 'estado' => EstadoOrden::Aprobada,
             ]);
@@ -186,8 +185,8 @@ class LineasServicioTest extends TestCase
     {
         $tugo = $this->sede('TuGo');
         $this->ordenes($tugo, 2);
-        $ajeno = Empleado::create(['cedula' => '999', 'nombres' => 'Ajeno', 'apellidos' => 'A Ditranza']);
-        AccionDesempeno::create(['empleado_id' => $ajeno->id, 'fecha' => '2026-10-02', 'tipo' => TipoAccion::LlamadoAtencion, 'descripcion' => 'Llegó tarde a otra operación']);
+        $ajeno = User::factory()->sinAcceso()->create(['cedula' => '999', 'nombres' => 'Ajeno', 'primer_apellido' => 'A Ditranza', 'linea_servicio_id' => null]);
+        AccionDesempeno::create(['user_id' => $ajeno->id, 'fecha' => '2026-10-02', 'tipo' => TipoAccion::LlamadoAtencion, 'descripcion' => 'Llegó tarde a otra operación']);
 
         $deDitranza = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
         $this->actingAs($deDitranza)->get('/lineas/logisticos')

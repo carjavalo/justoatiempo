@@ -62,9 +62,10 @@ class PasswordResetLinkController extends Controller
         }
         RateLimiter::hit($clave, 15 * 60);
 
-        // Solo las cuentas activas reciben el enlace. La respuesta es la misma exista o no la cuenta, y el correo
-        // sale después de responder (User::avisarDespues): ni el mensaje ni la espera delatan qué correos existen.
-        Password::sendResetLink([...$request->only('email'), 'activo' => true]);
+        // Solo las cuentas activas y con acceso a la plataforma reciben el enlace (a quien no tiene acceso, una
+        // contraseña nueva se lo daría). La respuesta es la misma exista o no la cuenta, y el correo sale después de
+        // responder (User::avisarDespues): ni el mensaje ni la espera delatan qué correos existen.
+        Password::sendResetLink([...$request->only('email'), 'activo' => true, 'acceso' => true]);
         $request->session()->put(self::ULTIMO_ENVIO, now()->getTimestamp());
 
         return back()->with('status', "Si {$request->email} tiene una cuenta activa en la plataforma, en unos minutos te llegará un correo con el enlace para crear una nueva contraseña. Revisa también la carpeta de correo no deseado.");

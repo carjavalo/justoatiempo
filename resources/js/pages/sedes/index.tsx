@@ -49,6 +49,8 @@ interface Props {
     total: number;
     filtros: { q: string; empresa: string; estado: string };
     empresas: Empresa[];
+    /** La meta con la que nace una sede nueva (Parámetros). */
+    metaPorDefecto: number;
 }
 
 const VACIO = { nombre: '', codigo: '', empresa_id: '', meta_efectividad: '95' };
@@ -60,7 +62,7 @@ const formatoMeta = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 })
  * Sedes: los clientes que atiende cada empresa (TuGo y Sodimac, de Ditranza). Cada una tiene su meta de
  * efectividad pactada y sus sucursales.
  */
-export default function Sedes({ sedes, total, filtros, empresas }: Props) {
+export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto }: Props) {
     const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('sedes.index'), filtros);
     const [abierto, setAbierto] = useState(false);
@@ -83,7 +85,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                       meta_efectividad: formatoMeta.format(sede.meta),
                   }
                 : // Si la lista está filtrada por una empresa, la sede nueva nace en esa empresa
-                  { ...VACIO, empresa_id: /^\d+$/.test(valores.empresa) ? valores.empresa : '' },
+                  { ...VACIO, empresa_id: /^\d+$/.test(valores.empresa) ? valores.empresa : '', meta_efectividad: formatoMeta.format(metaPorDefecto) },
         );
         setAbierto(true);
     };
@@ -324,7 +326,7 @@ export default function Sedes({ sedes, total, filtros, empresas }: Props) {
                     id="meta_efectividad"
                     etiqueta="Meta de efectividad"
                     requerido
-                    ayuda="De cada 100 entregas, cuántas deben salir bien (aprobadas, sin devolución). Es lo pactado con el cliente; el tablero de logística compara la efectividad real contra esta meta. Si no hay un acuerdo, deja 95 %."
+                    ayuda="De cada 100 entregas, cuántas deben salir bien (aprobadas, sin devolución). Es lo pactado con el cliente; el tablero de logística compara la efectividad real contra esta meta. Si no hay un acuerdo, deja la de Parámetros (${formatoMeta.format(metaPorDefecto)} %)."
                     error={form.errors.meta_efectividad}
                 >
                     <div className="relative w-36">

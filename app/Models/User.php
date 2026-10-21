@@ -39,6 +39,10 @@ class User extends Authenticatable
         'segundo_apellido',
         'cedula',
         'cargo',
+        'telefono',
+        'ciudad',
+        'fecha_nacimiento',
+        'fecha_ingreso',
         'email',
         'password',
         'rol',
@@ -46,8 +50,8 @@ class User extends Authenticatable
         'foto_path',
         'arl_path',
         'arl_subida_en',
-        'empleado_id',
         'activo',
+        'acceso',
         'ultimo_acceso_en',
     ];
 
@@ -78,6 +82,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'rol' => Rol::class,
             'activo' => 'boolean',
+            'acceso' => 'boolean',
+            'fecha_nacimiento' => 'date',
+            'fecha_ingreso' => 'date',
             'ultimo_acceso_en' => 'datetime',
             'arl_subida_en' => 'datetime',
         ];
@@ -89,6 +96,17 @@ class User extends Authenticatable
         // Cada persona nace con el código que lleva el QR de su carnet
         static::creating(function (User $user) {
             $user->carnet_codigo ??= Str::random(12);
+        });
+
+        // Con su cédula, las entregas de Drivin que se importaron antes de registrarla quedan a su nombre (y si se
+        // corrige, las de la cédula anterior dejan de serlo)
+        static::saved(function (User $user) {
+            // (wasRecentlyCreated sigue en true en la misma instancia después de crearla: primero va el cambio)
+            if ($user->wasChanged('cedula')) {
+                Orden::asignarAPersona($user, $user->getOriginal('cedula'));
+            } elseif ($user->wasRecentlyCreated && filled($user->cedula)) {
+                Orden::asignarAPersona($user);
+            }
         });
 
         static::saving(function (User $user) {
@@ -143,9 +161,22 @@ class User extends Authenticatable
         });
     }
 
-    public function empleado(): BelongsTo
+    /** Sus entregas en la línea logística (las órdenes de Drivin en las que fue el auxiliar). */
+    public function ordenes(): HasMany
     {
-        return $this->belongsTo(Empleado::class);
+        return $this->hasMany(Orden::class, 'auxiliar_id');
+    }
+
+    /** Su seguimiento: felicitaciones, retroalimentaciones y llamados de atención. */
+    public function acciones(): HasMany
+    {
+        return $this->hasMany(AccionDesempeno::class);
+    }
+
+    /** Si puede entrar a la plataforma: tiene acceso, correo y está activo. Sin acceso sigue teniendo su carnet. */
+    public function puedeIngresar(): bool
+    {
+        return $this->activo && $this->acceso && filled($this->email);
     }
 
     /** Dónde presta el servicio y qué hace allí: puede estar en varias empresas, cada una con sus líneas y su periodo. */
@@ -286,9 +317,15 @@ class User extends Authenticatable
     /** Si su rol abre algún módulo de la administración (usuarios, roles, empresas…). */
     public function administraAlgo(): bool
     {
-        foreach (array_keys(Permisos::CATALOGO[0]['modulos']) as $modulo) {
-            if ($this->puede("{$modulo}.ver")) {
-                return true;
+        // Administración y datos maestros (la flota, los parámetros)
+        foreach (Permisos::CATALOGO as $grupo) {
+            if (! in_array($grupo['clave'], ['administracion', 'maestros'], true)) {
+                continue;
+            }
+            foreach (array_keys($grupo['modulos']) as $modulo) {
+                if ($this->puede("{$modulo}.ver")) {
+                    return true;
+                }
             }
         }
 

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\EstadoOrden;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
-use App\Models\Empleado;
 use App\Models\Orden;
 use App\Models\Sede;
 use App\Models\User;
@@ -20,9 +19,9 @@ class DashboardTest extends TestCase
 
     private Sede $sede;
 
-    private Empleado $juan;
+    private User $juan;
 
-    private Empleado $andres;
+    private User $andres;
 
     protected function setUp(): void
     {
@@ -30,8 +29,9 @@ class DashboardTest extends TestCase
 
         // TuGo es sede de Ditranza, que recibe la línea logística
         $this->sede = $this->sede('TuGo');
-        $this->juan = Empleado::create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'apellidos' => 'Plaza']);
-        $this->andres = Empleado::create(['cedula' => '222', 'nombres' => 'Andrés', 'apellidos' => 'Moreno']);
+        // Juan entra a la plataforma (ve su desempeño); Andrés es parte del personal sin acceso
+        $this->juan = User::factory()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza']);
+        $this->andres = User::factory()->sinAcceso()->create(['cedula' => '222', 'nombres' => 'Andrés', 'primer_apellido' => 'Moreno', 'linea_servicio_id' => null]);
 
         // Ejemplo del SRS: 8 tareas, 5 aprobadas y 3 rechazadas => 62,5 %
         $carga = Carga::create(['archivo_nombre' => 'p.xlsx', 'archivo_path' => 'p', 'archivo_hash' => str_repeat('a', 64)]);
@@ -42,7 +42,7 @@ class DashboardTest extends TestCase
                 'sede_id' => $this->sede->id,
                 'ruta' => 'CALI SUR',
                 'placa' => 'SNX708',
-                'empleado_id' => $this->juan->id,
+                'auxiliar_id' => $this->juan->id,
                 'codigo_orden' => "PDVT{$i}",
                 'estado' => $i <= 5 ? EstadoOrden::Aprobada : EstadoOrden::Rechazada,
             ]);
@@ -51,7 +51,7 @@ class DashboardTest extends TestCase
             'carga_id' => $carga->id,
             'fecha_operacion' => '2026-10-02',
             'sede_id' => $this->sede->id,
-            'empleado_id' => $this->andres->id,
+            'auxiliar_id' => $this->andres->id,
             'codigo_orden' => 'PDVT99',
             'estado' => EstadoOrden::Aprobada,
         ]);
@@ -82,7 +82,7 @@ class DashboardTest extends TestCase
 
     public function test_auxiliar_solo_ve_sus_propias_entregas()
     {
-        $this->actingAs(User::factory()->create(['empleado_id' => $this->juan->id]));
+        $this->actingAs($this->juan);
 
         $this->get('/lineas/logisticos')
             ->assertOk()
@@ -106,9 +106,11 @@ class DashboardTest extends TestCase
         $this->actingAs($auxiliar)->get('/informes')->assertForbidden();
         $this->actingAs($auxiliar)->get('/mis-entregas')->assertOk();
         $this->actingAs($coordinador)->get('/auditoria')->assertOk();
-        $this->actingAs($coordinador)->get('/empleados')->assertForbidden();
-        $this->actingAs($admin)->get('/empleados')->assertOk();
-        $this->actingAs(User::factory()->admin()->create(['activo' => false]))->get('/empleados')->assertRedirect('/login');
+        $this->actingAs($coordinador)->get('/vehiculos')->assertForbidden();
+        $this->actingAs($admin)->get('/vehiculos')->assertOk();
+        $this->actingAs(User::factory()->admin()->create(['activo' => false]))->get('/vehiculos')->assertRedirect('/login');
+        // El módulo Empleados ya no existe: el personal está en Usuarios
+        $this->actingAs($admin)->get('/empleados')->assertNotFound();
     }
 
     public function test_el_consolidador_calcula_la_linea_del_informe_y_el_protocolo()
@@ -125,7 +127,7 @@ class DashboardTest extends TestCase
         ]);
 
         $informe = app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->sede->id, null);
-        $linea = $informe->lineas->firstWhere('empleado_id', $this->juan->id);
+        $linea = $informe->lineas->firstWhere('auxiliar_id', $this->juan->id);
 
         $this->assertSame(9, $informe->total_asignadas);
         $this->assertSame(8, $linea->asignadas);

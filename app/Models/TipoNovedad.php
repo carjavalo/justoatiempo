@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TipoNovedad extends Model
 {
+    /** Los que la auditoría sugiere sola (App\Services\Pod\EvaluadorProtocolo): su nombre no se cambia. */
+    public const DEL_SISTEMA = [
+        'Buen protocolo de entrega', 'Entregado sin destapar con nota en remesa', 'Falta foto de fachada',
+        'Faltan fotos de producto sellado', 'Faltan fotos de producto destapado', 'Falta remesa firmada',
+        'Falta foto de fachada y remesa firmada', 'Sin evidencia',
+    ];
+
     protected $table = 'tipos_novedad';
 
     protected $fillable = ['nombre', 'severidad', 'activo'];

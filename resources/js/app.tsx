@@ -38,10 +38,10 @@ createInertiaApp({
  */
 let rutaAnterior = window.location.pathname;
 let componenteAnterior: string | null = null;
-router.on('navigate', (evento) => {
-    const ruta = new URL(evento.detail.page.url, window.location.origin).pathname;
-    const mismaPantalla = evento.detail.page.component === componenteAnterior;
-    componenteAnterior = evento.detail.page.component;
+function alCambiarDePagina(pagina: { url: string; component: string }) {
+    const ruta = new URL(pagina.url, window.location.origin).pathname;
+    const mismaPantalla = pagina.component === componenteAnterior;
+    componenteAnterior = pagina.component;
     if (ruta === rutaAnterior) return;
     rutaAnterior = ruta;
 
@@ -57,7 +57,11 @@ router.on('navigate', (evento) => {
         if (detalle) detalle.focus();
         else document.getElementById('contenido')?.focus({ preventScroll: true });
     }, 120);
-});
+}
+router.on('navigate', (evento) => alCambiarDePagina(evento.detail.page));
+// Las visitas que reemplazan la entrada del historial (ingresar, una página pedida de nuevo al volver con «Atrás»)
+// no emiten "navigate"; si cambiaron de página, se anuncia igual
+router.on('success', (evento) => alCambiarDePagina(evento.detail.page));
 
 // This will set light / dark mode on load...
 initializeTheme();

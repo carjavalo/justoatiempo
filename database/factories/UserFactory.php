@@ -37,7 +37,14 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'rol' => Rol::Auxiliar,
             'activo' => true,
+            'acceso' => true,
         ];
+    }
+
+    /** Parte del personal sin acceso a la plataforma: sin correo ni contraseña (tiene su carnet). */
+    public function sinAcceso(): static
+    {
+        return $this->state(fn () => ['email' => null, 'password' => null, 'acceso' => false]);
     }
 
     /** Dónde se pidió asignar a cada persona creada (empresa_id, sede_id, sucursal_id, linea_servicio_id). */

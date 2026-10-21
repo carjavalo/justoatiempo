@@ -26,7 +26,7 @@ class NewPasswordController extends Controller
     {
         $correo = is_string($request->query('email')) ? $request->query('email') : '';
         $token = (string) $request->route('token');
-        $usuario = $correo !== '' ? Password::getUser(['email' => $correo, 'activo' => true]) : null;
+        $usuario = $correo !== '' ? Password::getUser(['email' => $correo, 'activo' => true, 'acceso' => true]) : null;
 
         return Inertia::render('auth/reset-password', [
             'email' => $correo,
@@ -52,7 +52,7 @@ class NewPasswordController extends Controller
 
         // Solo cuentas activas: a quien desactivaron después de pedir el enlace no le sirve
         $status = Password::reset(
-            [...$request->only('email', 'password', 'password_confirmation', 'token'), 'activo' => true],
+            [...$request->only('email', 'password', 'password_confirmation', 'token'), 'activo' => true, 'acceso' => true],
             function (User $usuario) use ($request) {
                 $usuario->forceFill([
                     'password' => Hash::make($request->password),

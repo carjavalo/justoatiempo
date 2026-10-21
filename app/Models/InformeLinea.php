@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class InformeLinea extends Model
 {
     protected $fillable = [
-        'informe_id', 'ruta', 'vehiculo_id', 'placa', 'empleado_id', 'auxiliar_nombre',
-        'asignadas', 'aprobadas', 'rechazadas', 'efectividad', 'devoluciones',
-        'averias', 'faltantes', 'ordenes_sin_evidencia', 'pod_cumple', 'novedades',
+        'informe_id', 'ruta', 'vehiculo_id', 'placa', 'auxiliar_id', 'auxiliar_nombre',
+        'asignadas', 'aprobadas', 'rechazadas', 'productos', 'productos_entregados', 'efectividad', 'devoluciones',
+        'averias', 'faltantes', 'ordenes_sin_evidencia', 'pod_cumple', 'novedades', 'observacion',
     ];
 
     protected function casts(): array
@@ -31,8 +31,8 @@ class InformeLinea extends Model
         return $this->belongsTo(Vehiculo::class);
     }
 
-    public function empleado(): BelongsTo
+    public function auxiliar(): BelongsTo
     {
-        return $this->belongsTo(Empleado::class);
+        return $this->belongsTo(User::class, 'auxiliar_id');
     }
 }

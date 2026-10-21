@@ -46,4 +46,19 @@ class AccesoAdministradorTest extends TestCase
         $this->assertTrue(Hash::check('Clave-nueva-2026', $segundo->fresh()->password));
         $this->assertFalse(Hash::check('Clave-nueva-2026', $primero->fresh()->password));
     }
+
+    public function test_devuelve_el_acceso_a_un_administrador_sin_acceso_ni_correo()
+    {
+        $admin = User::factory()->admin()->sinAcceso()->create();
+
+        $this->artisan('admin:acceso')
+            ->expectsQuestion('Correo nuevo', 'recupera@example.com')
+            ->expectsQuestion('Contraseña nueva', 'Clave-nueva-2026')
+            ->expectsQuestion('Repite la contraseña nueva', 'Clave-nueva-2026')
+            ->assertSuccessful();
+
+        $this->assertTrue($admin->fresh()->acceso);
+        $this->post('/login', ['email' => 'recupera@example.com', 'password' => 'Clave-nueva-2026'])->assertSessionHasNoErrors();
+        $this->assertAuthenticatedAs($admin);
+    }
 }

@@ -45,6 +45,14 @@ function tomar(pagina: Pagina) {
     router.flushAll();
 }
 
+type Posicion = { top: number; left: number };
+
+/**
+ * La página que se está pidiendo al servidor en lugar de una copia del historial: a qué dirección se volvió y en qué
+ * posición estaba. `marcada`: su petición ya salió (con el encabezado X-Desde-Historial).
+ */
+let desdeHistorial: { destino: string; posicion: Posicion | null; marcada: boolean } | null = null;
+
 /**
  * Se llama una vez al iniciar la app, antes de mostrarla: Inertia aún no escucha el historial, así que esta revisión
  * va antes que la suya.
@@ -58,34 +66,64 @@ export function iniciarSesion(paginaInicial: Pagina) {
     // falla sin ella (página en blanco): también queda la del servidor.
     const guardada: unknown = window.history.state?.page;
     if (!esPagina(guardada) || !esDeEstaSesion(guardada)) {
-        window.history.replaceState({ page: paginaInicial }, '');
+        window.history.replaceState({ ...window.history.state, page: paginaInicial }, '');
     }
 
     // Atrás y Adelante dentro de la app
     window.addEventListener('popstate', (evento) => {
-        const pagina: unknown = evento.state?.page;
+        const estado = evento.state;
+        const pagina: unknown = estado?.page;
         // Sin copia (un enlace a una sección, #) o de esta sesión: la restaura Inertia, como siempre
         if (!esPagina(pagina) || esDeEstaSesion(pagina)) return;
-        // Es de otra sesión: no se muestra; se pide la de esta dirección y su respuesta toma el lugar de la copia
-        evento.stopImmediatePropagation();
-        router.visit(window.location.href, { replace: true });
+        // Es de otra sesión: Inertia no debe mostrarla. Se le quita la copia al evento (no al historial) y, sin ella,
+        // Inertia hace lo que hace cuando el historial no le sirve: pide al servidor la página de esta dirección y la
+        // respuesta toma el lugar de la copia
+        desdeHistorial = { destino: window.location.href, posicion: estado.documentScrollPosition ?? null, marcada: false };
+        estado.page = null;
     });
 
     // El navegador puede guardar la página entera al salir del sitio y mostrarla tal cual al volver: puede ser de
     // antes de ingresar o de salir, así que se actualiza con el servidor (conservando lo escrito y el desplazamiento)
     window.addEventListener('pageshow', (evento) => {
-        if (evento.persisted) router.reload({ replace: true });
+        if (!evento.persisted) return;
+        desdeHistorial = { destino: window.location.href, posicion: { top: window.scrollY, left: window.scrollX }, marcada: false };
+        router.reload({ replace: true });
     });
 
-    router.on('success', (evento) => tomar(evento.detail.page));
+    router.on('before', (evento) => {
+        const headers: Record<string, string> = { ...evento.detail.visit.headers };
+        // Cada envío lleva el código de la sesión vigente
+        if (codigo) headers['X-CSRF-TOKEN'] = codigo;
+        // La pide el historial, no la persona: si no hay sesión, el servidor no la recuerda para después de ingresar
+        // (quien ingrese después, quizá otra persona, no debe terminar en ella)
+        if (desdeHistorial && !desdeHistorial.marcada) {
+            headers['X-Desde-Historial'] = '1';
+            desdeHistorial.marcada = true;
+        } else if (!evento.detail.visit.prefetch) {
+            // Otra visita (un clic mientras tanto) reemplazó a la del historial; precargar un enlace no la reemplaza
+            desdeHistorial = null;
+        }
+        evento.detail.visit.headers = headers;
+    });
+
+    router.on('success', (evento) => {
+        tomar(evento.detail.page);
+
+        // La del historial llegó: vuelve a la posición en que se dejó esa página; si el servidor llevó a otra, arriba
+        if (desdeHistorial?.marcada) {
+            const { destino, posicion } = desdeHistorial;
+            desdeHistorial = null;
+            const llego = new URL(evento.detail.page.url, window.location.origin);
+            const pedida = new URL(destino);
+            const misma = llego.pathname === pedida.pathname && llego.search === pedida.search;
+            // Después de que React pinte la página (antes, la altura aún es la de la anterior). Sin animación: el sitio
+            // público desplaza suave (scroll-behavior) y se vería correr la página
+            window.setTimeout(() => window.scrollTo({ ...(misma && posicion ? posicion : { top: 0, left: 0 }), behavior: 'instant' }));
+        }
+    });
     // Con errores de validación no hay "success"; la página que llegó ya quedó escrita en el historial
     router.on('error', () => {
         const pagina: unknown = window.history.state?.page;
         if (esPagina(pagina)) tomar(pagina);
-    });
-
-    // Cada envío lleva el código de la sesión vigente
-    router.on('before', (evento) => {
-        if (codigo) evento.detail.visit.headers = { ...evento.detail.visit.headers, 'X-CSRF-TOKEN': codigo };
     });
 }

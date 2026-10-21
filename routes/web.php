@@ -2,19 +2,24 @@
 
 use App\Http\Controllers\Admin\AsignacionController;
 use App\Http\Controllers\Admin\EmpresaController;
+use App\Http\Controllers\Admin\ImportacionPersonalController;
 use App\Http\Controllers\Admin\LineaServicioController;
+use App\Http\Controllers\Admin\ParametroController;
 use App\Http\Controllers\Admin\RolController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\SolicitudController;
 use App\Http\Controllers\Admin\SucursalController;
 use App\Http\Controllers\Admin\UsuarioController;
+use App\Http\Controllers\Admin\VehiculoController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CargaController;
 use App\Http\Controllers\CarnetController;
 use App\Http\Controllers\ContactoController;
+use App\Http\Controllers\InformeController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\MiCarnetController;
 use App\Http\Controllers\PanelController;
+use App\Http\Controllers\SeguimientoController;
 use App\Models\LineaServicio;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -43,6 +48,14 @@ Route::middleware(['auth'])->group(function () {
 
     // Administración: cada acción pide su permiso (ver, crear, editar, activar y desactivar)
     Route::get('usuarios', [UsuarioController::class, 'index'])->middleware('permiso:usuarios.ver')->name('usuarios.index');
+    // Importar el Excel del personal: se sube, se revisa y se confirma
+    Route::middleware('permiso:usuarios.crear')->prefix('usuarios/importar')->name('usuarios.importar')->group(function () {
+        Route::get('/', [ImportacionPersonalController::class, 'index'])->name('');
+        Route::post('/', [ImportacionPersonalController::class, 'revisar'])->name('.revisar');
+        Route::put('empresas', [ImportacionPersonalController::class, 'empresas'])->name('.empresas');
+        Route::post('confirmar', [ImportacionPersonalController::class, 'confirmar'])->name('.confirmar');
+        Route::delete('/', [ImportacionPersonalController::class, 'descartar'])->name('.descartar');
+    });
     Route::post('usuarios', [UsuarioController::class, 'store'])->middleware('permiso:usuarios.crear')->name('usuarios.store');
     Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->middleware('permiso:usuarios.editar')->name('usuarios.update');
     Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'estado'])->middleware('permiso:usuarios.estado')->name('usuarios.estado');
@@ -110,8 +123,12 @@ Route::middleware(['auth'])->group(function () {
 
     // Herramientas de la línea de servicios logísticos (Drivin, auditoría POD). Su permiso solo le aplica a quien
     // trabaja en la línea (o las ve todas) y no está limitado a una empresa: ver App\Models\User::permisos
-    Route::get('informes', $modulo('informes', 'Informe diario', 'Cuadro consolidado por fecha, sede, sucursal, ruta, placa y auxiliar, con efectividad, devoluciones, averías y faltantes.', ['RF-05', 'RF-06', 'RF-07', 'RF-08']))
-        ->middleware('permiso:informes.ver')->name('informes.index');
+    // Informe diario (el Excel de la operación): por jornada, sede y sucursal; se descarga con su mismo formato
+    Route::get('informes', [InformeController::class, 'index'])->middleware('permiso:informes.ver')->name('informes.index');
+    Route::get('informes/descargar', [InformeController::class, 'descargar'])->middleware('permiso:informes.descargar')->name('informes.descargar');
+    Route::patch('informes/filas/{linea}/observacion', [InformeController::class, 'observacion'])->middleware('permiso:informes.editar')->name('informes.observacion');
+    Route::patch('informes/{informe}/observaciones', [InformeController::class, 'observaciones'])->middleware('permiso:informes.editar')->name('informes.observaciones');
+    Route::patch('informes/{informe}/estado', [InformeController::class, 'estado'])->middleware('permiso:informes.cerrar')->name('informes.estado');
 
     // Módulo 2: preliquidación de Drivin (subir → revisar → confirmar)
     Route::get('cargas', [CargaController::class, 'index'])->middleware('permiso:cargas.ver')->name('cargas.index');
@@ -133,18 +150,29 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('evidencias/{evidencia}', [AuditoriaController::class, 'clasificar'])->middleware('permiso:auditoria.revisar')->name('evidencias.clasificar');
     Route::delete('evidencias/{evidencia}', [AuditoriaController::class, 'eliminarEvidencia'])->middleware('permiso:auditoria.eliminar')->name('evidencias.eliminar');
 
-    Route::get('seguimiento', $modulo('seguimiento', 'Seguimiento y desempeño', 'Felicitaciones, retroalimentación y llamados de atención por auxiliar, y control de informes en seguimiento.', ['RF-11']))
-        ->middleware('permiso:seguimiento.ver')->name('seguimiento.index');
+    // Seguimiento y desempeño: cómo le va a cada auxiliar y las acciones que se toman con él
+    Route::get('seguimiento', [SeguimientoController::class, 'index'])->middleware('permiso:seguimiento.ver')->name('seguimiento.index');
+    Route::post('seguimiento/acciones', [SeguimientoController::class, 'registrar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.registrar');
+    Route::delete('seguimiento/acciones/{accion}', [SeguimientoController::class, 'eliminar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.eliminar');
     Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por sede, sucursal y fecha.', ['RF-02']))
         ->middleware('permiso:programacion.ver')->name('programacion.index');
 
-    // Datos maestros (en construcción)
-    Route::get('empleados', $modulo('empleados', 'Empleados', 'Auxiliares y conductores, registrados por cédula, con estado e historial de desempeño.', ['RF-01']))
-        ->middleware('permiso:empleados.ver')->name('empleados.index');
-    Route::get('vehiculos', $modulo('vehiculos', 'Flota', 'Vehículos de la operación urbana por placa y código interno.', ['Datos maestros']))
-        ->middleware('permiso:vehiculos.ver')->name('vehiculos.index');
-    Route::get('parametros', $modulo('parametros', 'Parámetros', 'Metas de efectividad, umbrales de acciones y reglas globales.', ['Configuración']))
-        ->middleware('permiso:parametros.ver')->name('parametros.index');
+    // Datos maestros (en construcción). El personal (auxiliares, conductores, operarios) está en Usuarios
+    Route::get('vehiculos', [VehiculoController::class, 'index'])->middleware('permiso:vehiculos.ver')->name('vehiculos.index');
+    Route::post('vehiculos', [VehiculoController::class, 'store'])->middleware('permiso:vehiculos.crear')->name('vehiculos.store');
+    Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->middleware('permiso:vehiculos.editar')->name('vehiculos.update');
+    Route::patch('vehiculos/{vehiculo}/estado', [VehiculoController::class, 'estado'])->middleware('permiso:vehiculos.estado')->name('vehiculos.estado');
+
+    Route::get('parametros', [ParametroController::class, 'index'])->middleware('permiso:parametros.ver')->name('parametros.index');
+    Route::middleware('permiso:parametros.editar')->group(function () {
+        Route::put('parametros', [ParametroController::class, 'valores'])->name('parametros.valores');
+        Route::post('parametros/motivos', [ParametroController::class, 'guardarMotivo'])->name('parametros.motivos.store');
+        Route::put('parametros/motivos/{motivo}', [ParametroController::class, 'guardarMotivo'])->name('parametros.motivos.update');
+        Route::patch('parametros/motivos/{motivo}/estado', [ParametroController::class, 'estadoMotivo'])->name('parametros.motivos.estado');
+        Route::post('parametros/novedades', [ParametroController::class, 'guardarNovedad'])->name('parametros.novedades.store');
+        Route::put('parametros/novedades/{novedad}', [ParametroController::class, 'guardarNovedad'])->name('parametros.novedades.update');
+        Route::patch('parametros/novedades/{novedad}/estado', [ParametroController::class, 'estadoNovedad'])->name('parametros.novedades.estado');
+    });
 });
 
 require __DIR__.'/settings.php';

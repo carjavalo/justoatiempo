@@ -11,7 +11,7 @@ class AccionDesempeno extends Model
     protected $table = 'acciones_desempeno';
 
     protected $fillable = [
-        'empleado_id', 'informe_id', 'fecha', 'tipo', 'descripcion',
+        'user_id', 'informe_id', 'fecha', 'tipo', 'descripcion',
         'efectividad_referencia', 'notificado', 'registrado_por',
     ];
 
@@ -25,9 +25,10 @@ class AccionDesempeno extends Model
         ];
     }
 
-    public function empleado(): BelongsTo
+    /** La persona a la que se le hace el seguimiento. */
+    public function persona(): BelongsTo
     {
-        return $this->belongsTo(Empleado::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function informe(): BelongsTo

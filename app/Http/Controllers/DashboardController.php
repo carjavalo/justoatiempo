@@ -35,7 +35,7 @@ class DashboardController extends Controller
         $user = $request->user();
         // Con alcance "solo lo suyo" (p. ej. el auxiliar) el tablero muestra únicamente su desempeño
         $esAuxiliar = $user->soloLoSuyo();
-        $empleadoId = $esAuxiliar ? ($user->empleado_id ?? 0) : null;
+        $auxiliarId = $esAuxiliar ? $user->id : null;
 
         // Alcance: las sedes de las empresas que reciben la línea. Quien solo ve sus asignaciones queda limitado a
         // sus empresas (y a sus sedes y sucursales, si las fijan); el auxiliar ve sus propias órdenes en sus empresas.
@@ -57,7 +57,7 @@ class DashboardController extends Controller
         $ubicacion = fn (Builder $q) => $alcance->filtrarUbicacion($q, $sedesVista);
 
         $enAlcance = fn (Builder $q) => $ubicacion($q)
-            ->when($empleadoId !== null, fn (Builder $q) => $q->where('empleado_id', $empleadoId));
+            ->when($auxiliarId !== null, fn (Builder $q) => $q->where('auxiliar_id', $auxiliarId));
 
         // El periodo termina en la última jornada con datos del alcance (la carga es a día vencido)
         $ultimaOperacion = $enAlcance(Orden::query())->max('fecha_operacion');
@@ -67,7 +67,7 @@ class DashboardController extends Controller
 
         $base = fn (Carbon $d, Carbon $h) => $enAlcance(Orden::query()->whereBetween('fecha_operacion', [$d->toDateString(), $h->toDateString()]));
         // Con alcance limitado, las acciones de desempeño se limitan a lo ocurrido dentro de ese alcance
-        $limitarAcciones = ! $alcance->todo && $empleadoId === null;
+        $limitarAcciones = ! $alcance->todo && $auxiliarId === null;
 
         $dias = $desde->diffInDays($hasta) + 1;
         $prevHasta = $desde->copy()->subDay();
@@ -101,7 +101,7 @@ class DashboardController extends Controller
             'protocolo' => $this->protocolo($base($desde, $hasta)),
             // La última carga de Drivin solo la ve quien puede abrir Cargas
             'pendientes' => $esAuxiliar ? null : $this->pendientes($ubicacion, $user->puede('cargas.ver')),
-            'acciones' => $this->accionesRecientes($empleadoId, $ubicacion, $limitarAcciones),
+            'acciones' => $this->accionesRecientes($auxiliarId, $ubicacion, $limitarAcciones),
         ]);
     }
 
@@ -120,7 +120,7 @@ class DashboardController extends Controller
                 SUM(a.cumple_protocolo) as cumplen,
                 SUM(a.sin_evidencia) as sin_evidencia,
                 SUM(ordenes.estado = 'aprobada' AND a.id IS NULL) as sin_auditar,
-                COUNT(DISTINCT ordenes.empleado_id) as auxiliares,
+                COUNT(DISTINCT ordenes.auxiliar_id) as auxiliares,
                 COUNT(DISTINCT ordenes.fecha_operacion) as jornadas
             ")
             ->first();
@@ -220,10 +220,10 @@ class DashboardController extends Controller
     private function ranking(Builder $q, Carbon $desde, Carbon $hasta, ?Builder $informes = null): array
     {
         $filas = $q->clone()
-            ->join('empleados as e', 'e.id', '=', 'ordenes.empleado_id')
+            ->join('users as e', 'e.id', '=', 'ordenes.auxiliar_id')
             ->leftJoin('auditorias_pod as a', 'a.orden_id', '=', 'ordenes.id')
             ->selectRaw("
-                e.id, e.nombres, e.apellidos, e.cedula,
+                e.id, e.name, e.cedula,
                 COUNT(*) as asignadas,
                 SUM(ordenes.estado = 'aprobada') as aprobadas,
                 COUNT(a.id) as auditadas,
@@ -231,19 +231,19 @@ class DashboardController extends Controller
                 SUM(a.sin_evidencia) as sin_evidencia,
                 COUNT(DISTINCT ordenes.fecha_operacion) as jornadas
             ")
-            ->groupBy('e.id', 'e.nombres', 'e.apellidos', 'e.cedula')
+            ->groupBy('e.id', 'e.name', 'e.cedula')
             ->get();
 
         // toBase(): sin el cast a enum, "tipo" llega como texto y sirve de clave
         $acciones = AccionDesempeno::query()
             ->toBase()
             ->whereBetween('fecha', [$desde->toDateString(), $hasta->copy()->addDay()->toDateString()])
-            ->whereIn('empleado_id', $filas->pluck('id'))
+            ->whereIn('user_id', $filas->pluck('id'))
             ->when($informes, fn ($q) => $q->whereIn('informe_id', $informes))
-            ->selectRaw('empleado_id, tipo, COUNT(*) as total')
-            ->groupBy('empleado_id', 'tipo')
+            ->selectRaw('user_id, tipo, COUNT(*) as total')
+            ->groupBy('user_id', 'tipo')
             ->get()
-            ->groupBy('empleado_id');
+            ->groupBy('user_id');
 
         return $filas
             ->map(function ($r) use ($acciones) {
@@ -251,7 +251,7 @@ class DashboardController extends Controller
 
                 return [
                     'id' => $r->id,
-                    'nombre' => trim("$r->nombres $r->apellidos"),
+                    'nombre' => $r->name,
                     'cedula' => $r->cedula,
                     'jornadas' => (int) $r->jornadas,
                     'asignadas' => (int) $r->asignadas,
@@ -261,7 +261,7 @@ class DashboardController extends Controller
                     'sinEvidencia' => (int) $r->sin_evidencia,
                     'felicitaciones' => (int) ($porTipo[TipoAccion::Felicitacion->value] ?? 0),
                     'retroalimentaciones' => (int) ($porTipo[TipoAccion::Retroalimentacion->value] ?? 0),
-                    'llamados' => (int) ($porTipo[TipoAccion::LlamadoAtencion->value] ?? 0),
+                    'llamados' => (int) ($porTipo[TipoAccion::LlamadoAtencion->value] ?? 0) + (int) ($porTipo[TipoAccion::LlamadoEscrito->value] ?? 0),
                 ];
             })
             ->sortByDesc(fn ($r) => [$r['efectividad'], $r['pod'] ?? -1])
@@ -334,17 +334,17 @@ class DashboardController extends Controller
      * @param  list<int>  $sedes
      * @param  bool  $limitar  con alcance fijo, las acciones generales (sin informe) solo de quienes operan en él
      */
-    private function accionesRecientes(?int $empleadoId, Closure $ubicacion, bool $limitar): array
+    private function accionesRecientes(?int $auxiliarId, Closure $ubicacion, bool $limitar): array
     {
         return AccionDesempeno::query()
-            ->with('empleado:id,nombres,apellidos')
-            ->when($empleadoId !== null, fn ($q) => $q->where('empleado_id', $empleadoId))
+            ->with('persona:id,name')
+            ->when($auxiliarId !== null, fn ($q) => $q->where('user_id', $auxiliarId))
             // Acciones ligadas a un informe fuera del alcance no se muestran
             ->where(fn ($q) => $q
                 ->whereIn('informe_id', $this->informesDe($ubicacion))
                 ->orWhere(fn ($g) => $g->whereNull('informe_id')->when($limitar, fn ($w) => $w->whereIn(
-                    'empleado_id',
-                    $ubicacion(Orden::query())->whereNotNull('empleado_id')->select('empleado_id'),
+                    'user_id',
+                    $ubicacion(Orden::query())->whereNotNull('auxiliar_id')->select('auxiliar_id'),
                 ))))
             ->latest('fecha')
             ->latest('id')
@@ -355,7 +355,7 @@ class DashboardController extends Controller
                 'fecha' => $a->fecha->toDateString(),
                 'tipo' => $a->tipo->value,
                 'tipoLabel' => $a->tipo->label(),
-                'empleado' => $a->empleado?->nombre_completo,
+                'persona' => $a->persona?->name,
                 'descripcion' => $a->descripcion,
             ])
             ->all();

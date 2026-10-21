@@ -236,7 +236,7 @@ class AuditoriaController extends Controller
             ->when($sedeId, fn (Builder $q) => $q->where('ordenes.sede_id', $sedeId));
 
         $lista = $base->clone()
-            ->with(['auditoria:id,orden_id,cumple_protocolo,sin_evidencia', 'sede:id,nombre', 'sucursal:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado'])
+            ->with(['auditoria:id,orden_id,cumple_protocolo,sin_evidencia', 'sede:id,nombre', 'sucursal:id,nombre', 'auxiliar:id,name', 'informe:id,estado'])
             ->withCount('evidencias')
             ->when($busqueda !== '', fn (Builder $q) => $q->where(fn ($w) => $w
                 ->where('codigo_orden', 'like', "%{$busqueda}%")
@@ -279,7 +279,7 @@ class AuditoriaController extends Controller
                 'ciudad' => $o->ciudad,
                 'sede' => $o->sede?->nombre,
                 'sucursal' => $o->sucursal?->nombre,
-                'auxiliar' => $o->empleado?->nombre_completo ?? $o->auxiliar_nombre,
+                'auxiliar' => $o->auxiliar?->name ?? $o->auxiliar_nombre,
                 'placa' => $o->placa,
                 'evidencias' => (int) $o->evidencias_count,
                 'estadoAuditoria' => $this->estadoAuditoria($o),
@@ -292,7 +292,7 @@ class AuditoriaController extends Controller
 
     private function detalle(Orden $orden): array
     {
-        $orden->loadMissing(['auditoria.auditor:id,name', 'evidencias', 'sede:id,nombre', 'sucursal:id,nombre', 'empleado:id,nombres,apellidos', 'informe:id,estado']);
+        $orden->loadMissing(['auditoria.auditor:id,name', 'evidencias', 'sede:id,nombre', 'sucursal:id,nombre', 'auxiliar:id,name', 'informe:id,estado']);
         $evidencias = $orden->evidencias->sortBy('id')->values();
         $a = $orden->auditoria;
 
@@ -318,7 +318,7 @@ class AuditoriaController extends Controller
             'sucursal' => $orden->sucursal?->nombre,
             'ruta' => $orden->ruta,
             'placa' => $orden->placa,
-            'auxiliar' => $orden->empleado?->nombre_completo ?? $orden->auxiliar_nombre,
+            'auxiliar' => $orden->auxiliar?->name ?? $orden->auxiliar_nombre,
             'conductor' => $orden->datos_crudos['conductor'] ?? null,
             'destinatario' => $orden->destinatario,
             'direccion' => $orden->direccion,

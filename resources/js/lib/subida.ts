@@ -36,6 +36,12 @@ export async function subirEnTandas(
                 credentials: 'same-origin',
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': codigoCsrf() ?? '' },
             });
+            // Sin sesión válida: el código venció (419), ya no hay sesión (401) o el servidor la cerró y llevó al
+            // ingreso (una redirección, que fetch sigue y daría por buena)
+            if (r.status === 419 || r.status === 401 || r.redirected) {
+                total.errores.push('Tu sesión expiró o se cerró. Recarga la página e inténtalo de nuevo.');
+                break;
+            }
             const json = await r.json().catch(() => ({}));
 
             if (r.ok) {
@@ -48,9 +54,6 @@ export async function subirEnTandas(
                 // Error de validación de una tanda: se informa y se sigue con las demás
                 const mensajes = Object.values(json.errors as Record<string, string[]>).flat();
                 total.errores.push(...new Set(mensajes));
-            } else if (r.status === 419) {
-                total.errores.push('Tu sesión expiró. Recarga la página e inténtalo de nuevo.');
-                break;
             } else {
                 total.errores.push(json.message ?? `No se pudo subir una tanda de archivos (error ${r.status}).`);
             }

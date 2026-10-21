@@ -44,7 +44,8 @@ export interface DatosCarnet {
     apellidos: string;
     cedula: string | null;
     cargo: string;
-    email: string;
+    /** Sin acceso a la plataforma puede no tener correo: ese renglón queda vacío. */
+    email: string | null;
     /** Dónde presta el servicio hoy: cada asignación vigente con su empresa (sin empresa: toda la línea), sede, sucursal y líneas. */
     asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
     /** Dirección de la foto (fondo blanco o sin fondo), si la tiene. */
@@ -150,7 +151,7 @@ export function dibujarCarnet(lienzo: HTMLCanvasElement, recursos: RecursosCarne
     escribir(ctx, apellidos, TEXTOS.apellidos, factorNombre);
     escribir(ctx, datos.cargo.toLocaleUpperCase('es-CO'), TEXTOS.cargo);
     escribir(ctx, datos.cedula ? cedulaLegible(datos.cedula) : '', TEXTOS.cedula);
-    escribir(ctx, datos.email, TEXTOS.correo);
+    escribir(ctx, datos.email ?? '', TEXTOS.correo);
 
     dibujarAsignacion(ctx, datos);
     dibujarLineas(ctx, datos);

@@ -16,18 +16,20 @@ import {
     SinResultados,
     Tabla,
 } from '@/components/admin/piezas';
-import { CalendarRange, IdCard, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
+import { CalendarRange, FileSpreadsheet, IdCard, LockKeyhole, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
 import { PasswordInput } from '@/components/password-input';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import InputError from '@/components/input-error';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { fechaHoraCompleta, haceCuanto } from '@/lib/formato';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 interface FilaUsuario {
@@ -38,7 +40,14 @@ interface FilaUsuario {
     segundoApellido: string | null;
     cedula: string | null;
     cargo: string | null;
-    email: string;
+    email: string | null;
+    /** Si entra a la plataforma (con correo y contraseña); sin acceso, sigue teniendo su carnet. */
+    acceso: boolean;
+    tieneContrasena: boolean;
+    telefono: string | null;
+    ciudad: string | null;
+    fechaNacimiento: string | null;
+    fechaIngreso: string | null;
     rolId: number | null;
     /** Rol dentro de la empresa (auxiliar, conductor…). */
     rolNombre: string;
@@ -61,7 +70,7 @@ interface FilaUsuario {
 interface Props {
     usuarios: Paginado<FilaUsuario>;
     total: number;
-    filtros: { q: string; rol: string; estado: string; empresa: string; sede: string; sucursal: string; linea: string };
+    filtros: { q: string; rol: string; estado: string; acceso: string; empresa: string; sede: string; sucursal: string; linea: string };
     contexto: { empresa: string | null; sede: string | null; sucursal: string | null };
     /** Roles de la empresa con lo que permite cada uno. asignable: el rol de quien edita lo cubre (nadie da más acceso del que tiene). */
     roles: { id: number; nombre: string; resumen: string; alcance: string; asignable: boolean; activo: boolean }[];
@@ -74,6 +83,11 @@ const VACIO = {
     segundo_apellido: '',
     cedula: '',
     cargo: '',
+    telefono: '',
+    ciudad: '',
+    fecha_nacimiento: '',
+    fecha_ingreso: '',
+    acceso: true,
     email: '',
     rol_id: '',
     foto: null as File | null,
@@ -88,10 +102,15 @@ const ORDEN_CAMPOS = [
     'segundo_apellido',
     'cedula',
     'cargo',
-    'email',
+    'telefono',
+    'ciudad',
+    'fecha_nacimiento',
+    'fecha_ingreso',
     'rol_id',
     'foto',
     'arl',
+    'acceso',
+    'email',
     'password',
 ];
 
@@ -134,7 +153,12 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                       segundo_apellido: usuario.segundoApellido ?? '',
                       cedula: usuario.cedula ?? '',
                       cargo: usuario.cargo ?? '',
-                      email: usuario.email,
+                      telefono: usuario.telefono ?? '',
+                      ciudad: usuario.ciudad ?? '',
+                      fecha_nacimiento: usuario.fechaNacimiento ?? '',
+                      fecha_ingreso: usuario.fechaIngreso ?? '',
+                      acceso: usuario.acceso,
+                      email: usuario.email ?? '',
                       rol_id: usuario.rolId ? String(usuario.rolId) : '',
                       foto: null,
                       quitar_foto: false,
@@ -175,13 +199,28 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
         </Button>
     );
 
+    // Con acceso y sin contraseña aún (nueva, o a quien antes no tenía acceso), hay que asignarle una
+    const pideContrasena = form.data.acceso && !(editando?.tieneContrasena && editando.acceso);
+
+    const acciones = puede('usuarios.crear') && (
+        <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="h-10 rounded-lg px-4 font-semibold">
+                <Link href={route('usuarios.importar')}>
+                    <FileSpreadsheet className="size-4" aria-hidden="true" />
+                    Importar desde Excel
+                </Link>
+            </Button>
+            {botonNuevo('Nuevo usuario')}
+        </div>
+    );
+
     type CampoChip = 'empresa' | 'sede' | 'sucursal';
     const chips: { campo: CampoChip; texto: string }[] = [
         contexto.empresa && { campo: 'empresa' as const, texto: `Empresa: ${contexto.empresa}` },
         contexto.sede && { campo: 'sede' as const, texto: `Sede: ${contexto.sede}` },
         contexto.sucursal && { campo: 'sucursal' as const, texto: `Sucursal: ${contexto.sucursal}` },
     ].filter((c): c is { campo: CampoChip; texto: string } => Boolean(c));
-    const soloUnChip = chips.length === 1 && !valores.q && !valores.rol && !valores.estado && !valores.linea;
+    const soloUnChip = chips.length === 1 && !valores.q && !valores.rol && !valores.estado && !valores.acceso && !valores.linea;
 
     return (
         <AppLayout>
@@ -190,16 +229,16 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Usuarios"
-                    descripcion="Quién puede ingresar a la plataforma, con qué rol y su carnet. Dónde presta el servicio (empresas, sedes, sucursales y líneas) se maneja en Asignaciones."
-                    accion={total > 0 && puede('usuarios.crear') && botonNuevo('Nuevo usuario')}
+                    descripcion="Todo el personal, con su rol, su carnet y su ARL. Entrar a la plataforma es opcional: los auxiliares y operarios pueden tener solo su carnet. Dónde presta el servicio se maneja en Asignaciones."
+                    accion={total > 0 && acciones}
                 />
 
                 {total === 0 ? (
                     <EstadoVacio
                         icono={UsersRound}
                         titulo="Aún no hay usuarios"
-                        texto="Crea el acceso de cada persona con su rol y su carnet. Después la asignas a las empresas donde presta el servicio."
-                        accion={puede('usuarios.crear') && botonNuevo('Crear el primer usuario')}
+                        texto="Registra a cada persona con su rol y su carnet, o importa el Excel del personal. Después la asignas a las empresas donde presta el servicio."
+                        accion={acciones}
                     />
                 ) : (
                     <>
@@ -217,7 +256,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                             <CampoBusqueda
                                 id="buscar-usuarios"
                                 etiqueta="Buscar usuarios"
-                                placeholder="Buscar por nombre o correo"
+                                placeholder="Buscar por nombre, cédula o correo"
                                 valor={valores.q}
                                 onCambio={(v) => cambiar('q', v, { inmediato: false })}
                             />
@@ -248,6 +287,17 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                     { valor: '', texto: 'Activos e inactivos' },
                                     { valor: 'activos', texto: 'Solo activos' },
                                     { valor: 'inactivos', texto: 'Solo inactivos' },
+                                ]}
+                            />
+                            <FiltroLista
+                                id="filtro-acceso"
+                                etiqueta="Acceso a la plataforma"
+                                valor={valores.acceso}
+                                onCambio={(v) => cambiar('acceso', v)}
+                                opciones={[
+                                    { valor: '', texto: 'Con y sin acceso' },
+                                    { valor: 'con', texto: 'Entran a la plataforma' },
+                                    { valor: 'sin', texto: 'Solo carnet (sin acceso)' },
                                 ]}
                             />
                             {chips.map((c) => (
@@ -331,8 +381,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                                 </span>
                                                             )}
                                                         </p>
-                                                        <p className="text-muted-foreground truncate text-xs" title={u.email}>
-                                                            {u.email}
+                                                        <p className="text-muted-foreground truncate text-xs" title={u.email ?? undefined}>
+                                                            {u.acceso ? u.email : u.cedula ? `C.C. ${u.cedula} · solo carnet` : 'Solo carnet'}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -377,7 +427,12 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                 <EstadoBadge activo={u.activo} />
                                             </td>
                                             <td className={cn(claseTd, 'text-xs')}>
-                                                {u.ultimoAcceso ? (
+                                                {!u.acceso ? (
+                                                    <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                                                        <LockKeyhole className="size-3.5" aria-hidden="true" />
+                                                        Sin acceso
+                                                    </span>
+                                                ) : u.ultimoAcceso ? (
                                                     <time
                                                         dateTime={u.ultimoAcceso}
                                                         title={fechaHoraCompleta.format(new Date(u.ultimoAcceso))}
@@ -396,7 +451,11 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                     // Nadie se desactiva a sí mismo, ni toca a quien tiene más permisos que él
                                                     urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
                                                     onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
-                                                    consecuencia="Perderá el acceso de inmediato, incluso si tiene la sesión abierta. Podrás devolverle el acceso cuando quieras."
+                                                    consecuencia={
+                                                        u.acceso
+                                                            ? 'Perderá el acceso de inmediato, incluso si tiene la sesión abierta, y su carnet dejará de estar vigente. Podrás activarla de nuevo cuando quieras.'
+                                                            : 'Su carnet dejará de estar vigente: quien escanee el QR lo verá como no vigente. Podrás activarla de nuevo cuando quieras.'
+                                                    }
                                                     enlaces={[
                                                         { texto: 'Ver carnet', href: route('usuarios.carnet', u.id), icono: IdCard },
                                                         ...(puede('asignaciones.ver') ? [{ texto: 'Asignaciones', href: route('asignaciones.index', { usuario: u.id }), icono: CalendarRange }] : []),
@@ -419,7 +478,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                 onCambio={setAbierto}
                 titulo={editando ? 'Editar usuario' : 'Nuevo usuario'}
                 descripcion={
-                    editando ? `Actualiza el acceso de ${editando.nombre}.` : 'La persona ingresará con este correo y la contraseña que le asignes.'
+                    editando
+                        ? `Actualiza los datos de ${editando.nombre}.`
+                        : 'Sus datos, su rol y su carnet. Si debe entrar a la plataforma, dale acceso con su correo y una contraseña.'
                 }
                 onEnviar={guardar}
                 procesando={form.processing}
@@ -462,7 +523,13 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
 
                 {/* Van en el carnet */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Campo id="cedula" etiqueta="Cédula" ayuda="Solo los números." error={form.errors.cedula}>
+                    <Campo
+                        id="cedula"
+                        etiqueta="Cédula"
+                        requerido={!form.data.acceso}
+                        ayuda="Solo los números. Con ella se reconocen sus entregas de Drivin."
+                        error={form.errors.cedula}
+                    >
                         <Input
                             {...propsCampo('cedula', form.errors.cedula, 'cedula-ayuda')}
                             inputMode="numeric"
@@ -487,18 +554,48 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                     </Campo>
                 </div>
 
-                <Campo id="email" etiqueta="Correo electrónico" requerido error={form.errors.email}>
-                    <Input
-                        {...propsCampo('email', form.errors.email)}
-                        type="email"
-                        required
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={form.data.email}
-                        onChange={(e) => form.setData('email', e.target.value)}
-                        className="h-10 rounded-lg"
-                    />
-                </Campo>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Campo id="telefono" etiqueta="Teléfono" error={form.errors.telefono}>
+                        <Input
+                            {...propsCampo('telefono', form.errors.telefono)}
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="off"
+                            value={form.data.telefono}
+                            onChange={(e) => form.setData('telefono', e.target.value)}
+                            className="h-10 rounded-lg tabular-nums"
+                        />
+                    </Campo>
+                    <Campo id="ciudad" etiqueta="Ciudad" error={form.errors.ciudad}>
+                        <Input
+                            {...propsCampo('ciudad', form.errors.ciudad)}
+                            autoComplete="off"
+                            placeholder="Ej.: Cali"
+                            maxLength={80}
+                            value={form.data.ciudad}
+                            onChange={(e) => form.setData('ciudad', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                    <Campo id="fecha_nacimiento" etiqueta="Fecha de nacimiento" error={form.errors.fecha_nacimiento}>
+                        <Input
+                            {...propsCampo('fecha_nacimiento', form.errors.fecha_nacimiento)}
+                            type="date"
+                            value={form.data.fecha_nacimiento}
+                            onChange={(e) => form.setData('fecha_nacimiento', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                    <Campo id="fecha_ingreso" etiqueta="Fecha de ingreso" error={form.errors.fecha_ingreso}>
+                        <Input
+                            {...propsCampo('fecha_ingreso', form.errors.fecha_ingreso)}
+                            type="date"
+                            value={form.data.fecha_ingreso}
+                            onChange={(e) => form.setData('fecha_ingreso', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                </div>
 
                 <Campo
                     id="rol_id"
@@ -562,42 +659,88 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                     onQuitar={(quitar) => form.setData('quitar_arl', quitar)}
                 />
 
-                <Campo
-                    id="password"
-                    etiqueta={editando ? 'Nueva contraseña' : 'Contraseña'}
-                    requerido={!editando}
-                    ayuda={editando ? 'Déjala en blanco para conservar la actual.' : 'Compártela con la persona por un medio seguro.'}
-                    error={form.errors.password}
-                >
-                    <PasswordInput
-                        {...propsCampo('password', form.errors.password, 'password-ayuda')}
-                        required={!editando}
-                        autoComplete="new-password"
-                        placeholder="Mínimo 8 caracteres"
-                        value={form.data.password}
-                        onChange={(e) => {
-                            form.setData('password', e.target.value);
-                            setGenerada(false);
-                        }}
-                        visible={verContrasena}
-                        onVisibleChange={setVerContrasena}
-                        // Monoespaciada solo para lo escrito: distingue l, I y 1 al dictarla; el texto guía queda normal
-                        className={cn('h-10 rounded-lg', form.data.password && 'font-mono')}
-                    />
-                    <div className="flex items-center justify-between gap-3">
-                        <button
-                            type="button"
-                            onClick={generar}
-                            className="text-primary focus-visible:ring-ring inline-flex w-fit items-center gap-1.5 rounded-md text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
-                        >
-                            <Sparkles weight="bold" className="size-3.5" aria-hidden="true" />
-                            Generar una segura
-                        </button>
-                        <span role="status" className="text-good text-xs font-medium">
-                            {generada ? 'Contraseña generada: cópiala antes de guardar.' : ''}
-                        </span>
+                {/* Entrar a la plataforma es opcional: sin acceso tiene su carnet, pero no correo ni contraseña para ingresar */}
+                <fieldset className="grid gap-4 rounded-xl border p-4">
+                    <legend className="px-1 text-sm font-semibold">Acceso a la plataforma</legend>
+                    <div className="flex items-start gap-3">
+                        <Checkbox
+                            id="acceso"
+                            checked={form.data.acceso}
+                            onCheckedChange={(v) => form.setData('acceso', v === true)}
+                            aria-describedby={form.errors.acceso ? 'acceso-ayuda acceso-error' : 'acceso-ayuda'}
+                            aria-invalid={form.errors.acceso ? true : undefined}
+                            className="mt-0.5"
+                        />
+                        <div className="grid gap-1">
+                            <label htmlFor="acceso" className="cursor-pointer text-sm leading-none font-medium">
+                                Puede entrar a la plataforma
+                            </label>
+                            <p id="acceso-ayuda" className="text-muted-foreground text-xs">
+                                {form.data.acceso
+                                    ? 'Ingresa con su correo y su contraseña, y ve lo que su rol le permite.'
+                                    : 'Solo tiene su carnet: no ingresa ni puede pedir una contraseña.'}
+                            </p>
+                            <InputError id="acceso-error" message={form.errors.acceso} />
+                        </div>
                     </div>
-                </Campo>
+
+                    <Campo
+                        id="email"
+                        etiqueta={form.data.acceso ? 'Correo electrónico' : 'Correo electrónico (opcional)'}
+                        requerido={form.data.acceso}
+                        error={form.errors.email}
+                    >
+                        <Input
+                            {...propsCampo('email', form.errors.email)}
+                            type="email"
+                            required={form.data.acceso}
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={form.data.email}
+                            onChange={(e) => form.setData('email', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+
+                    {form.data.acceso && (
+                        <Campo
+                            id="password"
+                            etiqueta={pideContrasena ? 'Contraseña' : 'Nueva contraseña'}
+                            requerido={pideContrasena}
+                            ayuda={pideContrasena ? 'Compártela con la persona por un medio seguro.' : 'Déjala en blanco para conservar la actual.'}
+                            error={form.errors.password}
+                        >
+                            <PasswordInput
+                                {...propsCampo('password', form.errors.password, 'password-ayuda')}
+                                required={pideContrasena}
+                                autoComplete="new-password"
+                                placeholder="Mínimo 8 caracteres"
+                                value={form.data.password}
+                                onChange={(e) => {
+                                    form.setData('password', e.target.value);
+                                    setGenerada(false);
+                                }}
+                                visible={verContrasena}
+                                onVisibleChange={setVerContrasena}
+                                // Monoespaciada solo para lo escrito: distingue l, I y 1 al dictarla; el texto guía queda normal
+                                className={cn('h-10 rounded-lg', form.data.password && 'font-mono')}
+                            />
+                            <div className="flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={generar}
+                                    className="text-primary focus-visible:ring-ring inline-flex w-fit items-center gap-1.5 rounded-md text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                                >
+                                    <Sparkles weight="bold" className="size-3.5" aria-hidden="true" />
+                                    Generar una segura
+                                </button>
+                                <span role="status" className="text-good text-xs font-medium">
+                                    {generada ? 'Contraseña generada: cópiala antes de guardar.' : ''}
+                                </span>
+                            </div>
+                        </Campo>
+                    )}
+                </fieldset>
             </FormularioLateral>
         </AppLayout>
     );

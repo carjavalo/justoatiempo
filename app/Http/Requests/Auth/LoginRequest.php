@@ -58,6 +58,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Sigue siendo parte del personal (con su carnet), pero ya no entra a la plataforma
+        if (! Auth::user()->acceso) {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Tu usuario no tiene acceso a la plataforma. Si lo necesitas, habla con el administrador.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

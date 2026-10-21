@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Enums\Rol;
-use App\Models\Empleado;
 use App\Models\LineaServicio;
 use App\Models\Sede;
 use App\Models\User;
@@ -32,24 +31,30 @@ class DatabaseSeeder extends Seeder
             'primer_apellido' => 'Restrepo',
             'password' => 'password',
             'rol' => Rol::Admin,
+            'acceso' => true,
             'email_verified_at' => now(),
         ]);
 
-        $coordinador = User::updateOrCreate(['email' => 'coordinador@justoatiempo.test'], [
+        // El coordinador y un auxiliar con acceso; se reconocen por su cédula (la que llega de Drivin)
+        $coordinador = User::updateOrCreate(['cedula' => '1000000006'], [
+            'email' => 'coordinador@justoatiempo.test',
             'nombres' => 'Carlos',
             'primer_apellido' => 'Valderrama',
+            'cargo' => 'Coordinador logístico',
             'password' => 'password',
             'rol' => Rol::Coordinador,
-            'empleado_id' => Empleado::where('cedula', '1000000006')->value('id'),
+            'acceso' => true,
             'email_verified_at' => now(),
         ]);
 
-        $auxiliar = User::updateOrCreate(['email' => 'auxiliar@justoatiempo.test'], [
+        $auxiliar = User::updateOrCreate(['cedula' => '1000000002'], [
+            'email' => 'auxiliar@justoatiempo.test',
             'nombres' => 'Andrés',
             'primer_apellido' => 'Moreno',
+            'cargo' => 'Auxiliar logístico',
             'password' => 'password',
             'rol' => Rol::Auxiliar,
-            'empleado_id' => Empleado::where('cedula', '1000000002')->value('id'),
+            'acceso' => true,
             'email_verified_at' => now(),
         ]);
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SedeRequest;
 use App\Models\Empresa;
+use App\Models\Parametro;
 use App\Models\Sede;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +56,8 @@ class SedeController extends Controller
             'total' => Sede::count(),
             'filtros' => ['q' => $filtros['q'] ?? '', 'empresa' => (string) ($filtros['empresa'] ?? ''), 'estado' => $filtros['estado'] ?? ''],
             'empresas' => Empresa::orderBy('nombre')->get(['id', 'nombre', 'activo']),
+            // La meta con la que nace una sede nueva (Parámetros)
+            'metaPorDefecto' => (float) Parametro::valor('meta_efectividad_global', 95),
         ]);
     }
 

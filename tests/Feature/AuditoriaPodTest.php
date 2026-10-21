@@ -118,7 +118,8 @@ class AuditoriaPodTest extends TestCase
 
         $linea = InformeDiario::first()->lineas()->first();
         $this->assertTrue($linea->pod_cumple);
-        $this->assertSame('Buen protocolo', $linea->novedades);
+        // La fila resume las novedades de la jornada; el concepto de cada orden va en la hoja de seguimiento
+        $this->assertSame('1 devolución', $linea->novedades);
     }
 
     public function test_sin_evidencia_anula_la_lista_y_no_cumple()

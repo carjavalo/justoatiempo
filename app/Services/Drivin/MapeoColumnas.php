@@ -6,12 +6,15 @@ use Illuminate\Support\Str;
 
 /**
  * Relación entre los encabezados de la preliquidación de Drivin y los campos internos (RF-03 / RF-04).
- * Los alias salen de la exportación real ("Nombre Plan", "Fecha Plan", "Código del Vehículo",
- * "Código de Dirección", "Estado de la orden", "Motivo", "Hora de Entrega", "Comentario PoE"…)
- * y de variantes habituales; el usuario puede corregir el mapeo en la revisión.
+ * Los alias salen de la exportación real (hoja "PdE": "Nombre Plan", "Fecha Plan", "Código del Vehículo",
+ * "Código de Orden", "Estado de la Órden", "Asistente conductor", "Entregado por", "Tiene imágenes",
+ * "Nombre del Esquema"…) y de variantes habituales; el usuario puede corregir el mapeo en la revisión.
  */
 class MapeoColumnas
 {
+    /** Cambia cuando cambian los campos o sus alias: un mapeo recordado de otra versión se vuelve a detectar. */
+    public const VERSION = 2;
+
     /**
      * campo => [etiqueta, obligatorio, alias normalizados (en orden de preferencia)].
      * "obligatorio" significa que sin esa columna no se puede importar el archivo.
@@ -21,20 +24,35 @@ class MapeoColumnas
         'codigo_orden' => ['Código de orden (NP / nota)', true, ['codigo de orden', 'codigo orden', 'numero de orden', 'nro de orden', 'orden', 'nota', 'np', 'codigo de pedido', 'pedido', 'codigo del evento', 'evento', 'codigo de direccion']],
         'estado' => ['Estado de la orden', true, ['estado de la orden', 'estado orden', 'estado de entrega', 'estado entrega', 'estado']],
         'placa' => ['Placa / código del vehículo', true, ['codigo del vehiculo', 'codigo vehiculo', 'placa', 'placa vehiculo', 'vehiculo']],
-        'auxiliar' => ['Asistente del conductor (auxiliar)', true, ['asistente del conductor', 'asistente de conductor', 'asistente', 'asistentes', 'auxiliar', 'auxiliar de reparto', 'ayudante', 'acompanante']],
+        'auxiliar' => ['Asistente del conductor (auxiliar)', true, ['asistente del conductor', 'asistente de conductor', 'asistente conductor', 'asistente', 'asistentes', 'auxiliar', 'auxiliar de reparto', 'ayudante', 'acompanante']],
+        // "[Mobile] 1144203579@justoatiempo.com": la cuenta de Drivin del auxiliar lleva su cédula
+        'cedula_auxiliar' => ['Entregado por (cédula del auxiliar)', false, ['entregado por', 'cedula auxiliar', 'cedula del auxiliar', 'cedula asistente']],
         'ruta' => ['Ruta / nombre del plan', false, ['nombre plan', 'nombre del plan', 'plan', 'nombre ruta', 'ruta', 'operacion']],
         'codigo_direccion' => ['Código de dirección', false, ['codigo de direccion', 'codigo direccion', 'cod direccion']],
+        // El esquema con el que se filtra la operación en Drivin ("CALI SUR"): la sucursal
+        'esquema' => ['Esquema (sucursal)', false, ['nombre del esquema', 'esquema']],
         'cliente' => ['Cliente corporativo (sede)', false, ['cliente corporativo', 'cliente', 'nombre cliente', 'cuenta']],
-        'destinatario' => ['Destinatario', false, ['nombre de contacto', 'nombre contacto', 'contacto', 'destinatario', 'nombre destinatario', 'cliente final']],
+        'destinatario' => ['Destinatario', false, ['nombre direccion', 'nombre de contacto', 'nombre del contacto', 'nombre contacto', 'contacto', 'destinatario', 'nombre destinatario', 'cliente final']],
         'direccion' => ['Dirección de entrega', false, ['direccion', 'direccion de entrega', 'direccion entrega']],
         'ciudad' => ['Ciudad', false, ['ciudad', 'municipio', 'comuna']],
         'producto' => ['Producto', false, ['descripcion del item', 'descripcion item', 'descripcion del producto', 'producto', 'item', 'articulo']],
-        'unidades' => ['Unidades', false, ['unidades entregadas', 'unidades', 'cantidad entregada', 'cantidad']],
+        // "Unidades ítem" (lo pedido de cada producto); "Unidades" a secas es el volumen del vehículo que ocupa
+        'unidades' => ['Unidades', false, ['unidades item', 'unidades del item', 'unidades entregadas', 'cantidad entregada', 'cantidad', 'unidades']],
+        'unidades_entregadas' => ['Unidades entregadas', false, ['unidades entregadas item', 'unidades entregadas del item']],
         'motivo' => ['Motivo de rechazo / novedad', false, ['motivo', 'motivo de rechazo', 'motivo rechazo', 'motivo de no entrega', 'causal', 'razon']],
         'hora_entrega' => ['Hora de entrega', false, ['hora de entrega', 'hora entrega', 'fecha de entrega', 'fecha hora entrega', 'fecha real de entrega']],
         'comentario_pod' => ['Comentario PoE', false, ['comentario poe', 'comentario pod', 'comentario de entrega', 'comentario']],
         'conductor' => ['Conductor', false, ['conductor', 'nombre conductor', 'chofer']],
+        // "Si" / "No": si el auxiliar subió fotos de la entrega
+        'tiene_imagenes' => ['Tiene imágenes (evidencias)', false, ['tiene imagenes', 'tiene imagen', 'con imagenes']],
+        'descripcion_vehiculo' => ['Descripción del vehículo', false, ['descripcion del vehiculo', 'descripcion vehiculo', 'tipo de vehiculo']],
     ];
+
+    /** La cédula dentro de "[Mobile] 1144203579@justoatiempo.com" (o la cédula sola). */
+    public static function cedula(mixed $valor): ?string
+    {
+        return preg_match('/(?<!\d)(\d{5,12})(?!\d)/', (string) $valor, $m) ? $m[1] : null;
+    }
 
     public static function normalizar(?string $texto): string
     {

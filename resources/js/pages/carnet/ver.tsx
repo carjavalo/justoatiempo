@@ -125,7 +125,7 @@ export default function VerCarnet({ persona, propio, editable = false }: Props) 
                                 <strong className="font-semibold">Para que el carnet quede completo, falta {lista(faltan)}.</strong> Puedes agregarlo
                                 en{' '}
                                 <Link
-                                    href={route('usuarios.index', { q: persona.email })}
+                                    href={route('usuarios.index', { q: persona.cedula ?? persona.email ?? persona.nombreCompleto })}
                                     className="text-primary font-semibold underline underline-offset-4"
                                 >
                                     Usuarios, editando a {persona.nombreCompleto}

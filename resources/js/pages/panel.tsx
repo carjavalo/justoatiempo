@@ -1,4 +1,19 @@
-import { ArrowRight, Bandeja, Building2, CalendarRange, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UserCheck, UsersRound } from '@/components/iconos';
+import {
+    ArrowRight,
+    Bandeja,
+    Building2,
+    CalendarRange,
+    Layers,
+    LayoutGrid,
+    Lightbulb,
+    MapPinned,
+    Settings,
+    Store,
+    type TipoIcono,
+    Truck,
+    UserCheck,
+    UsersRound,
+} from '@/components/iconos';
 import AppLayout from '@/layouts/app-layout';
 import { iconoLinea } from '@/lib/iconos-linea';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
@@ -15,6 +30,8 @@ interface Resumen {
     roles?: { total: number; activos: number };
     servicios?: { activas: number };
     asignaciones?: { vigentes: number; personas: number };
+    vehiculos?: { total: number; activos: number };
+    parametros?: { felicitacion: number; llamado: number };
 }
 
 interface LineaPanel {
@@ -79,7 +96,7 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 }
 
 function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
-    const { usuarios, asignaciones, roles, servicios, empresas, sedes, sucursales, solicitudes } = resumen;
+    const { usuarios, asignaciones, roles, servicios, empresas, sedes, sucursales, solicitudes, vehiculos, parametros } = resumen;
     type Opcion = { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string; pendiente?: boolean };
     const todas: (Opcion | undefined)[] = [
         usuarios && {
@@ -154,6 +171,22 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
                   ? 'Todas atendidas'
                   : 'Aún no han llegado',
             pendiente: solicitudes.pendientes > 0,
+        },
+        vehiculos && {
+            id: 'vehiculos',
+            titulo: 'Flota',
+            texto: 'Los vehículos de la operación urbana por su placa, con su código interno y su conductor habitual.',
+            href: route('vehiculos.index'),
+            icono: Truck,
+            dato: vehiculos.total ? plural(vehiculos.activos, 'vehículo activo', 'vehículos activos') : 'Aún no hay vehículos',
+        },
+        parametros && {
+            id: 'parametros',
+            titulo: 'Parámetros',
+            texto: 'Cuándo el informe sugiere felicitar o llamar la atención, y los motivos de rechazo y tipos de novedad.',
+            href: route('parametros.index'),
+            icono: Settings,
+            dato: `Felicitación desde ${parametros.felicitacion.toLocaleString('es-CO')} %`,
         },
     ];
     const opciones = todas.filter((o): o is Opcion => Boolean(o));

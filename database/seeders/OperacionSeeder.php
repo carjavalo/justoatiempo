@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CargoEmpleado;
-use App\Models\Empleado;
+use App\Enums\Rol;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\Sede;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Database\Seeder;
 
@@ -44,22 +44,38 @@ class OperacionSeeder extends Seeder
         Vehiculo::updateOrCreate(['placa' => 'TTT768'], ['tipo' => 'Furgón']);
         Vehiculo::updateOrCreate(['placa' => 'ZNK295'], ['tipo' => 'Furgón']);
 
-        $empleados = [
-            ['1000000001', 'Juan Fernando', 'Plaza', CargoEmpleado::Auxiliar],
-            ['1000000002', 'Andrés', 'Moreno', CargoEmpleado::Auxiliar],
-            ['1000000003', 'Alber', 'Prado', CargoEmpleado::Auxiliar],
-            ['1000000004', 'Cristian', 'Gómez', CargoEmpleado::Auxiliar],
-            ['1000000005', 'Andrés Felipe', 'Rojas', CargoEmpleado::Auxiliar],
-            ['1000000006', 'Carlos', 'Valderrama', CargoEmpleado::Coordinador],
-        ];
-
-        foreach ($empleados as [$cedula, $nombres, $apellidos, $cargo]) {
-            Empleado::updateOrCreate(['cedula' => $cedula], [
-                'nombres' => $nombres,
-                'apellidos' => $apellidos,
-                'cargo' => $cargo,
-                'activo' => true,
-            ]);
+        // Auxiliares de la operación logística: personal sin acceso a la plataforma (con su carnet), asignado a Ditranza
+        foreach ([
+            ['1000000001', 'Juan Fernando', 'Plaza'],
+            ['1000000003', 'Alber', 'Prado'],
+            ['1000000004', 'Cristian', 'Gómez'],
+            ['1000000005', 'Andrés Felipe', 'Rojas'],
+        ] as [$cedula, $nombres, $apellido]) {
+            self::personal($cedula, $nombres, $apellido, $ditranza);
         }
+    }
+
+    /** Una persona del personal operativo, sin acceso a la plataforma, asignada a la empresa en su línea logística. */
+    public static function personal(string $cedula, string $nombres, string $apellido, Empresa $empresa): User
+    {
+        $persona = User::firstOrCreate(['cedula' => $cedula], [
+            'nombres' => $nombres,
+            'primer_apellido' => $apellido,
+            'cargo' => 'Auxiliar logístico',
+            'rol' => Rol::Auxiliar,
+            'activo' => true,
+            'acceso' => false,
+        ]);
+
+        if (! $persona->asignaciones()->exists()) {
+            $asignacion = $persona->asignaciones()->create([
+                'empresa_id' => $empresa->id,
+                'fecha_inicio' => today()->subYear()->toDateString(),
+                'duracion' => 'indefinida',
+            ]);
+            $asignacion->lineas()->sync([LineaServicio::logistica()->id]);
+        }
+
+        return $persona;
     }
 }

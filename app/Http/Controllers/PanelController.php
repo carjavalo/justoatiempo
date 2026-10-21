@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
+use App\Models\Parametro;
 use App\Models\RolUsuario;
 use App\Models\Sede;
 use App\Models\SolicitudContacto;
 use App\Models\Sucursal;
 use App\Models\User;
+use App\Models\Vehiculo;
 use App\Support\Permisos;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -81,6 +83,14 @@ class PanelController extends Controller
             })() : null,
             'solicitudes' => $user->puede('solicitudes.ver')
                 ? ['total' => SolicitudContacto::count(), 'pendientes' => SolicitudContacto::where('atendida', false)->count()]
+                : null,
+            'vehiculos' => $user->puede('vehiculos.ver') ? (function () {
+                $v = Vehiculo::selectRaw('count(*) as total, sum(activo) as activos')->first();
+
+                return ['total' => (int) $v->total, 'activos' => (int) $v->activos];
+            })() : null,
+            'parametros' => $user->puede('parametros.ver')
+                ? ['felicitacion' => (float) Parametro::valor('umbral_felicitacion', 100), 'llamado' => (float) Parametro::valor('umbral_llamado_atencion', 70)]
                 : null,
         ], fn ($dato) => $dato !== null);
 

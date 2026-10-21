@@ -31,6 +31,7 @@ class UsuarioController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'rol' => ['nullable', 'integer'],
             'estado' => ['nullable', Rule::in(['activos', 'inactivos'])],
+            'acceso' => ['nullable', Rule::in(['con', 'sin'])],
             'empresa' => ['nullable', 'integer'],
             'sede' => ['nullable', 'integer'],
             'sucursal' => ['nullable', 'integer'],
@@ -52,6 +53,7 @@ class UsuarioController extends Controller
             })
             ->when($filtros['rol'] ?? null, fn (Builder $q, int|string $rol) => $q->where('rol_id', (int) $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
+            ->when($filtros['acceso'] ?? null, fn (Builder $q, string $acceso) => $q->where('acceso', $acceso === 'con'))
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('empresa_id', $id)))
             ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sede_id', $id)))
             ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sucursal_id', $id)))
@@ -71,6 +73,12 @@ class UsuarioController extends Controller
                 'cedula' => $u->cedula,
                 'cargo' => $u->cargo,
                 'email' => $u->email,
+                'acceso' => $u->acceso,
+                'tieneContrasena' => filled($u->password),
+                'telefono' => $u->telefono,
+                'ciudad' => $u->ciudad,
+                'fechaNacimiento' => $u->fecha_nacimiento?->toDateString(),
+                'fechaIngreso' => $u->fecha_ingreso?->toDateString(),
                 // Su rol dentro de la empresa
                 'rolId' => $u->rol_id,
                 'rolNombre' => $u->nombreRol(),
@@ -97,6 +105,7 @@ class UsuarioController extends Controller
                 'q' => $filtros['q'] ?? '',
                 'rol' => (string) ($filtros['rol'] ?? ''),
                 'estado' => $filtros['estado'] ?? '',
+                'acceso' => $filtros['acceso'] ?? '',
                 'empresa' => (string) ($filtros['empresa'] ?? ''),
                 'sede' => (string) ($filtros['sede'] ?? ''),
                 'sucursal' => (string) ($filtros['sucursal'] ?? ''),
@@ -126,16 +135,20 @@ class UsuarioController extends Controller
     {
         $usuario = User::create([...$request->datos(), 'activo' => true]);
         // Lo crea el administrador: el correo ya se da por verificado
-        $usuario->markEmailAsVerified();
+        if ($usuario->email) {
+            $usuario->markEmailAsVerified();
+        }
         $this->guardarArchivos($request, $usuario);
 
         // Lo siguiente es decir dónde presta el servicio: se abre Asignaciones con la persona elegida
         if ($request->user()->puede('asignaciones.crear') && $request->user()->cubreA($usuario)) {
             return to_route('asignaciones.index', ['usuario' => $usuario->id, 'nueva' => 1])
-                ->with('success', "Usuario creado: {$usuario->name}. Ahora elige dónde presta el servicio y qué líneas hace.");
+                ->with('success', "Persona registrada: {$usuario->name}. Ahora elige dónde presta el servicio y qué líneas hace.");
         }
 
-        return back()->with('success', "Usuario creado: {$usuario->name} ya puede ingresar con su correo.");
+        return back()->with('success', $usuario->acceso
+            ? "Usuario creado: {$usuario->name} ya puede ingresar con su correo."
+            : "Persona registrada: {$usuario->name}, con su carnet y sin acceso a la plataforma.");
     }
 
     public function update(UsuarioRequest $request, User $usuario): RedirectResponse
@@ -144,7 +157,7 @@ class UsuarioController extends Controller
         $usuario->update($datos);
         $this->guardarArchivos($request, $usuario);
 
-        // Contraseña nueva: las sesiones abiertas con la anterior dejan de valer (menos la de quien edita)
+        // Contraseña nueva (o sin acceso): las sesiones abiertas con la anterior dejan de valer (menos la de quien edita)
         if (array_key_exists('password', $datos)) {
             DB::table(config('session.table', 'sessions'))
                 ->where('user_id', $usuario->id)
@@ -236,11 +249,11 @@ class UsuarioController extends Controller
         if (! $request->user()->cubreA($usuario)) {
             return back()->with('error', "{$usuario->name} tiene más acceso que tu rol: no puedes cambiar su acceso.");
         }
-        // Siempre queda al menos una persona activa con el rol Administrador
+        // Siempre queda al menos una persona activa, con acceso, con el rol Administrador
         $administrador = RolUsuario::administrador();
         if (! $activo && $administrador && $usuario->rol_id === $administrador->id
-            && ! User::where('rol_id', $administrador->id)->where('activo', true)->whereKeyNot($usuario->id)->exists()) {
-            return back()->with('error', "{$usuario->name} es la única persona activa con el rol {$administrador->nombre}: dáselo antes a otra persona.");
+            && ! User::where('rol_id', $administrador->id)->where('activo', true)->where('acceso', true)->whereKeyNot($usuario->id)->exists()) {
+            return back()->with('error', "{$usuario->name} es la única persona con el rol {$administrador->nombre} que puede entrar a la plataforma: dáselo antes a otra persona.");
         }
 
         $usuario->update(['activo' => $activo]);

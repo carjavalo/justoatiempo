@@ -124,6 +124,34 @@ class NavegacionTest extends TestCase
             ->assertRedirect('/lineas/'.LineaServicio::logistica()->slug);
     }
 
+    public function test_lo_que_pide_el_historial_sin_sesion_no_queda_como_destino_al_ingresar(): void
+    {
+        // Tras salir, «Atrás» lleva a una página privada: la app la pide al servidor marcada como del historial
+        $this->get('/usuarios', ['X-Desde-Historial' => '1'])->assertRedirect('/login');
+        $this->assertNull(session('url.intended'));
+
+        // Quien ingresa después va a su inicio, no a esa página
+        $coordinador = User::factory()->coordinador()->create();
+        $this->post('/login', ['email' => $coordinador->email, 'password' => 'password'])
+            ->assertRedirect('/panel');
+
+        // Un enlace que la persona abrió sin sesión sí se recuerda para después de ingresar
+        auth()->logout();
+        $this->get('/usuarios')->assertRedirect('/login');
+        $this->assertSame(url('/usuarios'), session('url.intended'));
+    }
+
+    public function test_una_subida_con_el_codigo_vencido_recibe_el_419(): void
+    {
+        // Con una redirección, el fetch de las subidas en tandas tomaría la página como respuesta correcta
+        Route::middleware('web')->post('/prueba-subida', fn () => throw new TokenMismatchException);
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->from('/auditoria')
+            ->postJson('/prueba-subida')
+            ->assertStatus(419);
+    }
+
     public function test_al_salir_cambia_el_codigo_de_la_sesion(): void
     {
         // Con él, la app reconoce las páginas guardadas en el historial que son de una sesión anterior

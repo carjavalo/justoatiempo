@@ -47,7 +47,7 @@ class HandleInertiaRequests extends Middleware
             'csrf' => Inertia::always(fn () => csrf_token()),
             'auth' => [
                 'user' => $user ? [
-                    ...$user->only(['id', 'name', 'nombres', 'primer_apellido', 'segundo_apellido', 'email', 'email_verified_at', 'created_at', 'updated_at', 'empleado_id']),
+                    ...$user->only(['id', 'name', 'nombres', 'primer_apellido', 'segundo_apellido', 'email', 'email_verified_at', 'created_at', 'updated_at']),
                     // El rol dentro de la empresa ("Conductor")
                     'rol_label' => $user->nombreRol(),
                     // Destino de la miga raíz: el panel o la línea en la que trabaja

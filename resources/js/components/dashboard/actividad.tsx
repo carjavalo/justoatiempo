@@ -58,13 +58,14 @@ const ACCION = {
     felicitacion: { icono: Felicitacion, clase: 'bg-good-soft text-good' },
     retroalimentacion: { icono: MessageCircle, clase: 'bg-warning-soft text-warning' },
     llamado_atencion: { icono: ShieldAlert, clase: 'bg-critical-soft text-critical' },
+    llamado_escrito: { icono: ShieldAlert, clase: 'bg-critical-soft text-critical' },
 } as const;
 
 /** Últimas acciones de desempeño registradas (RF-11). */
-export function AccionesRecientes({ acciones, mostrarEmpleado = true }: { acciones: AccionReciente[]; mostrarEmpleado?: boolean }) {
+export function AccionesRecientes({ acciones, mostrarPersona = true }: { acciones: AccionReciente[]; mostrarPersona?: boolean }) {
     return (
         <Panel
-            titulo={mostrarEmpleado ? 'Acciones de desempeño' : 'Mis acciones de desempeño'}
+            titulo={mostrarPersona ? 'Acciones de desempeño' : 'Mis acciones de desempeño'}
             descripcion="Últimas felicitaciones, retroalimentaciones y llamados"
         >
             {acciones.length === 0 ? (
@@ -81,9 +82,9 @@ export function AccionesRecientes({ acciones, mostrarEmpleado = true }: { accion
                                 <div className="min-w-0 pt-0.5">
                                     <p className="text-sm leading-tight">
                                         {/* En la vista del auxiliar todas las acciones son suyas: no se repite su nombre */}
-                                        {mostrarEmpleado ? (
+                                        {mostrarPersona ? (
                                             <>
-                                                <span className="font-semibold">{a.empleado}</span>{' '}
+                                                <span className="font-semibold">{a.persona}</span>{' '}
                                                 <span className="text-muted-foreground">· {a.tipoLabel}</span>
                                             </>
                                         ) : (

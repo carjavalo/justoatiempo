@@ -11,8 +11,9 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Validator;
 
 /**
- * Crear o editar a una persona: sus datos, su rol, su cargo, su foto y su ARL. Dónde presta el servicio (empresas,
- * sedes, sucursales y líneas) va aparte, en Asignaciones.
+ * Crear o editar a una persona del personal: sus datos, su rol, su cargo, su foto y su ARL, y si entra a la plataforma
+ * (con correo y contraseña) o no (auxiliares y operarios que solo necesitan su carnet). Dónde presta el servicio
+ * (empresas, sedes, sucursales y líneas) va aparte, en Asignaciones.
  */
 class UsuarioRequest extends FormRequest
 {
@@ -37,8 +38,14 @@ class UsuarioRequest extends FormRequest
             // La cédula se guarda solo con sus números ("1.144.123.456" → "1144123456")
             'cedula' => is_string($c = $this->input('cedula')) ? (preg_replace('/[\s.,-]/', '', $c) ?: null) : $c,
             'cargo' => $this->texto('cargo') ?: null,
-            'email' => is_string($e = $this->texto('email')) ? mb_strtolower($e) : $e,
+            'email' => is_string($e = $this->texto('email')) ? (mb_strtolower($e) ?: null) : $e,
             'password' => $this->input('password') ?: null,
+            // Sin decirlo, como siempre: entra a la plataforma con su correo
+            'acceso' => $this->has('acceso') ? $this->input('acceso') : true,
+            'telefono' => $this->texto('telefono') ?: null,
+            'ciudad' => $this->texto('ciudad') ?: null,
+            'fecha_nacimiento' => $this->input('fecha_nacimiento') ?: null,
+            'fecha_ingreso' => $this->input('fecha_ingreso') ?: null,
         ]);
     }
 
@@ -51,13 +58,21 @@ class UsuarioRequest extends FormRequest
             'nombres' => ['required', 'string', 'max:80'],
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
-            'cedula' => ['nullable', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
+            // Sin acceso a la plataforma, la cédula es la que la identifica (en su carnet y en las entregas de Drivin)
+            'cedula' => ['nullable', 'required_unless:acceso,true', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
             // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
-            'email' => ['required', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
+            'acceso' => ['required', 'boolean'],
+            // Con acceso, el correo es con el que ingresa; sin acceso es solo un dato de contacto
+            'email' => ['nullable', 'required_if:acceso,true', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
-            // Al crear es obligatoria; al editar, vacía significa "conservar la actual"
-            'password' => [$usuario ? 'nullable' : 'required', 'string', 'max:255', Password::defaults()],
+            // Con acceso, al crear (o al darle acceso a quien no tenía contraseña) es obligatoria; al editar, vacía
+            // significa "conservar la actual". Sin acceso no se usa.
+            'password' => [Rule::requiredIf(fn () => $this->boolean('acceso') && blank($usuario?->password)), 'nullable', 'string', 'max:255', Password::defaults()],
+            'telefono' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\s-]{7,30}$/'],
+            'ciudad' => ['nullable', 'string', 'max:80'],
+            'fecha_nacimiento' => ['nullable', 'date', 'before:-14 years'],
+            'fecha_ingreso' => ['nullable', 'date', 'before_or_equal:+1 month'],
             // Foto para el carnet: opcional (el navegador ya la reduce; el tope cubre fotos sin reducir)
             'foto' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
             'quitar_foto' => ['nullable', 'boolean'],
@@ -88,11 +103,20 @@ class UsuarioRequest extends FormRequest
                 $validator->errors()->add('rol_id', 'Este rol tiene permisos que el tuyo no tiene: no puedes asignarlo.');
             }
 
-            // Siempre queda al menos una persona activa con el rol Administrador (la que puede corregir todo)
+            // Siempre queda al menos una persona activa, con acceso, con el rol Administrador (la que puede corregir todo)
             $administrador = RolUsuario::administrador();
-            if ($usuario && $administrador && $usuario->rol_id === $administrador->id && $rol->id !== $administrador->id
-                && ! User::where('rol_id', $administrador->id)->where('activo', true)->whereKeyNot($usuario->id)->exists()) {
-                $validator->errors()->add('rol_id', "Es la única persona activa con el rol {$administrador->nombre}: dáselo antes a otra persona.");
+            $otroAdministrador = fn () => User::where('rol_id', $administrador->id)->where('activo', true)->where('acceso', true)->whereKeyNot($usuario->id)->exists();
+            if ($usuario && $administrador && $usuario->rol_id === $administrador->id && $rol->id !== $administrador->id && ! $otroAdministrador()) {
+                $validator->errors()->add('rol_id', "Es la única persona con el rol {$administrador->nombre} que puede entrar a la plataforma: dáselo antes a otra persona.");
+            }
+
+            // Nadie se quita a sí mismo la entrada a la plataforma
+            if ($usuario?->is($this->user()) && ! $this->boolean('acceso')) {
+                $validator->errors()->add('acceso', 'No puedes quitarte tu propio acceso: pídeselo a otra persona.');
+            }
+
+            if ($usuario && $administrador && $usuario->rol_id === $administrador->id && $usuario->acceso && ! $this->boolean('acceso') && ! $otroAdministrador()) {
+                $validator->errors()->add('acceso', "Es la única persona con el rol {$administrador->nombre} que puede entrar a la plataforma: dale acceso antes a otra.");
             }
 
             // Nadie se quita a sí mismo lo que necesita para corregir usuarios y roles
@@ -111,7 +135,13 @@ class UsuarioRequest extends FormRequest
         return [
             'rol_id.required' => 'Elige el rol.',
             'cargo.required' => 'Escribe el cargo: va en el carnet.',
+            'email.required_if' => 'Escribe el correo: es con el que entrará a la plataforma.',
             'email.unique' => 'Ya hay un usuario con este correo.',
+            'cedula.required_unless' => 'Escribe la cédula: sin acceso a la plataforma, es la que identifica a la persona.',
+            'password.required' => 'Escribe la contraseña con la que entrará.',
+            'telefono.regex' => 'Escribe un teléfono válido (solo números, espacios y +).',
+            'fecha_nacimiento.before' => 'Revisa la fecha de nacimiento: debe tener al menos 14 años.',
+            'fecha_ingreso.before_or_equal' => 'La fecha de ingreso no puede ser tan adelante.',
             'cedula.regex' => 'Escribe solo los números de la cédula (entre 5 y 12).',
             'cedula.unique' => 'Ya hay un usuario con esta cédula.',
             'foto.image' => 'La foto debe ser una imagen JPG, PNG o WebP.',
@@ -126,13 +156,17 @@ class UsuarioRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL'];
+        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL', 'acceso' => 'el acceso', 'telefono' => 'el teléfono', 'ciudad' => 'la ciudad', 'fecha_nacimiento' => 'la fecha de nacimiento', 'fecha_ingreso' => 'la fecha de ingreso'];
     }
 
-    /** @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. */
+    /**
+     * @return array<string, mixed> Datos listos para guardar; sin contraseña si se dejó en blanco al editar. Sin acceso,
+     *                              la contraseña se borra: si después se le da acceso, se le asigna una nueva.
+     */
     public function datos(): array
     {
         $datos = $this->validated();
+        $acceso = (bool) $datos['acceso'];
 
         $guardar = [
             'nombres' => $datos['nombres'],
@@ -140,12 +174,19 @@ class UsuarioRequest extends FormRequest
             'segundo_apellido' => $datos['segundo_apellido'] ?? null,
             'cedula' => $datos['cedula'] ?? null,
             'cargo' => $datos['cargo'],
-            'email' => $datos['email'],
+            'acceso' => $acceso,
+            'email' => $datos['email'] ?? null,
+            'telefono' => $datos['telefono'] ?? null,
+            'ciudad' => $datos['ciudad'] ?? null,
+            'fecha_nacimiento' => $datos['fecha_nacimiento'] ?? null,
+            'fecha_ingreso' => $datos['fecha_ingreso'] ?? null,
             // El nivel de acceso sale del rol (lo pone el modelo al guardar)
             'rol_id' => (int) $datos['rol_id'],
         ];
 
-        if (filled($datos['password'] ?? null)) {
+        if (! $acceso) {
+            $guardar['password'] = null;
+        } elseif (filled($datos['password'] ?? null)) {
             $guardar['password'] = $datos['password'];
         }
 

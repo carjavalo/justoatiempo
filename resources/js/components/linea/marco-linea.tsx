@@ -1,4 +1,4 @@
-import { ClipboardCheck, LayoutGrid, type TipoIcono, UploadCloud } from '@/components/iconos';
+import { ClipboardCheck, FileSpreadsheet, LayoutGrid, Target, type TipoIcono, UploadCloud } from '@/components/iconos';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { iconoLinea } from '@/lib/iconos-linea';
@@ -8,12 +8,14 @@ import { type SharedData, type Volver } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
-export type SeccionLogistica = 'tablero' | 'cargas' | 'auditoria';
+export type SeccionLogistica = 'tablero' | 'cargas' | 'auditoria' | 'informes' | 'seguimiento';
 
 const PESTANAS_LOGISTICA: { id: SeccionLogistica; texto: string; icono: TipoIcono; href: (slug: string) => string; permiso: string }[] = [
     { id: 'tablero', texto: 'Tablero', icono: LayoutGrid, href: (slug) => route('lineas.show', slug), permiso: 'tablero.ver' },
     { id: 'cargas', texto: 'Cargas Drivin', icono: UploadCloud, href: () => route('cargas.index'), permiso: 'cargas.ver' },
     { id: 'auditoria', texto: 'Auditoría POD', icono: ClipboardCheck, href: () => route('auditoria.index'), permiso: 'auditoria.ver' },
+    { id: 'informes', texto: 'Informe diario', icono: FileSpreadsheet, href: () => route('informes.index'), permiso: 'informes.ver' },
+    { id: 'seguimiento', texto: 'Seguimiento', icono: Target, href: () => route('seguimiento.index'), permiso: 'seguimiento.ver' },
 ];
 
 /** La línea de las herramientas de Drivin (sus páginas no reciben la línea desde el servidor). */

@@ -25,7 +25,7 @@ class AccesoAdministrador extends Command
 {
     protected $signature = 'admin:acceso';
 
-    protected $description = 'Cambia el correo y la contraseña de un administrador (para recuperar el acceso)';
+    protected $description = 'Cambia el correo y la contraseña de un administrador y le devuelve el acceso a la plataforma (para recuperarlo)';
 
     public function handle(): int
     {
@@ -43,19 +43,19 @@ class AccesoAdministrador extends Command
 
         $admin = $admins->count() === 1 ? $admins->first() : $admins->firstWhere('id', (int) select(
             label: '¿A cuál administrador le cambias el acceso?',
-            options: $admins->mapWithKeys(fn (User $u) => [$u->id => "{$u->name} ({$u->email})"])->all(),
+            options: $admins->mapWithKeys(fn (User $u) => [$u->id => "{$u->name} (".($u->email ?? 'sin correo').($u->acceso ? '' : ', sin acceso').')'])->all(),
         ));
-        $this->components->info("Administrador: {$admin->name} ({$admin->email})");
+        $this->components->info("Administrador: {$admin->name} (".($admin->email ?? 'sin correo').')');
 
         $correo = text(
             label: 'Correo nuevo',
-            default: $admin->email,
+            default: (string) $admin->email,
             required: true,
             validate: fn (string $valor) => $this->errorDe(
                 ['correo' => trim($valor)],
                 ['correo' => ['email', 'max:255', Rule::unique('users', 'email')->ignore($admin->id)]],
             ),
-            hint: 'Enter deja el actual.',
+            hint: $admin->email ? 'Enter deja el actual.' : 'No tiene correo: escribe uno.',
         );
 
         $clave = password(
@@ -75,6 +75,7 @@ class AccesoAdministrador extends Command
             'password' => $clave,
             'remember_token' => Str::random(60),
             'activo' => true,
+            'acceso' => true,
             // Con el rol Administrador de vuelta, puede corregir cualquier otro acceso
             'rol_id' => $administrador?->id ?? $admin->rol_id,
         ])->save();

@@ -9,16 +9,16 @@ class ProgramacionAsignacion extends Model
 {
     protected $table = 'programacion_asignaciones';
 
-    protected $fillable = ['programacion_id', 'empleado_id', 'vehiculo_id', 'ruta'];
+    protected $fillable = ['programacion_id', 'user_id', 'vehiculo_id', 'ruta'];
 
     public function programacion(): BelongsTo
     {
         return $this->belongsTo(Programacion::class);
     }
 
-    public function empleado(): BelongsTo
+    public function persona(): BelongsTo
     {
-        return $this->belongsTo(Empleado::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function vehiculo(): BelongsTo

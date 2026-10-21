@@ -49,8 +49,8 @@ final class Permisos
                 'tablero' => ['titulo' => 'Tablero de la línea', 'descripcion' => 'Indicadores, empresas y personal de su línea de servicio.', 'acciones' => ['ver' => 'Ver']],
                 'cargas' => ['titulo' => 'Cargas Drivin', 'descripcion' => 'La preliquidación diaria de Drivin (servicios logísticos).', 'acciones' => ['ver' => 'Ver', 'subir' => 'Subir y revisar', 'confirmar' => 'Confirmar', 'anular' => 'Anular']],
                 'auditoria' => ['titulo' => 'Auditoría POD', 'descripcion' => 'Las evidencias de entrega de cada orden.', 'acciones' => ['ver' => 'Ver', 'revisar' => 'Revisar órdenes', 'subir' => 'Subir evidencias', 'eliminar' => 'Eliminar evidencias']],
-                'informes' => ['titulo' => 'Informe diario', 'descripcion' => 'Cuadro consolidado por fecha, sede, ruta y auxiliar.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
-                'seguimiento' => ['titulo' => 'Seguimiento y desempeño', 'descripcion' => 'Felicitaciones y llamados de atención por auxiliar.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
+                'informes' => ['titulo' => 'Informe diario', 'descripcion' => 'Cuadro consolidado por fecha, sede, ruta y auxiliar, como el Excel de la operación.', 'acciones' => ['ver' => 'Ver', 'editar' => 'Escribir observaciones', 'cerrar' => 'Pasar a seguimiento, cerrar y reabrir', 'descargar' => 'Descargar en Excel']],
+                'seguimiento' => ['titulo' => 'Seguimiento y desempeño', 'descripcion' => 'Felicitaciones, retroalimentaciones y llamados de atención por persona.', 'acciones' => ['ver' => 'Ver', 'registrar' => 'Registrar acciones']],
                 'programacion' => ['titulo' => 'Programación diaria', 'descripcion' => 'Auxiliares y vehículos requeridos por sede y fecha.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
             ],
         ],
@@ -58,9 +58,8 @@ final class Permisos
             'clave' => 'maestros',
             'titulo' => 'Datos maestros',
             'modulos' => [
-                'empleados' => ['titulo' => 'Empleados', 'descripcion' => 'Auxiliares y conductores por cédula.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
-                'vehiculos' => ['titulo' => 'Flota', 'descripcion' => 'Vehículos por placa y código interno.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
-                'parametros' => ['titulo' => 'Parámetros', 'descripcion' => 'Metas de efectividad y reglas globales.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
+                'vehiculos' => ['titulo' => 'Flota', 'descripcion' => 'Vehículos por placa y código interno, con su conductor habitual.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
+                'parametros' => ['titulo' => 'Parámetros', 'descripcion' => 'Umbrales del seguimiento, motivos de rechazo y tipos de novedad.', 'acciones' => ['ver' => 'Ver', 'editar' => 'Editar']],
             ],
         ],
         [
@@ -73,12 +72,12 @@ final class Permisos
     ];
 
     /**
-     * Módulos que reúnen la información de todas las empresas: no se abren a quien ve solo la suya. Usuarios sí:
-     * a esa persona le muestra solo los de su empresa (App\Models\User::alcanza).
+     * Módulos que reúnen la información de todas las empresas: no se abren a quien ve solo la suya. Usuarios, el
+     * informe diario y el seguimiento sí: a esa persona le muestran solo lo de sus asignaciones.
      */
     public const MEZCLAN_EMPRESAS = [
         'roles', 'servicios', 'empresas', 'sedes', 'sucursales', 'solicitudes',
-        'cargas', 'auditoria', 'informes', 'seguimiento', 'programacion', 'empleados', 'vehiculos', 'parametros',
+        'cargas', 'auditoria', 'programacion', 'vehiculos', 'parametros',
     ];
 
     /** Lo único que tiene sentido con el alcance "solo lo suyo": su tablero (su desempeño) y sus entregas. */
@@ -180,7 +179,7 @@ final class Permisos
                 'permisos' => self::normalizar([
                     'tablero.ver', 'cargas.subir', 'cargas.confirmar', 'cargas.anular',
                     'auditoria.revisar', 'auditoria.subir', 'auditoria.eliminar',
-                    'informes.ver', 'seguimiento.ver', 'programacion.ver',
+                    'informes.editar', 'informes.cerrar', 'informes.descargar', 'seguimiento.registrar', 'programacion.ver',
                 ]),
                 'alcance' => self::ALCANCE_ASIGNACION,
             ],

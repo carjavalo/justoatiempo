@@ -214,7 +214,7 @@ export default function TableroLogistica(props: Props) {
                         {/* Seguimiento */}
                         <div className={cn('grid gap-4', gerencial && 'lg:grid-cols-2')}>
                             {pendientes && <InformesPendientes pendientes={pendientes} />}
-                            <AccionesRecientes acciones={acciones} mostrarEmpleado={gerencial} />
+                            <AccionesRecientes acciones={acciones} mostrarPersona={gerencial} />
                         </div>
                     </>
                 )}

@@ -11,7 +11,7 @@ interface Vigente {
     nombre: string;
     cedula: string | null;
     cargo: string;
-    email: string;
+    email: string | null;
     /** Dónde presta el servicio hoy (todos son personal de Justo a Tiempo): cada empresa con su sede, sucursal y líneas. */
     asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
     foto: string | null;

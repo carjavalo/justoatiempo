@@ -4,6 +4,7 @@ use App\Http\Middleware\CerrarSesionInactiva;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\TienePermiso;
 use App\Http\Middleware\VistaPreviaPublica;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -45,6 +46,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Una página privada que pidió el navegador al volver con «Atrás» después de salir (resources/js/lib/sesion.ts):
+        // al inicio de sesión, pero sin recordarla como destino; si no, quien ingrese después en ese equipo, quizá otra
+        // persona, terminaría en ella (o en un 403)
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            return $request->hasHeader('X-Desde-Historial') ? redirect()->route('login') : null;
+        });
+
         // Un solo callback: Laravel guarda únicamente el último que se registra con respond()
         $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
             $estado = $response->getStatusCode();
@@ -52,6 +60,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // Código de seguridad vencido (419): volver a la página con un aviso claro en vez de "Page Expired".
             // 303: si la petición era PUT/PATCH/DELETE, el navegador vuelve con GET.
             if ($estado === 419) {
+                // Una subida por fetch (resources/js/lib/subida.ts) recibe el 419 tal cual: con una redirección, el
+                // fetch la seguiría y tomaría la página como respuesta correcta, sin avisar que nada se subió
+                if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+                    return $response;
+                }
+
                 // En el ingreso y en el sitio público no había sesión que vencer: la página llevaba tanto tiempo
                 // abierta que su código ya no sirve. Lo escrito se conserva; solo falta la contraseña, que se borra.
                 if ($request->is('login', 'reset-password')) {

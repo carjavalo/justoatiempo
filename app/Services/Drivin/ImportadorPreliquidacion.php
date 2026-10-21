@@ -8,6 +8,7 @@ use App\Models\Carga;
 use App\Models\InformeDiario;
 use App\Models\Orden;
 use App\Models\Parametro;
+use App\Models\Vehiculo;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -61,8 +62,22 @@ class ImportadorPreliquidacion
 
         return DB::transaction(function () use ($carga, $lectura, $mapeo, $a, $inicio) {
             $ahora = now();
+
+            // Los vehículos que aún no están en Flota se agregan con la descripción de Drivin
+            $nuevos = [];
+            foreach (collect($a['ordenes'])->filter(fn ($o) => $o['placa'] && ! $o['vehiculo_id'])->unique('placa') as $o) {
+                $vehiculo = Vehiculo::withTrashed()->firstOrNew(['placa' => $o['placa']]);
+                if ($vehiculo->trashed()) {
+                    $vehiculo->restore();
+                }
+                $vehiculo->descripcion ??= $o['vehiculo_descripcion'];
+                $vehiculo->save();
+                $nuevos[$o['placa']] = $vehiculo->id;
+            }
+
             $filas = array_map(fn (array $o) => [
-                ...collect($o)->except(['fila'])->all(),
+                ...collect($o)->except(['fila', 'vehiculo_descripcion'])->all(),
+                'vehiculo_id' => $o['vehiculo_id'] ?? ($nuevos[$o['placa']] ?? null),
                 'carga_id' => $carga->id,
                 'datos_crudos' => json_encode($o['datos_crudos'], JSON_UNESCAPED_UNICODE),
                 'created_at' => $ahora,
@@ -106,7 +121,7 @@ class ImportadorPreliquidacion
             // El mapeo confirmado se recuerda para las próximas cargas
             Parametro::updateOrCreate(
                 ['clave' => 'drivin_mapeo_columnas'],
-                ['valor' => json_encode(['encabezados' => $lectura['encabezados'], 'mapeo' => $mapeo], JSON_UNESCAPED_UNICODE), 'descripcion' => 'Último mapeo de columnas confirmado para la preliquidación de Drivin'],
+                ['valor' => json_encode(['version' => MapeoColumnas::VERSION, 'encabezados' => $lectura['encabezados'], 'mapeo' => $mapeo], JSON_UNESCAPED_UNICODE), 'descripcion' => 'Último mapeo de columnas confirmado para la preliquidación de Drivin'],
             );
 
             Bitacora::registrar('importada', $carga, ['ordenes' => count($a['ordenes']), 'filas_omitidas' => $a['filasConError']]);
@@ -161,7 +176,8 @@ class ImportadorPreliquidacion
     {
         $ultimo = json_decode((string) Parametro::where('clave', 'drivin_mapeo_columnas')->value('valor'), true);
 
-        if (is_array($ultimo) && ($ultimo['encabezados'] ?? null) === $encabezados) {
+        // Un mapeo de otra versión de los campos (p. ej. "Unidades" tomaba el volumen) se vuelve a detectar
+        if (is_array($ultimo) && ($ultimo['version'] ?? 1) === MapeoColumnas::VERSION && ($ultimo['encabezados'] ?? null) === $encabezados) {
             return $ultimo['mapeo'] + array_fill_keys(array_keys(MapeoColumnas::CAMPOS), null);
         }
 

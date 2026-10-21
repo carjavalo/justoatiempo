@@ -191,7 +191,7 @@ class PermisosSeguridadTest extends TestCase
         $gestor = $this->rol(['usuarios.ver', 'usuarios.editar', 'roles.ver', 'roles.editar'], Permisos::ALCANCE_TODO, 'Gestor');
 
         $this->actingAs($this->admin)->put("/usuarios/{$this->admin->id}", $this->datosUsuario($this->admin, ['rol_id' => $gestor->id, 'linea_id' => LineaServicio::logistica()->id]))
-            ->assertSessionHasErrors(['rol_id' => 'Es la única persona activa con el rol Administrador: dáselo antes a otra persona.']);
+            ->assertSessionHasErrors(['rol_id' => 'Es la única persona con el rol Administrador que puede entrar a la plataforma: dáselo antes a otra persona.']);
 
         // Con otra persona activa con ese rol, sí se puede
         $otro = User::factory()->admin()->create();

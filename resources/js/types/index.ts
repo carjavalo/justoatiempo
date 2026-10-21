@@ -46,7 +46,6 @@ export interface User {
     inicio: { titulo: string; volver: string; url: string };
     /** Las líneas en las que trabaja hoy (por sus asignaciones vigentes). */
     lineas: { slug: string; nombre: string }[];
-    empleado_id: number | null;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

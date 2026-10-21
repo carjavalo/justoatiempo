@@ -39,7 +39,7 @@ class Vehiculo extends Model
 
     public function conductor(): BelongsTo
     {
-        return $this->belongsTo(Empleado::class, 'conductor_id');
+        return $this->belongsTo(User::class, 'conductor_id');
     }
 
     public function ordenes(): HasMany

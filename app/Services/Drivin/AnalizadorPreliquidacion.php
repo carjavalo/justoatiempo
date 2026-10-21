@@ -4,12 +4,12 @@ namespace App\Services\Drivin;
 
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
-use App\Models\Empleado;
 use App\Models\InformeDiario;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
 use App\Models\Sede;
 use App\Models\Sucursal;
+use App\Models\User;
 use App\Models\Vehiculo;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Support\Carbon;
@@ -24,8 +24,10 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as FechaExcel;
  * - Orden con todos sus productos entregados = aprobada; ninguno = rechazada (RF-07: genera devolución);
  *   mezcla = aprobada con faltante (entrega parcial, p. ej. llegó el sofá pero no la mesa).
  * - Avería solo si el motivo reporta daño físico (RF-08).
- * - Sede y sucursal salen del nombre del plan (alias Drivin de la sucursal), de la columna "Cliente corporativo"
- *   (la sede: TuGo, Sodimac…) o de la sede por defecto elegida en la revisión.
+ * - Sede y sucursal salen del esquema ("CALI SUR") o del nombre del plan (alias Drivin de la sucursal), de la
+ *   columna "Cliente corporativo" (la sede: TuGo, Sodimac…) o de la sede por defecto elegida en la revisión.
+ * - El auxiliar es la persona con la cédula de "Entregado por" (su cuenta de Drivin) o, si no la trae, la que
+ *   coincide con el nombre del asistente del conductor.
  */
 class AnalizadorPreliquidacion
 {
@@ -48,14 +50,20 @@ class AnalizadorPreliquidacion
     /** @var Collection<int, array{id: int, sede_id: int, alias: string}> */
     private Collection $sucursalesPorAlias;
 
+    /** @var Collection<int, array{id: int, sede_id: int, nombre: string, alias: string}> */
+    private Collection $sucursalesConSede;
+
     /** @var Collection<int, Sede> */
     private Collection $sedes;
 
     /** @var array<string, int> */
     private array $vehiculos = [];
 
-    /** @var Collection<int, array{id: int, tokens: list<string>, nombre: string}> */
-    private Collection $empleados;
+    /** @var Collection<int, array{id: int, tokens: list<string>, nombre: string}> el personal activo, por nombre */
+    private Collection $personas;
+
+    /** @var array<string, int> cédula => persona (activa o no: sus entregas pasadas siguen siendo suyas) */
+    private array $porCedula = [];
 
     /** @var array<string, int> */
     private array $motivos = [];
@@ -141,7 +149,7 @@ class AnalizadorPreliquidacion
             }
 
             $ruta = $valor($valores, 'ruta');
-            [$sedeId, $sucursalId, $porDefecto] = $this->resolverSedeSucursal($ruta, $valor($valores, 'cliente'), $valor($valores, 'ciudad'), $opciones);
+            [$sedeId, $sucursalId, $porDefecto] = $this->resolverSedeSucursal($valor($valores, 'esquema'), $ruta, $valor($valores, 'cliente'), $valor($valores, 'ciudad'), $opciones);
             if (! $sedeId) {
                 $error($fila, 'cliente', 'No se pudo identificar la sede ni la sucursal. Elige una sede por defecto en la revisión.', $ruta ?? $valor($valores, 'cliente'));
 
@@ -151,6 +159,7 @@ class AnalizadorPreliquidacion
             $clave = $fecha.'|'.$codigo;
             $producto = $valor($valores, 'producto');
             $unidades = is_numeric($valor($valores, 'unidades')) ? (int) $valor($valores, 'unidades') : null;
+            $entregadas = is_numeric($valor($valores, 'unidades_entregadas')) ? (int) $valor($valores, 'unidades_entregadas') : null;
             $motivo = $valor($valores, 'motivo');
 
             if (! isset($ordenes[$clave])) {
@@ -166,6 +175,13 @@ class AnalizadorPreliquidacion
                     'ruta' => $ruta ? mb_substr((string) $ruta, 0, 150) : null,
                     'placa' => Vehiculo::normalizarPlaca($placaCruda ? (string) $placaCruda : null),
                     'auxiliar_nombre' => $auxiliarCrudo ? mb_substr(trim((string) $auxiliarCrudo), 0, 150) : null,
+                    'auxiliar_cedula' => MapeoColumnas::cedula($valor($valores, 'cedula_auxiliar')),
+                    'vehiculo_descripcion' => ($d = $valor($valores, 'descripcion_vehiculo')) ? mb_substr((string) $d, 0, 255) : null,
+                    'tiene_imagenes' => match (MapeoColumnas::normalizar((string) $valor($valores, 'tiene_imagenes'))) {
+                        'si', 'yes', 'true', '1' => true,
+                        'no', 'false', '0' => false,
+                        default => null,
+                    },
                     'codigo_orden' => mb_substr($codigo, 0, 60),
                     'codigo_direccion' => ($cd = $valor($valores, 'codigo_direccion')) ? mb_substr((string) $cd, 0, 60) : null,
                     'destinatario' => ($d = $valor($valores, 'destinatario')) ? mb_substr((string) $d, 0, 150) : null,
@@ -187,7 +203,7 @@ class AnalizadorPreliquidacion
                 $o['motivos'][] = (string) $motivo;
             }
             if ($producto) {
-                $o['productos'][] = ['producto' => (string) $producto, 'estado' => $estado, 'unidades' => $unidades];
+                $o['productos'][] = ['producto' => (string) $producto, 'estado' => $estado, 'unidades' => $unidades, 'entregadas' => $entregadas];
             }
             if ($unidades !== null) {
                 $o['unidades'] = ($o['unidades'] ?? 0) + $unidades;
@@ -257,12 +273,20 @@ class AnalizadorPreliquidacion
             $avisos['vehiculos'][$o['placa']] = ($avisos['vehiculos'][$o['placa']] ?? 0) + 1;
         }
 
-        $empleadoId = $o['auxiliar_nombre'] ? $this->resolverEmpleado($o['auxiliar_nombre']) : null;
-        if (! $o['auxiliar_nombre']) {
+        // Con una cédula aún no registrada, el nombre solo puede ser de alguien sin cédula (si no, la orden quedaría con
+        // otra persona: "Fernando Plaza" para "JUAN FERNANDO PLAZA BENAVIDES"); queda con la cédula hasta registrarla
+        $auxiliarId = ($o['auxiliar_cedula'] ? ($this->porCedula[$o['auxiliar_cedula']] ?? null) : null)
+            ?? ($o['auxiliar_nombre'] ? $this->resolverPersona($o['auxiliar_nombre'], sinCedula: $o['auxiliar_cedula'] !== null) : null);
+        if (! $o['auxiliar_nombre'] && ! $o['auxiliar_cedula']) {
             $avisos['sinAuxiliar']++;
-        } elseif (! $empleadoId) {
-            $avisos['auxiliares'][$o['auxiliar_nombre']] = ($avisos['auxiliares'][$o['auxiliar_nombre']] ?? 0) + 1;
+        } elseif (! $auxiliarId) {
+            $quien = trim(($o['auxiliar_nombre'] ?? 'Sin nombre').($o['auxiliar_cedula'] ? " · C.C. {$o['auxiliar_cedula']}" : ''));
+            $avisos['auxiliares'][$quien] = ($avisos['auxiliares'][$quien] ?? 0) + 1;
         }
+
+        // Un producto se entregó si Drivin lo dice (unidades entregadas) o, sin ese dato, si su fila quedó aprobada
+        $productos = collect($o['productos']);
+        $entregados = $productos->filter(fn ($p) => $p['entregadas'] !== null ? $p['entregadas'] > 0 : in_array($p['estado'], ['aprobada', 'parcial'], true))->count();
 
         $motivoId = null;
         if ($estado !== EstadoOrden::Aprobada && $motivo) {
@@ -284,19 +308,24 @@ class AnalizadorPreliquidacion
             'ruta' => $o['ruta'],
             'vehiculo_id' => $vehiculoId,
             'placa' => $o['placa'] ? mb_substr($o['placa'], 0, 10) : null,
-            'empleado_id' => $empleadoId,
+            'vehiculo_descripcion' => $o['vehiculo_descripcion'],
+            'auxiliar_id' => $auxiliarId,
             'auxiliar_nombre' => $o['auxiliar_nombre'],
+            'auxiliar_cedula' => $o['auxiliar_cedula'],
             'codigo_orden' => $o['codigo_orden'],
             'codigo_direccion' => $o['codigo_direccion'],
             'destinatario' => $o['destinatario'],
             'direccion' => $o['direccion'],
             'ciudad' => $o['ciudad'],
             'unidades' => $o['unidades'],
+            'productos' => min($productos->count(), 65535),
+            'productos_entregados' => min($entregados, 65535),
             'estado' => $estado->value,
             'motivo_rechazo_id' => $motivoId,
             'motivo_texto' => $motivo ? mb_substr($motivo, 0, 255) : null,
             'comentario_pod' => $o['comentario_pod'],
             'hora_entrega' => $o['hora_entrega'],
+            'tiene_imagenes' => $o['tiene_imagenes'],
             'devolucion' => $estado === EstadoOrden::Rechazada,
             'averia' => $averia,
             'averia_detalle' => $averia ? mb_substr($motivo, 0, 255) : null,
@@ -320,6 +349,11 @@ class AnalizadorPreliquidacion
             ->sortByDesc(fn ($s) => strlen($s['alias'])) // el alias más específico gana
             ->values();
 
+        $this->sucursalesConSede = Sucursal::query()
+            ->whereNotNull('sede_id')
+            ->get(['id', 'sede_id', 'nombre', 'alias_drivin'])
+            ->map(fn (Sucursal $s) => ['id' => $s->id, 'sede_id' => $s->sede_id, 'nombre' => MapeoColumnas::normalizar($s->nombre), 'alias' => MapeoColumnas::normalizar($s->alias_drivin)]);
+
         $this->sedes = Sede::with('sucursales:id,sede_id,nombre,ciudad,activo')->get();
 
         foreach (Vehiculo::get(['id', 'placa', 'codigo_interno']) as $v) {
@@ -329,23 +363,42 @@ class AnalizadorPreliquidacion
             }
         }
 
-        $this->empleados = Empleado::where('activo', true)->get(['id', 'nombres', 'apellidos'])->map(fn (Empleado $e) => [
-            'id' => $e->id,
-            'nombre' => MapeoColumnas::normalizar($e->nombres.' '.$e->apellidos),
-            'tokens' => array_values(array_filter(explode(' ', MapeoColumnas::normalizar($e->nombres.' '.$e->apellidos)))),
+        $this->porCedula = User::whereNotNull('cedula')->pluck('id', 'cedula')->mapWithKeys(fn ($id, $cedula) => [(string) $cedula => $id])->all();
+        $this->personas = User::where('activo', true)->get(['id', 'name', 'cedula'])->map(fn (User $u) => [
+            'id' => $u->id,
+            'conCedula' => filled($u->cedula),
+            'nombre' => MapeoColumnas::normalizar($u->name),
+            'tokens' => array_values(array_filter(explode(' ', MapeoColumnas::normalizar($u->name)))),
         ]);
 
-        foreach (MotivoRechazo::get(['id', 'nombre']) as $m) {
+        // Los inactivos (Parámetros) ya no se reconocen: la orden guarda solo el texto de Drivin
+        foreach (MotivoRechazo::where('activo', true)->get(['id', 'nombre']) as $m) {
             $this->motivos[MapeoColumnas::normalizar($m->nombre)] = $m->id;
         }
     }
 
     /**
+     * @param  mixed  $esquema  "Nombre del Esquema" de Drivin: la sucursal ("CALI SUR")
      * @param  mixed  $clienteCorporativo  columna "Cliente corporativo" de Drivin: la sede (TuGo, Sodimac…)
      * @return array{0: int|null, 1: int|null, 2: bool} sede, sucursal y si se usó la sede por defecto
      */
-    private function resolverSedeSucursal(mixed $ruta, mixed $clienteCorporativo, mixed $ciudad, array $opciones): array
+    private function resolverSedeSucursal(mixed $esquema, mixed $ruta, mixed $clienteCorporativo, mixed $ciudad, array $opciones): array
     {
+        // El esquema es el nombre de la sucursal (o su alias en Drivin); si dos sedes tienen una sucursal con ese
+        // nombre, decide el cliente corporativo
+        $esquemaNorm = MapeoColumnas::normalizar((string) $esquema);
+        if ($esquemaNorm !== '') {
+            $candidatas = $this->sucursalesConSede->filter(fn ($s) => $esquemaNorm === $s['nombre'] || ($s['alias'] !== '' && ($esquemaNorm === $s['alias'] || str_starts_with($s['alias'], $esquemaNorm.' '))));
+            if ($candidatas->count() > 1) {
+                $sedeNorm = MapeoColumnas::normalizar((string) $clienteCorporativo);
+                $sede = $this->sedes->first(fn (Sede $s) => in_array($sedeNorm, [MapeoColumnas::normalizar($s->nombre), MapeoColumnas::normalizar($s->codigo)], true));
+                $candidatas = $sede ? $candidatas->where('sede_id', $sede->id) : collect();
+            }
+            if ($candidatas->count() === 1) {
+                return [$candidatas->first()['sede_id'], $candidatas->first()['id'], false];
+            }
+        }
+
         $rutaNorm = MapeoColumnas::normalizar((string) $ruta);
         if ($rutaNorm !== '') {
             foreach ($this->sucursalesPorAlias as $s) {
@@ -376,22 +429,23 @@ class AnalizadorPreliquidacion
     }
 
     /**
-     * El nombre del archivo suele traer los dos apellidos ("CRISTIAN ALEJANDRO APONZA MINA")
-     * y el maestro uno solo: hay coincidencia si todas las palabras del empleado están en el nombre del archivo.
+     * Sin cédula, por el nombre: el archivo trae los dos apellidos ("CRISTIAN ALEJANDRO APONZA MINA") y la persona
+     * puede tener uno solo: hay coincidencia si todas las palabras de su nombre están en el nombre del archivo.
      */
-    private function resolverEmpleado(string $nombre): ?int
+    private function resolverPersona(string $nombre, bool $sinCedula = false): ?int
     {
+        $personas = $sinCedula ? $this->personas->where('conCedula', false) : $this->personas;
         // Si vienen varios asistentes separados ("A / B", "A, B"), se toma el primero
         $principal = preg_split('/\s*(?:[,;\/|]|\sy\s)\s*/i', $nombre)[0] ?? $nombre;
         $norm = MapeoColumnas::normalizar($principal);
         $tokens = array_flip(explode(' ', $norm));
 
-        $exacto = $this->empleados->firstWhere('nombre', $norm);
+        $exacto = $personas->firstWhere('nombre', $norm);
         if ($exacto) {
             return $exacto['id'];
         }
 
-        $candidatos = $this->empleados
+        $candidatos = $personas
             ->filter(fn ($e) => count($e['tokens']) >= 2 && collect($e['tokens'])->every(fn ($t) => isset($tokens[$t])))
             ->sortByDesc(fn ($e) => count($e['tokens']))
             ->values();
@@ -400,7 +454,7 @@ class AnalizadorPreliquidacion
             return null;
         }
 
-        // Dos empleados igual de específicos = ambiguo: mejor no asignar
+        // Dos personas igual de específicas = ambiguo: mejor no asignar
         if ($candidatos->count() > 1 && count($candidatos[0]['tokens']) === count($candidatos[1]['tokens'])) {
             return null;
         }
@@ -506,10 +560,10 @@ class AnalizadorPreliquidacion
         $top = fn (array $conteos) => collect($conteos)->sortDesc()->map(fn ($n, $k) => ['valor' => (string) $k, 'ordenes' => $n])->values()->all();
 
         if ($a['vehiculos']) {
-            $lista[] = ['tipo' => 'vehiculos', 'titulo' => 'Vehículos no registrados en la flota', 'detalle' => 'Se importan con la placa del archivo. Regístralos en Flota para verlos en los reportes por vehículo.', 'items' => $top($a['vehiculos'])];
+            $lista[] = ['tipo' => 'vehiculos', 'titulo' => 'Vehículos nuevos', 'detalle' => 'Al importar se agregan a Flota con la descripción de Drivin. Allí puedes completar su tipo y su conductor habitual.', 'items' => $top($a['vehiculos'])];
         }
         if ($a['auxiliares']) {
-            $lista[] = ['tipo' => 'auxiliares', 'titulo' => 'Auxiliares no reconocidos', 'detalle' => 'Se importan con el nombre del archivo, pero no suman al historial del empleado hasta que exista en Empleados con ese nombre.', 'items' => $top($a['auxiliares'])];
+            $lista[] = ['tipo' => 'auxiliares', 'titulo' => 'Auxiliares que aún no están en Usuarios', 'detalle' => 'Se importan con su nombre y su cédula. Cuando la persona se registre en Usuarios con esa cédula (o se importe el Excel del personal), sus entregas quedan a su nombre.', 'items' => $top($a['auxiliares'])];
         }
         if ($a['motivos']) {
             $lista[] = ['tipo' => 'motivos', 'titulo' => 'Motivos de rechazo fuera del catálogo', 'detalle' => 'Se guardan como texto libre.', 'items' => $top($a['motivos'])];
@@ -549,7 +603,9 @@ class AnalizadorPreliquidacion
                     'placa' => $p['placa'],
                     'vehiculoRegistrado' => $p['vehiculo_id'] !== null,
                     'auxiliar' => $p['auxiliar_nombre'],
-                    'auxiliarReconocido' => $p['empleado_id'] !== null,
+                    'auxiliarReconocido' => $p['auxiliar_id'] !== null,
+                    'productos' => $g->sum('productos'),
+                    'sinImagenes' => $g->where('tiene_imagenes', false)->count(),
                     'asignadas' => $g->count(),
                     'aprobadas' => $aprobadas,
                     'rechazadas' => $g->where('estado', 'rechazada')->count(),

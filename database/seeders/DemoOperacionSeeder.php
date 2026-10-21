@@ -2,15 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CargoEmpleado;
 use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
+use App\Enums\Rol;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
-use App\Models\Empleado;
+use App\Models\Empresa;
 use App\Models\MotivoRechazo;
 use App\Models\Programacion;
 use App\Models\Sede;
@@ -39,7 +39,7 @@ class DemoOperacionSeeder extends Seeder
 
         $this->asegurarPersonalYFlota();
 
-        $auxiliares = Empleado::where('cargo', CargoEmpleado::Auxiliar)->get()->values();
+        $auxiliares = User::where('rol', Rol::Auxiliar)->whereNotNull('cedula')->where('activo', true)->get()->values();
         $vehiculos = Vehiculo::all()->values();
         $motivos = MotivoRechazo::pluck('id', 'nombre');
         $novedades = TipoNovedad::pluck('id', 'nombre');
@@ -128,14 +128,19 @@ class DemoOperacionSeeder extends Seeder
                             'ruta' => $ruta,
                             'vehiculo_id' => $veh->id,
                             'placa' => $veh->placa,
-                            'empleado_id' => $aux->id,
-                            'auxiliar_nombre' => strtoupper($aux->nombre_completo),
+                            'auxiliar_id' => $aux->id,
+                            'auxiliar_nombre' => mb_strtoupper($aux->name),
+                            'auxiliar_cedula' => $aux->cedula,
                             'codigo_orden' => $codigo,
                             'codigo_direccion' => $codigo,
                             'destinatario' => $faker->name(),
                             'direccion' => $faker->streetAddress(),
                             'ciudad' => $sucursal->ciudad,
-                            'unidades' => mt_rand(1, 4),
+                            'unidades' => $productos = mt_rand(1, 4),
+                            'productos' => $productos,
+                            'productos_entregados' => $aprobada ? $productos : 0,
+                            // Quien es menos riguroso a veces no sube fotos
+                            'tiene_imagenes' => mt_rand() / mt_getrandmax() < 0.75 + $p['rigor'] / 4,
                             'estado' => ($aprobada ? EstadoOrden::Aprobada : EstadoOrden::Rechazada)->value,
                             'motivo_rechazo_id' => $motivo ? $motivos[$motivo] : null,
                             'motivo_texto' => $motivo,
@@ -195,12 +200,10 @@ class DemoOperacionSeeder extends Seeder
             ['1000000012', 'Sebastián', 'Valencia'],
         ];
 
-        foreach ($extra as [$cedula, $nombres, $apellidos]) {
-            Empleado::updateOrCreate(['cedula' => $cedula], [
-                'nombres' => $nombres, 'apellidos' => $apellidos,
-                'cargo' => CargoEmpleado::Auxiliar, 'activo' => true,
-                'fecha_ingreso' => Carbon::parse('2025-01-15')->addDays(mt_rand(0, 400)),
-            ]);
+        $empresa = Empresa::where('nombre', 'Ditranza')->firstOrFail();
+        foreach ($extra as [$cedula, $nombres, $apellido]) {
+            OperacionSeeder::personal($cedula, $nombres, $apellido, $empresa)
+                ->update(['fecha_ingreso' => Carbon::parse('2025-01-15')->addDays(mt_rand(0, 400))]);
         }
 
         foreach (['WMK412' => 'NHR', 'GTS531' => 'Furgón', 'JKP903' => 'Turbo'] as $placa => $tipo) {
@@ -257,7 +260,7 @@ class DemoOperacionSeeder extends Seeder
     private function registrarAcciones($informe, ?int $usuario): void
     {
         foreach ($informe->lineas as $linea) {
-            if (! $linea->empleado_id) {
+            if (! $linea->auxiliar_id) {
                 continue;
             }
 
@@ -274,7 +277,7 @@ class DemoOperacionSeeder extends Seeder
             }
 
             AccionDesempeno::create([
-                'empleado_id' => $linea->empleado_id,
+                'user_id' => $linea->auxiliar_id,
                 'informe_id' => $informe->id,
                 'fecha' => $informe->fecha_operacion->copy()->addDay(),
                 'tipo' => $tipo,

@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
 use App\Models\Carga;
-use App\Models\Empleado;
 use App\Models\InformeDiario;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
@@ -37,7 +36,8 @@ class CargaDrivinTest extends TestCase
         $sodimac->sucursales()->create(['nombre' => 'Cali', 'ciudad' => 'Cali']);
 
         Vehiculo::create(['placa' => 'SNX 708']);
-        Empleado::create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'apellidos' => 'Plaza']);
+        // El auxiliar: parte del personal, sin acceso a la plataforma
+        User::factory()->sinAcceso()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null]);
         MotivoRechazo::create(['nombre' => 'Cliente ausente en domicilio']);
 
         $this->coordinador = User::factory()->coordinador()->create();
@@ -143,7 +143,7 @@ class CargaDrivinTest extends TestCase
 
         $primera = Orden::firstWhere('codigo_orden', 'PDVT1');
         $this->assertNotNull($primera->vehiculo_id);
-        $this->assertNotNull($primera->empleado_id);
+        $this->assertNotNull($primera->auxiliar_id);
 
         $informe = InformeDiario::firstOrFail();
         $this->assertSame(4, $informe->total_asignadas);

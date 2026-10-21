@@ -93,9 +93,9 @@ export interface Pendientes {
 export interface AccionReciente {
     id: number;
     fecha: string;
-    tipo: 'felicitacion' | 'retroalimentacion' | 'llamado_atencion';
+    tipo: 'felicitacion' | 'retroalimentacion' | 'llamado_atencion' | 'llamado_escrito';
     tipoLabel: string;
-    empleado: string | null;
+    persona: string | null;
     descripcion: string;
 }
 

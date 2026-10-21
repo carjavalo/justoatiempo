@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\CargoEmpleado;
 use App\Enums\Rol;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -18,7 +17,7 @@ return new class extends Migration
             $table->string('cedula', 20)->unique(); // RF-01: identificador único
             $table->string('nombres', 100);
             $table->string('apellidos', 100);
-            $table->enum('cargo', CargoEmpleado::values())->default(CargoEmpleado::Auxiliar->value);
+            $table->enum('cargo', ['auxiliar', 'conductor', 'coordinador', 'supervisor', 'otro'])->default('auxiliar');
             $table->string('telefono', 30)->nullable();
             $table->string('email')->nullable();
             $table->date('fecha_ingreso')->nullable();
