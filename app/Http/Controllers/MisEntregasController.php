@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AccionDesempeno;
 use App\Models\Orden;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +12,7 @@ use Inertia\Response;
 
 /**
  * Mis entregas: el historial de quien hace las rutas (sus órdenes de Drivin, por su cédula), jornada por jornada,
- * con su cumplimiento, sus evidencias y las acciones de seguimiento que ha recibido.
+ * con su cumplimiento y sus evidencias (las acciones de seguimiento que recibe están en su tablero).
  */
 class MisEntregasController extends Controller
 {
@@ -97,17 +96,6 @@ class MisEntregasController extends Controller
             'resumen' => $resumen,
             'fecha' => $fecha,
             'ordenes' => $detalle,
-            // Las felicitaciones, retroalimentaciones y llamados de atención que ha recibido
-            'acciones' => AccionDesempeno::where('user_id', $user->id)->with('registradoPor:id,name')
-                ->latest('fecha')->latest('id')->limit(10)->get()
-                ->map(fn (AccionDesempeno $a) => [
-                    'id' => $a->id,
-                    'tipo' => $a->tipo->value,
-                    'texto' => $a->tipo->label(),
-                    'fecha' => $a->fecha->toDateString(),
-                    'descripcion' => $a->descripcion,
-                    'registradaPor' => $a->registradoPor?->name,
-                ]),
         ]);
     }
 }

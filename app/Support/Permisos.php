@@ -49,9 +49,10 @@ final class Permisos
                 'tablero' => ['titulo' => 'Tablero de la línea', 'descripcion' => 'Indicadores, empresas y personal de su línea de servicio.', 'acciones' => ['ver' => 'Ver']],
                 'cargas' => ['titulo' => 'Cargas Drivin', 'descripcion' => 'La preliquidación diaria de Drivin (servicios logísticos).', 'acciones' => ['ver' => 'Ver', 'subir' => 'Subir y revisar', 'confirmar' => 'Confirmar', 'anular' => 'Anular']],
                 'auditoria' => ['titulo' => 'Auditoría POD', 'descripcion' => 'Las evidencias de entrega de cada orden.', 'acciones' => ['ver' => 'Ver', 'revisar' => 'Revisar órdenes', 'subir' => 'Subir evidencias', 'eliminar' => 'Eliminar evidencias']],
-                'informes' => ['titulo' => 'Informe diario', 'descripcion' => 'Cuadro consolidado por fecha, sede, ruta y auxiliar, como el Excel de la operación.', 'acciones' => ['ver' => 'Ver', 'editar' => 'Escribir observaciones', 'cerrar' => 'Pasar a seguimiento, cerrar y reabrir', 'descargar' => 'Descargar en Excel']],
+                'programacion' => ['titulo' => 'Programación y asistencia', 'descripcion' => 'Quién trabaja cada día en cada empresa, sede y sucursal de su línea, y si asistió.', 'acciones' => ['ver' => 'Ver', 'editar' => 'Programar personal', 'asistencia' => 'Registrar asistencia']],
+                'novedades' => ['titulo' => 'Novedades', 'descripcion' => 'Llegadas tarde, quejas, faltantes y demás novedades de la operación, con su seguimiento.', 'acciones' => ['ver' => 'Ver', 'registrar' => 'Registrar', 'cerrar' => 'Dar seguimiento y cerrar']],
+                'informes' => ['titulo' => 'Informe diario', 'descripcion' => 'El cuadro de cada jornada de su línea (en logística, por ruta y auxiliar, como el Excel de la operación).', 'acciones' => ['ver' => 'Ver', 'editar' => 'Escribir observaciones', 'cerrar' => 'Pasar a seguimiento, cerrar y reabrir', 'descargar' => 'Descargar en Excel']],
                 'seguimiento' => ['titulo' => 'Seguimiento y desempeño', 'descripcion' => 'Felicitaciones, retroalimentaciones y llamados de atención por persona.', 'acciones' => ['ver' => 'Ver', 'registrar' => 'Registrar acciones']],
-                'programacion' => ['titulo' => 'Programación diaria', 'descripcion' => 'Auxiliares y vehículos requeridos por sede y fecha.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
             ],
         ],
         [
@@ -77,14 +78,20 @@ final class Permisos
      */
     public const MEZCLAN_EMPRESAS = [
         'roles', 'servicios', 'empresas', 'sedes', 'sucursales', 'solicitudes',
-        'cargas', 'auditoria', 'programacion', 'vehiculos', 'parametros',
+        'cargas', 'auditoria', 'vehiculos', 'parametros',
     ];
 
     /** Lo único que tiene sentido con el alcance "solo lo suyo": su tablero (su desempeño) y sus entregas. */
     public const SOLO_LO_SUYO = ['tablero', 'entregas', 'lineas'];
 
-    /** Herramientas de la línea de servicios logísticos: solo para quien trabaja en ella (o ve todas). */
-    public const DE_LOGISTICA = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion'];
+    /** Herramientas de la línea de servicios logísticos (Drivin): solo para quien trabaja en ella (o ve todas). */
+    public const DE_LOGISTICA = ['cargas', 'auditoria'];
+
+    /**
+     * Herramientas que tiene cada línea de servicio: su permiso le aplica en las líneas donde trabaja (o en todas, si
+     * las ve todas), con lo que ve de cada una.
+     */
+    public const DE_LA_LINEA = ['programacion', 'novedades', 'informes', 'seguimiento'];
 
     /** Permisos que no se pueden quitar del propio rol: sin ellos nadie podría corregirlo. */
     public const IMPRESCINDIBLES = ['usuarios.editar', 'roles.editar'];
@@ -156,7 +163,7 @@ final class Permisos
             } else {
                 $elegidos[] = "{$modulo}.ver";
             }
-            if (in_array($modulo, self::DE_LOGISTICA, true)) {
+            if (in_array($modulo, [...self::DE_LOGISTICA, ...self::DE_LA_LINEA], true)) {
                 $elegidos[] = 'tablero.ver';
             }
         }
@@ -179,7 +186,8 @@ final class Permisos
                 'permisos' => self::normalizar([
                     'tablero.ver', 'cargas.subir', 'cargas.confirmar', 'cargas.anular',
                     'auditoria.revisar', 'auditoria.subir', 'auditoria.eliminar',
-                    'informes.editar', 'informes.cerrar', 'informes.descargar', 'seguimiento.registrar', 'programacion.ver',
+                    'informes.editar', 'informes.cerrar', 'informes.descargar', 'seguimiento.registrar',
+                    'programacion.editar', 'programacion.asistencia', 'novedades.registrar', 'novedades.cerrar',
                 ]),
                 'alcance' => self::ALCANCE_ASIGNACION,
             ],

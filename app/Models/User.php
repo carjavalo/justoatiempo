@@ -299,14 +299,29 @@ class User extends Authenticatable
         if ($deLogistica) {
             $this->logistica ??= LineaServicio::logistica();
         }
-        if ($deLogistica && ! $this->rolPermite(Permisos::TODAS_LAS_LINEAS) && ! in_array($this->logistica->id, $this->lineasIds(), true)) {
+        if ($deLogistica && ! $this->trabajaEn($this->logistica)) {
             return 'Esta herramienta es de otra línea de servicio.';
+        }
+        if (in_array($modulo, Permisos::DE_LA_LINEA, true) && ! $this->rolPermite(Permisos::TODAS_LAS_LINEAS) && $this->lineasIds() === []) {
+            return 'Esta herramienta es de las líneas de servicio: aún no trabajas en ninguna.';
         }
         if (in_array($modulo, Permisos::MEZCLAN_EMPRESAS, true) && ! $this->alcanceEn($deLogistica ? $this->logistica : null)->todo) {
             return 'Esta sección reúne la operación de todas las empresas: no está disponible para quien solo ve las suyas.';
         }
 
         return null;
+    }
+
+    /** Si trabaja en la línea (por sus asignaciones vigentes) o su rol las ve todas. */
+    public function trabajaEn(LineaServicio $linea): bool
+    {
+        return $this->rolPermite(Permisos::TODAS_LAS_LINEAS) || in_array($linea->id, $this->lineasIds(), true);
+    }
+
+    /** Si puede usar una herramienta de la línea (programación, novedades, informe…) en esta línea. */
+    public function puedeEnLinea(string $permiso, LineaServicio $linea): bool
+    {
+        return $this->puede($permiso) && $this->trabajaEn($linea);
     }
 
     public function puedeVerLinea(LineaServicio $linea): bool

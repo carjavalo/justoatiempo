@@ -58,6 +58,7 @@ class SeguimientoController extends Controller
             ->when($texto !== '', fn ($q) => $q->where(fn ($w) => $w->where('name', 'like', '%'.addcslashes($texto, '%_\\').'%')->orWhere('cedula', 'like', '%'.addcslashes($texto, '%_\\').'%')))
             ->get(['id', 'name', 'cedula', 'cargo', 'activo']);
         $acciones = AccionDesempeno::whereIn('user_id', $personas->pluck('id'))
+            ->where('linea_servicio_id', $op->linea->id)
             // Las acciones se registran después de la jornada (el informe es a día vencido): hasta hoy
             ->whereBetween('fecha', [$desde->toDateString(), max($hasta, today())->toDateString()])
             ->with('registradoPor:id,name')
@@ -136,6 +137,7 @@ class SeguimientoController extends Controller
         $tipo = TipoAccion::from($datos['tipo']);
         AccionDesempeno::create([
             'user_id' => $persona->id,
+            'linea_servicio_id' => $op->linea->id,
             'informe_id' => $informe?->id,
             // El día en que se revisa la operación (el informe es a día vencido)
             'fecha' => today(),

@@ -11,7 +11,7 @@ class AccionDesempeno extends Model
     protected $table = 'acciones_desempeno';
 
     protected $fillable = [
-        'user_id', 'informe_id', 'fecha', 'tipo', 'descripcion',
+        'user_id', 'linea_servicio_id', 'informe_id', 'novedad_id', 'fecha', 'tipo', 'descripcion',
         'efectividad_referencia', 'notificado', 'registrado_por',
     ];
 
@@ -34,6 +34,17 @@ class AccionDesempeno extends Model
     public function informe(): BelongsTo
     {
         return $this->belongsTo(InformeDiario::class, 'informe_id');
+    }
+
+    public function linea(): BelongsTo
+    {
+        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
+    }
+
+    /** La novedad por la que se tomó (en las líneas sin Drivin). */
+    public function novedad(): BelongsTo
+    {
+        return $this->belongsTo(NovedadLinea::class, 'novedad_id');
     }
 
     public function registradoPor(): BelongsTo

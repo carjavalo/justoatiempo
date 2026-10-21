@@ -26,7 +26,7 @@ import { usePuede } from '@/hooks/use-puede';
 import { fmt, semaforo } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 
 interface Accion {
     id: number;

@@ -237,6 +237,7 @@ class DashboardController extends Controller
         // toBase(): sin el cast a enum, "tipo" llega como texto y sirve de clave
         $acciones = AccionDesempeno::query()
             ->toBase()
+            ->where('linea_servicio_id', LineaServicio::logistica()->id)
             ->whereBetween('fecha', [$desde->toDateString(), $hasta->copy()->addDay()->toDateString()])
             ->whereIn('user_id', $filas->pluck('id'))
             ->when($informes, fn ($q) => $q->whereIn('informe_id', $informes))
@@ -338,6 +339,7 @@ class DashboardController extends Controller
     {
         return AccionDesempeno::query()
             ->with('persona:id,name')
+            ->where('linea_servicio_id', LineaServicio::logistica()->id)
             ->when($auxiliarId !== null, fn ($q) => $q->where('user_id', $auxiliarId))
             // Acciones ligadas a un informe fuera del alcance no se muestran
             ->where(fn ($q) => $q

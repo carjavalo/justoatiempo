@@ -186,7 +186,7 @@ class LineasServicioTest extends TestCase
         $tugo = $this->sede('TuGo');
         $this->ordenes($tugo, 2);
         $ajeno = User::factory()->sinAcceso()->create(['cedula' => '999', 'nombres' => 'Ajeno', 'primer_apellido' => 'A Ditranza', 'linea_servicio_id' => null]);
-        AccionDesempeno::create(['user_id' => $ajeno->id, 'fecha' => '2026-10-02', 'tipo' => TipoAccion::LlamadoAtencion, 'descripcion' => 'Llegó tarde a otra operación']);
+        AccionDesempeno::create(['user_id' => $ajeno->id, 'linea_servicio_id' => LineaServicio::logistica()->id, 'fecha' => '2026-10-02', 'tipo' => TipoAccion::LlamadoAtencion, 'descripcion' => 'Llegó tarde a otra operación']);
 
         $deDitranza = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
         $this->actingAs($deDitranza)->get('/lineas/logisticos')

@@ -34,6 +34,8 @@ final class OperacionLogistica
     public static function para(User $user, ?int $sedePedida = null, bool $soloEmpresas = false): self
     {
         $linea = LineaServicio::logistica();
+        // El informe y el seguimiento de logística (los de Drivin) son de quien trabaja en ella
+        abort_unless($user->trabajaEn($linea), 403, 'Esta herramienta es de otra línea de servicio.');
         $alcance = $soloEmpresas ? $user->alcanceEn($linea)->soloEmpresas() : $user->alcanceEn($linea);
         $sedes = $alcance->filtrarSedes(Sede::query()
             ->whereHas('empresa', fn ($q) => $q->whereHas('lineas', fn ($l) => $l->whereKey($linea->id))))

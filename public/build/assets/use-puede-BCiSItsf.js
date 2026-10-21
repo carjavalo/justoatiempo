@@ -1,0 +1,1 @@
+import{K as r}from"./app-2MCobXOB.js";function u(){const{auth:e}=r().props;return o=>e.permisos.includes(o)}export{u};

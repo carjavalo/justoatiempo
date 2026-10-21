@@ -11,6 +11,7 @@ use App\Models\AccionDesempeno;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
 use App\Models\Empresa;
+use App\Models\LineaServicio;
 use App\Models\MotivoRechazo;
 use App\Models\Programacion;
 use App\Models\Sede;
@@ -44,6 +45,7 @@ class DemoOperacionSeeder extends Seeder
         $motivos = MotivoRechazo::pluck('id', 'nombre');
         $novedades = TipoNovedad::pluck('id', 'nombre');
         $coordinador = User::where('rol', 'coordinador')->first();
+        $logistica = LineaServicio::logistica()->id;
 
         // Perfil de cada auxiliar: probabilidad de entrega y rigor con las fotos
         $perfil = $auxiliares->mapWithKeys(fn ($e) => [$e->id => [
@@ -102,9 +104,9 @@ class DemoOperacionSeeder extends Seeder
                     continue; // no se opera todos los días en esta sucursal
                 }
 
-                Programacion::updateOrCreate(
-                    ['fecha' => $fecha->toDateString(), 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id],
-                    ['auxiliares_requeridos' => $rutas + mt_rand(0, 1), 'vehiculos_requeridos' => $rutas],
+                $programacion = Programacion::updateOrCreate(
+                    ['fecha' => $fecha->toDateString(), 'linea_servicio_id' => $logistica, 'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id],
+                    ['personas_requeridas' => $rutas + mt_rand(0, 1), 'vehiculos_requeridos' => $rutas, 'creado_por' => $coordinador?->id],
                 );
 
                 for ($r = 0; $r < $rutas && $iAux < $disponibles->count(); $r++, $iAux++) {
@@ -114,6 +116,15 @@ class DemoOperacionSeeder extends Seeder
                     $ruta = strtoupper($sucursal->alias_drivin ?? $sucursal->nombre).' '.$fecha->format('j-n-Y');
                     // Los sábados la jornada es más corta
                     $tareas = $fecha->isSaturday() ? mt_rand(4, 10) : mt_rand(7, 20);
+
+                    // Programado con su vehículo y su ruta; a veces llega tarde
+                    $tarde = mt_rand(1, 100) <= 8;
+                    $programacion->asignaciones()->updateOrCreate(['user_id' => $aux->id], [
+                        'hora_entrada' => '07:00', 'hora_salida' => $fecha->isSaturday() ? '13:00' : '17:00',
+                        'vehiculo_id' => $veh->id, 'ruta' => $ruta,
+                        'asistencia' => $tarde ? 'tarde' : 'asistio', 'hora_llegada' => $tarde ? '07:'.mt_rand(15, 50) : null,
+                        'asistencia_por' => $coordinador?->id, 'asistencia_en' => $fecha->copy()->setTime(7, 30),
+                    ]);
 
                     for ($t = 0; $t < $tareas; $t++) {
                         $aprobada = mt_rand() / mt_getrandmax() < $p['entrega'];
@@ -278,6 +289,7 @@ class DemoOperacionSeeder extends Seeder
 
             AccionDesempeno::create([
                 'user_id' => $linea->auxiliar_id,
+                'linea_servicio_id' => LineaServicio::logistica()->id,
                 'informe_id' => $informe->id,
                 'fecha' => $informe->fecha_operacion->copy()->addDay(),
                 'tipo' => $tipo,
