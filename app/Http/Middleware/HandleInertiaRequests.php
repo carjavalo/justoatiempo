@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Orden;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -54,6 +55,8 @@ class HandleInertiaRequests extends Middleware
                     'inicio' => $user->inicio(),
                     // Las líneas en las que trabaja hoy (por sus asignaciones vigentes)
                     'lineas' => $user->lineas()->map(fn ($l) => ['slug' => $l->slug, 'nombre' => $l->nombre])->values(),
+                    // Si tiene entregas de Drivin a su nombre (para ofrecerle "Mis entregas")
+                    'entregas' => $user->puede('entregas.ver') && Orden::where('auxiliar_id', $user->id)->exists(),
                 ] : null,
                 // Lo que puede hacer (los permisos de su rol que le aplican): las pantallas muestran solo eso
                 'permisos' => $user ? $user->permisos() : [],

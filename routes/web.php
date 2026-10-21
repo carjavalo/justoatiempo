@@ -18,6 +18,7 @@ use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\InformeController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\MiCarnetController;
+use App\Http\Controllers\MisEntregasController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\SeguimientoController;
 use App\Models\LineaServicio;
@@ -118,8 +119,8 @@ Route::middleware(['auth'])->group(function () {
         'requisitos' => $requisitos,
     ]);
 
-    Route::get('mis-entregas', $modulo('mis-entregas', 'Mis entregas', 'Historial de tus entregas, tu efectividad diaria y las evidencias cargadas.', ['RBAC']))
-        ->middleware('permiso:entregas.ver')->name('mis-entregas');
+    // El historial de entregas de quien hace las rutas
+    Route::get('mis-entregas', MisEntregasController::class)->middleware('permiso:entregas.ver')->name('mis-entregas');
 
     // Herramientas de la línea de servicios logísticos (Drivin, auditoría POD). Su permiso solo le aplica a quien
     // trabaja en la línea (o las ve todas) y no está limitado a una empresa: ver App\Models\User::permisos
@@ -157,7 +158,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por sede, sucursal y fecha.', ['RF-02']))
         ->middleware('permiso:programacion.ver')->name('programacion.index');
 
-    // Datos maestros (en construcción). El personal (auxiliares, conductores, operarios) está en Usuarios
+    // Datos maestros. El personal (auxiliares, conductores, operarios) está en Usuarios
     Route::get('vehiculos', [VehiculoController::class, 'index'])->middleware('permiso:vehiculos.ver')->name('vehiculos.index');
     Route::post('vehiculos', [VehiculoController::class, 'store'])->middleware('permiso:vehiculos.crear')->name('vehiculos.store');
     Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->middleware('permiso:vehiculos.editar')->name('vehiculos.update');

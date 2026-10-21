@@ -205,13 +205,13 @@ class InformeController extends Controller
                         'descripcion' => $a->descripcion,
                         'registradaPor' => $a->registradoPor?->name,
                     ])->values(),
-                    // Lo que sugieren los umbrales de Parámetros (la persona decide)
+                    // Lo que sugieren los umbrales de Parámetros (la persona decide): felicitación desde el umbral y
+                    // sin novedades, llamado de atención por debajo del suyo y, entre ambos o con novedades, retroalimentación
                     'sugerencia' => match (true) {
                         ! $l->auxiliar_id => null,
                         $cumplimiento < $umbrales['llamado'] => TipoAccion::LlamadoAtencion->value,
-                        $l->pod_cumple === false => TipoAccion::Retroalimentacion->value,
-                        $cumplimiento >= $umbrales['felicitacion'] && ($l->novedades ?? 'Sin novedad') === 'Sin novedad' => TipoAccion::Felicitacion->value,
-                        default => null,
+                        $cumplimiento >= $umbrales['felicitacion'] && $l->pod_cumple !== false && ($l->novedades ?? 'Sin novedad') === 'Sin novedad' => TipoAccion::Felicitacion->value,
+                        default => TipoAccion::Retroalimentacion->value,
                     },
                 ];
             })->values(),

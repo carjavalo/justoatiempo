@@ -36,7 +36,7 @@ class AuditoriaPodTest extends TestCase
 
         $this->sede = $this->sede('TuGo');
         $this->coordinador = User::factory()->coordinador()->create();
-        TipoNovedad::create(['nombre' => 'Buen protocolo de entrega']);
+        TipoNovedad::firstOrCreate(['nombre' => 'Buen protocolo de entrega']);
 
         $carga = Carga::create(['archivo_nombre' => 'p.xlsx', 'archivo_path' => 'p', 'archivo_hash' => str_repeat('b', 64)]);
         foreach (['PDVT1001', 'PDVT1002', 'PDVT1003'] as $i => $codigo) {

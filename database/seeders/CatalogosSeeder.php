@@ -14,6 +14,7 @@ class CatalogosSeeder extends Seeder
     {
         $motivos = [
             ['Cliente reprograma fecha de entrega', false],
+            ['Cliente reprograma fecha de recibo', false],
             ['Cliente ausente en domicilio', false],
             ['Cliente no contesta llamadas', false],
             ['Dirección errada o incompleta', false],

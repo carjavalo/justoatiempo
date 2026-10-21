@@ -46,6 +46,8 @@ export interface User {
     inicio: { titulo: string; volver: string; url: string };
     /** Las líneas en las que trabaja hoy (por sus asignaciones vigentes). */
     lineas: { slug: string; nombre: string }[];
+    /** Si tiene entregas de Drivin a su nombre: se le ofrece "Mis entregas". */
+    entregas: boolean;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

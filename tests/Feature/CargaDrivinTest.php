@@ -38,7 +38,7 @@ class CargaDrivinTest extends TestCase
         Vehiculo::create(['placa' => 'SNX 708']);
         // El auxiliar: parte del personal, sin acceso a la plataforma
         User::factory()->sinAcceso()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null]);
-        MotivoRechazo::create(['nombre' => 'Cliente ausente en domicilio']);
+        MotivoRechazo::firstOrCreate(['nombre' => 'Cliente ausente en domicilio']);
 
         $this->coordinador = User::factory()->coordinador()->create();
     }

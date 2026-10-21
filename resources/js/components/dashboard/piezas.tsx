@@ -33,6 +33,17 @@ export function Panel({
     );
 }
 
+/** Un dato del resumen (cumplimiento, entregas…): va dentro de una lista <ul role="list">. */
+export function Dato({ titulo, valor, detalle }: { titulo: string; valor: string; detalle?: ReactNode }) {
+    return (
+        <li className="bg-card flex flex-col rounded-2xl border px-4 py-3.5">
+            <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{titulo}</span>
+            <span className="mt-1 text-2xl font-extrabold tabular-nums">{valor}</span>
+            {detalle && <span className="text-muted-foreground mt-1 text-xs">{detalle}</span>}
+        </li>
+    );
+}
+
 const ESTADO = {
     good: { icono: CheckCircle2, clase: 'bg-good-soft text-good' },
     warning: { icono: AlertTriangle, clase: 'bg-warning-soft text-warning' },

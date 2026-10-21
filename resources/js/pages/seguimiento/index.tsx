@@ -8,7 +8,7 @@ import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { usePuede } from '@/hooks/use-puede';
-import { fmt, type NivelEstado } from '@/lib/formato';
+import { fmt, semaforo } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
@@ -56,11 +56,7 @@ const TIPOS: Record<string, { clase: string; icono: typeof Felicitacion; corto: 
     llamado_escrito: { clase: 'bg-critical-soft text-critical', icono: ShieldAlert, corto: 'Llamados escritos' },
 };
 
-function nivel(cumplimiento: number): { nivel: NivelEstado; texto: string } {
-    if (cumplimiento >= 100) return { nivel: 'good', texto: 'Operación completa' };
-    if (cumplimiento >= 80) return { nivel: 'warning', texto: 'Revisar pendientes' };
-    return { nivel: 'critical', texto: 'Seguimiento inmediato' };
-}
+const nivel = (cumplimiento: number) => semaforo(cumplimiento)!;
 
 const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
 

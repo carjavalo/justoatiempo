@@ -47,6 +47,14 @@ export function variacion(actual: number | null, previo: number | null, modo: 'p
 
 export type NivelEstado = 'good' | 'warning' | 'critical';
 
+/** Semáforo del Excel de la operación: 100 % completa, 80 a 99 % revisar pendientes, menos de 80 % seguimiento inmediato. */
+export function semaforo(cumplimiento: number | null): { nivel: NivelEstado; texto: string } | null {
+    if (cumplimiento === null) return null;
+    if (cumplimiento >= 100) return { nivel: 'good', texto: 'Operación completa' };
+    if (cumplimiento >= 80) return { nivel: 'warning', texto: 'Revisar pendientes' };
+    return { nivel: 'critical', texto: 'Seguimiento inmediato' };
+}
+
 /** Semáforo frente a la meta: en meta, hasta 10 pts por debajo, o crítico. */
 export function nivelFrenteAMeta(valor: number | null, meta: number): NivelEstado | null {
     if (valor === null) return null;

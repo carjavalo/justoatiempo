@@ -1,5 +1,5 @@
 import { claseTd, claseTh, Tabla } from '@/components/admin/piezas';
-import { EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
+import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import {
     CalendarDays,
     CheckCircle2,
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { usePuede } from '@/hooks/use-puede';
-import { fmt, type NivelEstado } from '@/lib/formato';
+import { fmt, semaforo } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useState } from 'react';
@@ -112,14 +112,6 @@ interface Props {
     }[];
     tiposAccion: { valor: string; texto: string }[];
     umbrales: { felicitacion: number; llamado: number };
-}
-
-/** Semáforo del Excel de la operación: 100 % completa, 80 a 99 % revisar pendientes, menos de 80 % seguimiento inmediato. */
-function semaforo(cumplimiento: number | null): { nivel: NivelEstado; texto: string } | null {
-    if (cumplimiento === null) return null;
-    if (cumplimiento >= 100) return { nivel: 'good', texto: 'Operación completa' };
-    if (cumplimiento >= 80) return { nivel: 'warning', texto: 'Revisar pendientes' };
-    return { nivel: 'critical', texto: 'Seguimiento inmediato' };
 }
 
 const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
@@ -306,16 +298,6 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
             {accion && <DialogoAccion {...accion} tiposAccion={tiposAccion} umbrales={umbrales} onCerrar={() => setAccion(null)} />}
             {observacion && <DialogoObservacion fila={observacion} onCerrar={() => setObservacion(null)} />}
         </MarcoLinea>
-    );
-}
-
-function Dato({ titulo, valor, detalle }: { titulo: string; valor: string; detalle: ReactNode }) {
-    return (
-        <li className="bg-card flex flex-col rounded-2xl border px-4 py-3.5">
-            <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{titulo}</span>
-            <span className="mt-1 text-2xl font-extrabold tabular-nums">{valor}</span>
-            <span className="text-muted-foreground mt-1 text-xs">{detalle}</span>
-        </li>
     );
 }
 
@@ -662,7 +644,9 @@ function DialogoAccion({
             : fila.sugerencia === 'llamado_atencion'
               ? `Cumplimiento por debajo del ${fmt.pctEntero(umbrales.llamado)}.`
               : fila.sugerencia === 'retroalimentacion'
-                ? 'Hay órdenes sin evidencias o con el protocolo de entrega incompleto.'
+                ? fila.novedades && fila.novedades !== 'Sin novedad'
+                    ? `Novedades del día: ${fila.novedades}.`
+                    : `Cumplimiento del ${fmt.pct(fila.cumplimiento)}, por debajo del ${fmt.pctEntero(umbrales.felicitacion)} de la felicitación.`
                 : null;
 
     return (

@@ -1,4 +1,4 @@
-import { ClipboardCheck, FileSpreadsheet, LayoutGrid, Target, type TipoIcono, UploadCloud } from '@/components/iconos';
+import { ClipboardCheck, FileSpreadsheet, LayoutGrid, PackageCheck, Target, type TipoIcono, UploadCloud } from '@/components/iconos';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { iconoLinea } from '@/lib/iconos-linea';
@@ -8,7 +8,7 @@ import { type SharedData, type Volver } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
-export type SeccionLogistica = 'tablero' | 'cargas' | 'auditoria' | 'informes' | 'seguimiento';
+export type SeccionLogistica = 'tablero' | 'cargas' | 'auditoria' | 'informes' | 'seguimiento' | 'entregas';
 
 const PESTANAS_LOGISTICA: { id: SeccionLogistica; texto: string; icono: TipoIcono; href: (slug: string) => string; permiso: string }[] = [
     { id: 'tablero', texto: 'Tablero', icono: LayoutGrid, href: (slug) => route('lineas.show', slug), permiso: 'tablero.ver' },
@@ -16,6 +16,7 @@ const PESTANAS_LOGISTICA: { id: SeccionLogistica; texto: string; icono: TipoIcon
     { id: 'auditoria', texto: 'Auditoría POD', icono: ClipboardCheck, href: () => route('auditoria.index'), permiso: 'auditoria.ver' },
     { id: 'informes', texto: 'Informe diario', icono: FileSpreadsheet, href: () => route('informes.index'), permiso: 'informes.ver' },
     { id: 'seguimiento', texto: 'Seguimiento', icono: Target, href: () => route('seguimiento.index'), permiso: 'seguimiento.ver' },
+    { id: 'entregas', texto: 'Mis entregas', icono: PackageCheck, href: () => route('mis-entregas'), permiso: 'entregas.ver' },
 ];
 
 /** La línea de las herramientas de Drivin (sus páginas no reciben la línea desde el servidor). */
@@ -80,7 +81,8 @@ export function MarcoLinea({
           ? false
           : undefined;
     // Solo las herramientas que su rol abre; con una sola, no hay entre qué cambiar
-    const pestanasVisibles = PESTANAS_LOGISTICA.filter((p) => puede(p.permiso));
+    // "Mis entregas" solo para quien tiene entregas a su nombre
+    const pestanasVisibles = PESTANAS_LOGISTICA.filter((p) => puede(p.permiso) && (p.id !== 'entregas' || auth.user.entregas));
     const verPestanas = pestanas && paginaDeLaPestana && pestanasVisibles.length > 1;
 
     return (
