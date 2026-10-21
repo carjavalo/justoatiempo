@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
+use App\Enums\TipoEvidencia;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
 use App\Models\Evidencia;
@@ -101,6 +102,30 @@ class AuditoriaPodTest extends TestCase
         $grave = EvaluadorProtocolo::evaluar($this->checklist(['foto_fachada' => false, 'foto_remesa' => false, 'fotos_sellado' => 2]));
         $this->assertSame('Falta foto de fachada y remesa firmada', $grave['novedad']);
         $this->assertStringContainsString('2 de 4', $grave['concepto']);
+    }
+
+    public function test_las_fotos_borrosas_no_cuentan_y_dejan_su_novedad()
+    {
+        // Con 4 fotos selladas que se ven bien, cumple; las borrosas quedan anotadas
+        $cumple = EvaluadorProtocolo::evaluar($this->checklist(['fotos_ilegibles' => 2]));
+        $this->assertTrue($cumple['cumple']);
+        $this->assertSame('Buen protocolo de entrega pero puede mejorar', $cumple['novedad']);
+        $this->assertStringContainsString('2 fotos borrosas o ilegibles no se tuvieron en cuenta', $cumple['concepto']);
+
+        // Si por ellas faltan fotos del producto, la novedad son las fotos borrosas
+        $noCumple = EvaluadorProtocolo::evaluar($this->checklist(['fotos_sellado' => 2, 'fotos_ilegibles' => 2]));
+        $this->assertFalse($noCumple['cumple']);
+        $this->assertSame('Fotos borrosas o ilegibles', $noCumple['novedad']);
+
+        // Una foto clasificada como borrosa se cuenta en la lista de las órdenes aún sin auditar, y al guardar va al informe
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+        $orden->evidencias()->create(['tipo' => TipoEvidencia::Ilegible, 'nombre_original' => 'borrosa.jpg', 'path' => 'x/borrosa.jpg', 'hash' => str_repeat('b', 64), 'mime' => 'image/jpeg', 'tamano_bytes' => 10]);
+        $this->actingAs($this->coordinador)->get("/auditoria/{$orden->id}")
+            ->assertInertia(fn (Assert $p) => $p->where('seleccionada.auditoria.fotos_ilegibles', 1));
+
+        $this->post("/auditoria/{$orden->id}", $this->checklist(['fotos_ilegibles' => 1]))->assertSessionHasNoErrors();
+        $this->assertSame(1, AuditoriaPod::firstWhere('orden_id', $orden->id)->fotos_ilegibles);
+        $this->assertStringContainsString('Fotos borrosas o ilegibles en 1 orden', InformeDiario::first()->lineas()->first()->novedades);
     }
 
     public function test_guardar_actualiza_el_informe_y_pasa_a_la_siguiente()

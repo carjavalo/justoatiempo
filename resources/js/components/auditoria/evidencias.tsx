@@ -107,7 +107,7 @@ function TipoFoto({ evidencia, deshabilitado }: { evidencia: EvidenciaOrden; des
                 onCambio={(v) => router.patch(`/evidencias/${evidencia.id}`, { tipo: v }, { preserveScroll: true, preserveState: true })}
                 opciones={TIPOS_FOTO.map((t) => ({ valor: t.valor, texto: t.corto }))}
                 tamano="sm"
-                claseValor={evidencia.tipo === 'otro' ? 'text-warning' : undefined}
+                claseValor={evidencia.tipo === 'otro' || evidencia.tipo === 'ilegible' ? 'text-warning' : undefined}
             />
         </div>
     );

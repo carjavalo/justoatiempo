@@ -10,6 +10,8 @@ enum TipoEvidencia: string
     case Remesa = 'remesa';
     case Rotulo = 'rotulo';
     case PdfPod = 'pdf_pod';
+    // Borrosa o ilegible: no cuenta para el protocolo
+    case Ilegible = 'ilegible';
     case Otro = 'otro';
 
     public function label(): string
@@ -21,6 +23,7 @@ enum TipoEvidencia: string
             self::Remesa => 'Remesa / factura firmada',
             self::Rotulo => 'Rótulo',
             self::PdfPod => 'PDF prueba de entrega',
+            self::Ilegible => 'Borrosa o ilegible',
             self::Otro => 'Otro',
         };
     }

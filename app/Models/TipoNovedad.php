@@ -11,7 +11,7 @@ class TipoNovedad extends Model
     public const DEL_SISTEMA = [
         'Buen protocolo de entrega', 'Entregado sin destapar con nota en remesa', 'Falta foto de fachada',
         'Faltan fotos de producto sellado', 'Faltan fotos de producto destapado', 'Falta remesa firmada',
-        'Falta foto de fachada y remesa firmada', 'Sin evidencia',
+        'Falta foto de fachada y remesa firmada', 'Sin evidencia', 'Fotos borrosas o ilegibles', 'Buen protocolo de entrega pero puede mejorar',
     ];
 
     protected $table = 'tipos_novedad';

@@ -168,6 +168,10 @@ class ConsolidadorInforme
         if ($protocolo > 0) {
             $partes[] = 'Protocolo de entrega incompleto en '.$cuantas($protocolo, 'orden', 'órdenes');
         }
+        $borrosas = $auditadas->filter(fn (Orden $o) => $o->auditoria->fotos_ilegibles > 0)->count();
+        if ($borrosas > 0) {
+            $partes[] = 'Fotos borrosas o ilegibles en '.$cuantas($borrosas, 'orden', 'órdenes');
+        }
         $devueltas = $grupo->where('devolucion', true);
         if ($devueltas->isNotEmpty()) {
             $motivos = $devueltas->pluck('motivo_texto')->filter()->unique()->take(3)->implode(', ');

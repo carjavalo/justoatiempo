@@ -68,6 +68,8 @@ class AuditoriaController extends Controller
             'foto_fachada' => ['boolean'],
             'fotos_sellado' => ['integer', 'min:0', 'max:50'],
             'fotos_destapado' => ['integer', 'min:0', 'max:50'],
+            // Las borrosas o ilegibles: no cuentan en sellado ni destapado
+            'fotos_ilegibles' => ['integer', 'min:0', 'max:50'],
             'foto_remesa' => ['boolean'],
             'foto_rotulo' => ['boolean'],
             'recibe_sin_destapar' => ['boolean'],
@@ -79,8 +81,8 @@ class AuditoriaController extends Controller
 
         // "Sin evidencia" anula el resto de la lista de chequeo
         $checklist = ($datos['sin_evidencia'] ?? false)
-            ? ['foto_fachada' => false, 'fotos_sellado' => 0, 'fotos_destapado' => 0, 'foto_remesa' => false, 'foto_rotulo' => false, 'recibe_sin_destapar' => false, 'sin_evidencia' => true]
-            : collect($datos)->only(['foto_fachada', 'fotos_sellado', 'fotos_destapado', 'foto_remesa', 'foto_rotulo', 'recibe_sin_destapar'])->all() + ['sin_evidencia' => false];
+            ? ['foto_fachada' => false, 'fotos_sellado' => 0, 'fotos_destapado' => 0, 'fotos_ilegibles' => 0, 'foto_remesa' => false, 'foto_rotulo' => false, 'recibe_sin_destapar' => false, 'sin_evidencia' => true]
+            : collect($datos)->only(['foto_fachada', 'fotos_sellado', 'fotos_destapado', 'fotos_ilegibles', 'foto_remesa', 'foto_rotulo', 'recibe_sin_destapar'])->all() + ['sin_evidencia' => false];
 
         $auditoria = DB::transaction(function () use ($orden, $checklist, $datos, $request) {
             $auditoria = AuditoriaPod::updateOrCreate(['orden_id' => $orden->id], [
@@ -298,10 +300,11 @@ class AuditoriaController extends Controller
 
         // Si aún no se ha auditado, la lista de chequeo parte de lo que dicen las fotos clasificadas
         $porTipo = $evidencias->countBy(fn (Evidencia $e) => $e->tipo->value);
-        $checklist = $a ? $a->only(['foto_fachada', 'fotos_sellado', 'fotos_destapado', 'foto_remesa', 'foto_rotulo', 'recibe_sin_destapar', 'sin_evidencia']) : [
+        $checklist = $a ? $a->only(['foto_fachada', 'fotos_sellado', 'fotos_destapado', 'fotos_ilegibles', 'foto_remesa', 'foto_rotulo', 'recibe_sin_destapar', 'sin_evidencia']) : [
             'foto_fachada' => ($porTipo['fachada'] ?? 0) > 0,
             'fotos_sellado' => $porTipo['sellado'] ?? 0,
             'fotos_destapado' => $porTipo['destapado'] ?? 0,
+            'fotos_ilegibles' => $porTipo['ilegible'] ?? 0,
             'foto_remesa' => ($porTipo['remesa'] ?? 0) > 0,
             'foto_rotulo' => ($porTipo['rotulo'] ?? 0) > 0,
             'recibe_sin_destapar' => false,

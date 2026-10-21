@@ -103,6 +103,7 @@ export function FormularioAuditoria({
         foto_fachada: a.foto_fachada,
         fotos_sellado: a.fotos_sellado,
         fotos_destapado: a.fotos_destapado,
+        fotos_ilegibles: a.fotos_ilegibles ?? 0,
         foto_remesa: a.foto_remesa,
         foto_rotulo: a.foto_rotulo,
         recibe_sin_destapar: a.recibe_sin_destapar,
@@ -209,6 +210,29 @@ export function FormularioAuditoria({
                     <Item numero={4} titulo="Remesa o factura firmada" detalle="Constancia de recibido del cliente; el rótulo es opcional" estado={<Indicador ok={data.foto_remesa} texto={data.foto_remesa ? 'Cumple' : 'Falta'} />}>
                         <Interruptor id="foto-remesa" etiqueta="Remesa firmada" valor={data.foto_remesa} onChange={(v) => cambiar('foto_remesa', v)} deshabilitado={bloqueado || sinEvidencia} />
                         <Interruptor id="foto-rotulo" etiqueta="Rótulo" valor={data.foto_rotulo} onChange={(v) => cambiar('foto_rotulo', v)} deshabilitado={bloqueado || sinEvidencia} />
+                    </Item>
+                    <Item
+                        numero={5}
+                        titulo="Fotos borrosas o ilegibles"
+                        detalle="No cuentan para el protocolo: en los puntos 2 y 3 cuenta solo las que se ven bien"
+                        estado={
+                            data.fotos_ilegibles > 0 ? (
+                                <span className="text-warning inline-flex items-center gap-1 text-xs font-semibold">
+                                    <AlertTriangle className="size-4" aria-hidden="true" />
+                                    {data.fotos_ilegibles === 1 ? '1 no cuenta' : `${data.fotos_ilegibles} no cuentan`}
+                                </span>
+                            ) : (
+                                <Indicador ok texto="Ninguna" />
+                            )
+                        }
+                    >
+                        <Contador
+                            id="fotos-ilegibles"
+                            etiqueta="borrosas o ilegibles"
+                            valor={data.fotos_ilegibles}
+                            onChange={(n) => cambiar('fotos_ilegibles', n)}
+                            deshabilitado={bloqueado || sinEvidencia}
+                        />
                     </Item>
                 </ol>
 

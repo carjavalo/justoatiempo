@@ -14,7 +14,7 @@ class AuditoriaPod extends Model
     protected $table = 'auditorias_pod';
 
     protected $fillable = [
-        'orden_id', 'foto_fachada', 'fotos_sellado', 'fotos_destapado', 'foto_remesa',
+        'orden_id', 'foto_fachada', 'fotos_sellado', 'fotos_destapado', 'fotos_ilegibles', 'foto_remesa',
         'foto_rotulo', 'recibe_sin_destapar', 'sin_evidencia', 'cumple_protocolo',
         'tipo_novedad_id', 'concepto', 'auditado_por', 'auditado_en',
     ];
