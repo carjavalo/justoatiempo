@@ -1,4 +1,4 @@
-import { codigoCsrf } from '@/lib/csrf';
+import { codigoCsrf } from '@/lib/sesion';
 
 /**
  * Subida de muchos archivos en tandas: PHP acepta un número limitado de archivos por

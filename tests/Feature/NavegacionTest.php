@@ -112,4 +112,27 @@ class NavegacionTest extends TestCase
         auth()->logout();
         $this->get('/login')->assertInertia(fn (Assert $p) => $p->where('csrf', session()->token()));
     }
+
+    public function test_con_la_sesion_iniciada_el_inicio_de_sesion_lleva_a_su_inicio(): void
+    {
+        // Es lo que ve quien vuelve con «Atrás» al inicio de sesión: la app pide la página y el servidor la redirige
+        $this->actingAs(User::factory()->admin()->create())->get('/login')->assertRedirect('/panel');
+        $this->get('/forgot-password')->assertRedirect('/panel');
+
+        // Quien trabaja en una sola línea, directo a ella
+        $this->actingAs(User::factory()->coordinador()->create())->get('/login')
+            ->assertRedirect('/lineas/'.LineaServicio::logistica()->slug);
+    }
+
+    public function test_al_salir_cambia_el_codigo_de_la_sesion(): void
+    {
+        // Con él, la app reconoce las páginas guardadas en el historial que son de una sesión anterior
+        $admin = User::factory()->admin()->create();
+        $this->post('/login', ['email' => $admin->email, 'password' => 'password']);
+        $antes = session()->token();
+
+        $this->post('/logout', ['_token' => $antes]);
+        $this->assertGuest();
+        $this->assertNotSame($antes, session()->token());
+    }
 }

@@ -35,6 +35,10 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Con la sesión iniciada, el inicio de sesión (y recuperar la contraseña) llevan directo a su inicio: el panel
+        // o su línea. Es lo que ve quien vuelve con «Atrás» al inicio de sesión (ver resources/js/lib/sesion.ts).
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->inicio()['url'] ?? '/panel');
+
         // Cada sección pide un permiso del rol de la persona (App\Support\Permisos)
         $middleware->alias([
             'permiso' => TienePermiso::class,

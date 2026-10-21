@@ -39,6 +39,8 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
         e.preventDefault();
         if (processing) return;
         post(route('login'), {
+            // Al ingresar, el inicio de sesión se reemplaza en el historial: «Atrás» no vuelve a él
+            replace: true,
             onFinish: () => reset('password'),
         });
     };
