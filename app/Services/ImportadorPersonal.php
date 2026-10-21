@@ -257,12 +257,13 @@ class ImportadorPersonal
      *
      * @return array{nuevas: int, completadas: int, asignadas: int, sinAsignar: int}
      */
-    public function importar(array $analisis, RolUsuario $rol, User $quien): array
+    /** @param  bool  $acceso  si las personas nuevas entran a la plataforma (con su cédula como contraseña inicial) */
+    public function importar(array $analisis, RolUsuario $rol, User $quien, bool $acceso = true): array
     {
         $asignables = $this->empresasAsignables($quien);
         $empresas = Empresa::with('lineas:id')->whereIn('id', $asignables)->get()->keyBy('id');
 
-        return DB::transaction(function () use ($analisis, $rol, $quien, $empresas) {
+        return DB::transaction(function () use ($analisis, $rol, $quien, $empresas, $acceso) {
             $resultado = ['nuevas' => 0, 'completadas' => 0, 'asignadas' => 0, 'sinAsignar' => 0];
 
             foreach ($analisis['filas'] as $f) {
@@ -274,7 +275,9 @@ class ImportadorPersonal
                         'cargo' => $datos['cargo'] ?? $rol->nombre,
                         'rol_id' => $rol->id,
                         'activo' => true,
-                        'acceso' => false,
+                        'acceso' => $acceso,
+                        // Entra con su cédula y su cédula como contraseña inicial, que cambia al ingresar
+                        ...($acceso ? ['password' => $datos['cedula'], 'debe_cambiar_contrasena' => true] : []),
                     ]);
                     $resultado['nuevas']++;
 

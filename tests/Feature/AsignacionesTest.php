@@ -40,9 +40,10 @@ class AsignacionesTest extends TestCase
         parent::tearDown();
     }
 
+    /** Una persona del personal que ve su tablero (el auxiliar operativo base solo ve su carnet). */
     private function persona(): User
     {
-        return User::factory()->create(['linea_servicio_id' => null]);
+        return User::factory()->create(['linea_servicio_id' => null, 'rol_id' => $this->rolConTablero()->id]);
     }
 
     /** Lo que envía el formulario. */

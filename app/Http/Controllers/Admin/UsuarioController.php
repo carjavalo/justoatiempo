@@ -75,6 +75,8 @@ class UsuarioController extends Controller
                 'email' => $u->email,
                 'acceso' => $u->acceso,
                 'tieneContrasena' => filled($u->password),
+                // Aún con la contraseña inicial (su cédula)
+                'contrasenaInicial' => $u->acceso && $u->debe_cambiar_contrasena,
                 'telefono' => $u->telefono,
                 'ciudad' => $u->ciudad,
                 'fechaNacimiento' => $u->fecha_nacimiento?->toDateString(),

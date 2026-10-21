@@ -28,9 +28,24 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            // El correo o la cédula (la mayoría de auxiliares no tiene correo)
+            'email' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
         ];
+    }
+
+    public function messages(): array
+    {
+        return ['email.required' => 'Escribe tu correo o tu cédula.'];
+    }
+
+    /** Con qué se identifica: el correo (si trae @) o la cédula (solo sus números). */
+    private function credenciales(): array
+    {
+        $usuario = trim((string) $this->input('email'));
+        $campo = str_contains($usuario, '@') ? ['email' => mb_strtolower($usuario)] : ['cedula' => preg_replace('/\D/', '', $usuario)];
+
+        return [...$campo, 'password' => (string) $this->input('password')];
     }
 
     /**
@@ -42,7 +57,8 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $credenciales = $this->credenciales();
+        if (in_array('', [$credenciales['email'] ?? null, $credenciales['cedula'] ?? null], true) || ! Auth::attempt($credenciales, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([

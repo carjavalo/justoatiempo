@@ -40,8 +40,9 @@ class UsuarioRequest extends FormRequest
             'cargo' => $this->texto('cargo') ?: null,
             'email' => is_string($e = $this->texto('email')) ? (mb_strtolower($e) ?: null) : $e,
             'password' => $this->input('password') ?: null,
-            // Sin decirlo, como siempre: entra a la plataforma con su correo
+            // Sin decirlo, como siempre: entra a la plataforma
             'acceso' => $this->has('acceso') ? $this->input('acceso') : true,
+            'restablecer' => $this->boolean('restablecer'),
             'telefono' => $this->texto('telefono') ?: null,
             'ciudad' => $this->texto('ciudad') ?: null,
             'fecha_nacimiento' => $this->input('fecha_nacimiento') ?: null,
@@ -63,12 +64,14 @@ class UsuarioRequest extends FormRequest
             // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
             'acceso' => ['required', 'boolean'],
-            // Con acceso, el correo es con el que ingresa; sin acceso es solo un dato de contacto
-            'email' => ['nullable', 'required_if:acceso,true', 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
+            // Ingresa con su correo o con su cédula: con acceso, al menos uno de los dos
+            'email' => ['nullable', Rule::requiredIf(fn () => $this->boolean('acceso') && blank($this->input('cedula'))), 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
-            // Con acceso, al crear (o al darle acceso a quien no tenía contraseña) es obligatoria; al editar, vacía
-            // significa "conservar la actual". Sin acceso no se usa.
-            'password' => [Rule::requiredIf(fn () => $this->boolean('acceso') && blank($usuario?->password)), 'nullable', 'string', 'max:255', Password::defaults()],
+            // Con acceso y sin contraseña aún: la que se escriba o, en blanco, su cédula (la inicial, que cambia al entrar).
+            // Al editar, en blanco conserva la actual. Sin acceso no se usa.
+            'password' => [Rule::requiredIf(fn () => $this->boolean('acceso') && blank($usuario?->password) && blank($this->input('cedula'))), 'nullable', 'string', 'max:255', Password::defaults()],
+            // Volver a la contraseña inicial (su cédula), p. ej. si la olvidó y no tiene correo para restablecerla
+            'restablecer' => ['boolean'],
             'telefono' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\s-]{7,30}$/'],
             'ciudad' => ['nullable', 'string', 'max:80'],
             'fecha_nacimiento' => ['nullable', 'date', 'before:-14 years'],
@@ -135,10 +138,10 @@ class UsuarioRequest extends FormRequest
         return [
             'rol_id.required' => 'Elige el rol.',
             'cargo.required' => 'Escribe el cargo: va en el carnet.',
-            'email.required_if' => 'Escribe el correo: es con el que entrará a la plataforma.',
+            'email.required' => 'Escribe el correo o la cédula: con uno de los dos entra a la plataforma.',
             'email.unique' => 'Ya hay un usuario con este correo.',
             'cedula.required_unless' => 'Escribe la cédula: sin acceso a la plataforma, es la que identifica a la persona.',
-            'password.required' => 'Escribe la contraseña con la que entrará.',
+            'password.required' => 'Escribe la contraseña con la que entrará (o su cédula, que sería la inicial).',
             'telefono.regex' => 'Escribe un teléfono válido (solo números, espacios y +).',
             'fecha_nacimiento.before' => 'Revisa la fecha de nacimiento: debe tener al menos 14 años.',
             'fecha_ingreso.before_or_equal' => 'La fecha de ingreso no puede ser tan adelante.',
@@ -184,10 +187,18 @@ class UsuarioRequest extends FormRequest
             'rol_id' => (int) $datos['rol_id'],
         ];
 
+        /** @var User|null $usuario */
+        $usuario = $this->route('usuario');
         if (! $acceso) {
             $guardar['password'] = null;
+            $guardar['debe_cambiar_contrasena'] = false;
         } elseif (filled($datos['password'] ?? null)) {
             $guardar['password'] = $datos['password'];
+            $guardar['debe_cambiar_contrasena'] = false;
+        } elseif (filled($datos['cedula'] ?? null) && (($datos['restablecer'] ?? false) || blank($usuario?->password))) {
+            // Contraseña inicial: su cédula, que cambia en su primer ingreso
+            $guardar['password'] = $datos['cedula'];
+            $guardar['debe_cambiar_contrasena'] = true;
         }
 
         return $guardar;

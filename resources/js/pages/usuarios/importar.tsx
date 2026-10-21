@@ -3,6 +3,7 @@ import { claseTd, claseTh, contenedorModulo, EncabezadoModulo, Tabla } from '@/c
 import { AlertTriangle, FileSpreadsheet, Info, LoaderCircle, UploadCloud, UsersRound, XCircle } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
@@ -224,6 +225,8 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [rol, setRol] = useState(rolPorDefecto && roles.some((r) => r.id === rolPorDefecto) ? String(rolPorDefecto) : '');
     const [procesando, setProcesando] = useState(false);
+    // Las personas nuevas entran a la plataforma con su cédula (y su cédula como contraseña inicial)
+    const [acceso, setAcceso] = useState(true);
     const { resumen } = revision;
     const porImportar = resumen.nueva + resumen.completa;
     const nombreEmpresa = (id: number | null) => empresas.find((e) => e.id === id)?.nombre;
@@ -240,7 +243,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
     const confirmar = () => {
         router.post(
             route('usuarios.importar.confirmar'),
-            { token: revision.token, rol_id: rol },
+            { token: revision.token, rol_id: rol, acceso },
             { preserveScroll: true, onStart: () => setProcesando(true), onFinish: () => setProcesando(false) },
         );
     };
@@ -332,9 +335,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                         <h2 id="titulo-rol" className="text-sm font-bold">
                             Rol de las personas nuevas
                         </h2>
-                        <p className="text-muted-foreground mt-1 text-xs">
-                            Quienes ya estaban conservan su rol. Nadie recibe acceso a la plataforma.
-                        </p>
+                        <p className="text-muted-foreground mt-1 text-xs">Quienes ya estaban conservan su rol y su acceso.</p>
                     </div>
                     <Campo id="rol_id" etiqueta="Rol" requerido ayuda={roles.find((r) => String(r.id) === rol)?.resumen} error={errors.rol_id}>
                         <Selector
@@ -349,6 +350,25 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                             opciones={roles.map((r) => ({ valor: String(r.id), texto: r.nombre, detalle: r.resumen }))}
                         />
                     </Campo>
+                    <div className="flex items-start gap-3">
+                        <Checkbox
+                            id="acceso"
+                            checked={acceso}
+                            onCheckedChange={(v) => setAcceso(v === true)}
+                            aria-describedby="acceso-ayuda"
+                            className="mt-0.5"
+                        />
+                        <div className="grid gap-1">
+                            <label htmlFor="acceso" className="cursor-pointer text-sm leading-none font-medium">
+                                Pueden entrar a la plataforma
+                            </label>
+                            <p id="acceso-ayuda" className="text-muted-foreground text-xs">
+                                {acceso
+                                    ? 'Entran con su cédula, y su contraseña inicial es su cédula: la cambian en su primer ingreso.'
+                                    : 'Solo tendrán su carnet: no entran a la plataforma.'}
+                            </p>
+                        </div>
+                    </div>
                 </section>
             </div>
 

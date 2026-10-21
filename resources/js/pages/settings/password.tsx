@@ -1,4 +1,5 @@
 import { BotonEnviar } from '@/components/boton-enviar';
+import { CheckCircle2, KeyRound } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { PasswordInput } from '@/components/password-input';
 import { Label } from '@/components/ui/label';
@@ -6,10 +7,10 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { Head, useForm } from '@inertiajs/react';
-import { CheckCircle2 } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
-export default function Password() {
+/** obligatorio: entró con la contraseña inicial (su cédula) y debe cambiarla para seguir. */
+export default function Password({ obligatorio = false }: { obligatorio?: boolean }) {
     const { data, setData, errors, put, reset, processing, recentlySuccessful } = useForm({
         current_password: '',
         password: '',
@@ -33,10 +34,20 @@ export default function Password() {
     };
 
     return (
-        <AppLayout>
+        // Mientras deba cambiarla, no hay a dónde volver: cualquier otra página lo trae de regreso aquí
+        <AppLayout volver={obligatorio ? false : undefined}>
             <Head title="Contraseña" />
 
             <SettingsLayout descripcion="Usa una contraseña larga y difícil de adivinar. Al cambiarla, la usarás en tu próximo ingreso.">
+                {obligatorio && (
+                    <p role="status" className="bg-secondary text-secondary-foreground mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm">
+                        <KeyRound className="text-brand-coral-ink mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                        <span>
+                            <strong className="font-semibold">Crea tu propia contraseña para seguir.</strong> Entraste con la contraseña inicial (tu
+                            cédula): escríbela como contraseña actual y elige una nueva que solo tú conozcas.
+                        </span>
+                    </p>
+                )}
                 <form onSubmit={updatePassword} className="space-y-6" noValidate>
                     <div className="grid gap-2">
                         <Label htmlFor="current_password">Contraseña actual</Label>
@@ -47,7 +58,7 @@ export default function Password() {
                             required
                             className="h-11 rounded-lg"
                             autoComplete="current-password"
-                            placeholder="La que usas para ingresar"
+                            placeholder={obligatorio ? 'Tu número de cédula' : 'La que usas para ingresar'}
                         />
                         <InputError id="current_password-error" message={errors.current_password} />
                     </div>

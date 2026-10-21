@@ -52,6 +52,7 @@ class User extends Authenticatable
         'arl_subida_en',
         'activo',
         'acceso',
+        'debe_cambiar_contrasena',
         'ultimo_acceso_en',
     ];
 
@@ -83,6 +84,7 @@ class User extends Authenticatable
             'rol' => Rol::class,
             'activo' => 'boolean',
             'acceso' => 'boolean',
+            'debe_cambiar_contrasena' => 'boolean',
             'fecha_nacimiento' => 'date',
             'fecha_ingreso' => 'date',
             'ultimo_acceso_en' => 'datetime',
@@ -221,6 +223,21 @@ class User extends Authenticatable
         return $this->puede(Permisos::TODAS_LAS_LINEAS) && $this->puede('tablero.ver')
             ? LineaServicio::activas()->ordenadas()->get()
             : $this->lineas()->filter(fn (LineaServicio $l) => $l->activa && $this->puedeVerLinea($l))->values();
+    }
+
+    /**
+     * Si en la plataforma solo tiene su carnet: no administra nada ni abre el tablero de ninguna línea (como el
+     * auxiliar operativo). Su inicio es su carnet.
+     */
+    public function soloSuCarnet(?SupportCollection $lineas = null): bool
+    {
+        return ! $this->administraAlgo() && ! $this->puede('tablero.ver') && ($lineas ?? $this->lineasVisibles())->isEmpty();
+    }
+
+    /** La contraseña inicial es su cédula: entra con ella y debe cambiarla en su primer ingreso. */
+    public function contrasenaInicial(): array
+    {
+        return ['password' => $this->cedula, 'debe_cambiar_contrasena' => true];
     }
 
     /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con sus permisos en la plataforma. */
@@ -379,6 +396,9 @@ class User extends Authenticatable
     public function inicio(?SupportCollection $lineas = null): array
     {
         $lineas ??= $this->lineasVisibles();
+        if ($this->soloSuCarnet($lineas)) {
+            return ['titulo' => 'Mi carnet', 'volver' => 'Volver a mi carnet', 'url' => route('mi-carnet', [], false)];
+        }
         if (! $this->administraAlgo() && ! $this->puede(Permisos::TODAS_LAS_LINEAS) && $lineas->count() === 1) {
             $linea = $lineas->first();
 

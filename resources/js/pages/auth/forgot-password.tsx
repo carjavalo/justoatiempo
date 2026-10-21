@@ -40,7 +40,7 @@ export default function ForgotPassword({ status, espera, enviadoEn }: ForgotPass
     return (
         <AuthLayout
             title="Recupera tu contraseña"
-            description="Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña."
+            description="Escribe tu correo y te enviaremos un enlace para crear una nueva contraseña. Si ingresas con tu cédula y no tienes correo, pídele al administrador que la restablezca."
             volver={{ texto: 'Volver a iniciar sesión', href: route('login') }}
         >
             <Head title="Recuperar contraseña" />

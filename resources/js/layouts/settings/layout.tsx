@@ -1,5 +1,6 @@
 import { KeyRound, UserRound } from '@/components/iconos';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
+import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
@@ -10,8 +11,11 @@ const SECCIONES = [
 
 /** "Mi cuenta": el título vive aquí; cada sección solo agrega su descripción. */
 export default function SettingsLayout({ descripcion, children }: { descripcion: string; children: ReactNode }) {
-    const actual = usePage().url.split('?')[0];
-    const seccion = SECCIONES.find((s) => s.url === actual);
+    const pagina = usePage<SharedData>();
+    const actual = pagina.url.split('?')[0];
+    // Quien ve solo lo suyo no cambia sus datos (los lleva su carnet): solo su contraseña, sin pestañas
+    const secciones = pagina.props.auth.user.editaPerfil ? SECCIONES : SECCIONES.filter((s) => s.url !== '/settings/profile');
+    const seccion = secciones.find((s) => s.url === actual);
 
     return (
         // Mismo eje que la barra y el enlace "Volver"; el contenido se limita a una columna cómoda de leer
@@ -19,8 +23,8 @@ export default function SettingsLayout({ descripcion, children }: { descripcion:
             <div className="max-w-3xl">
                 <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">Mi cuenta</h1>
 
-                <nav aria-label="Secciones de mi cuenta" className="mt-6 flex gap-1 border-b">
-                    {SECCIONES.map(({ titulo, url, icono: Icono }) => {
+                <nav aria-label="Secciones de mi cuenta" className={cn('mt-6 flex gap-1 border-b', secciones.length < 2 && 'hidden')}>
+                    {secciones.map(({ titulo, url, icono: Icono }) => {
                         const activa = actual === url;
                         return (
                             <Link

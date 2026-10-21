@@ -94,7 +94,7 @@ class MenuLateralTest extends TestCase
     {
         // Un auxiliar en dos líneas llega al inicio: la tarjeta de logística muestra sus entregas, no las de su sede
         $aseo = LineaServicio::where('slug', 'aseo-general')->sole();
-        $auxiliar = User::factory()->create(['cedula' => '1144203579']);
+        $auxiliar = User::factory()->create(['cedula' => '1144203579', 'rol_id' => $this->rolConTablero()->id]);
         Asignacion::create(['user_id' => $auxiliar->id, 'fecha_inicio' => today()->subMonth(), 'duracion' => 'indefinida'])->lineas()->sync([$aseo->id]);
         $tugo = $this->sede('TuGo');
         $carga = Carga::create(['archivo_nombre' => 'p.xlsx', 'archivo_path' => 'p', 'archivo_hash' => str_repeat('b', 64)]);

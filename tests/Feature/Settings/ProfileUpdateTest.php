@@ -12,7 +12,7 @@ class ProfileUpdateTest extends TestCase
 
     public function test_profile_page_is_displayed()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->coordinador()->create();
 
         $response = $this
             ->actingAs($user)
@@ -23,7 +23,7 @@ class ProfileUpdateTest extends TestCase
 
     public function test_profile_information_can_be_updated()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->coordinador()->create();
 
         $response = $this
             ->actingAs($user)
@@ -46,7 +46,7 @@ class ProfileUpdateTest extends TestCase
 
     public function test_email_verification_status_is_unchanged_when_the_email_address_is_unchanged()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->coordinador()->create();
 
         $response = $this
             ->actingAs($user)

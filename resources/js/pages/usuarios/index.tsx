@@ -41,9 +41,11 @@ interface FilaUsuario {
     cedula: string | null;
     cargo: string | null;
     email: string | null;
-    /** Si entra a la plataforma (con correo y contraseña); sin acceso, sigue teniendo su carnet. */
+    /** Si entra a la plataforma (con su correo o su cédula); sin acceso, sigue teniendo su carnet. */
     acceso: boolean;
     tieneContrasena: boolean;
+    /** Aún entra con la contraseña inicial (su cédula): la cambia en su primer ingreso. */
+    contrasenaInicial: boolean;
     telefono: string | null;
     ciudad: string | null;
     fechaNacimiento: string | null;
@@ -95,6 +97,7 @@ const VACIO = {
     arl: null as File | null,
     quitar_arl: false,
     password: '',
+    restablecer: false,
 };
 const ORDEN_CAMPOS = [
     'nombres',
@@ -165,6 +168,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                       arl: null,
                       quitar_arl: false,
                       password: '',
+                      restablecer: false,
                   }
                 : VACIO,
         );
@@ -199,8 +203,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
         </Button>
     );
 
-    // Con acceso y sin contraseña aún (nueva, o a quien antes no tenía acceso), hay que asignarle una
+    // Con acceso y sin contraseña aún (nueva, o a quien antes no tenía acceso): la que se escriba o, en blanco, su cédula
     const pideContrasena = form.data.acceso && !(editando?.tieneContrasena && editando.acceso);
+    const conCedula = form.data.cedula.trim() !== '';
 
     const acciones = puede('usuarios.crear') && (
         <div className="flex flex-wrap gap-2">
@@ -382,7 +387,11 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                             )}
                                                         </p>
                                                         <p className="text-muted-foreground truncate text-xs" title={u.email ?? undefined}>
-                                                            {u.acceso ? u.email : u.cedula ? `C.C. ${u.cedula} · solo carnet` : 'Solo carnet'}
+                                                            {u.acceso
+                                                                ? (u.email ?? `C.C. ${u.cedula}`)
+                                                                : u.cedula
+                                                                  ? `C.C. ${u.cedula} · solo carnet`
+                                                                  : 'Solo carnet'}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -432,6 +441,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                         <LockKeyhole className="size-3.5" aria-hidden="true" />
                                                         Sin acceso
                                                     </span>
+                                                ) : u.contrasenaInicial ? (
+                                                    <span className="text-muted-foreground">Aún con la contraseña inicial</span>
                                                 ) : u.ultimoAcceso ? (
                                                     <time
                                                         dateTime={u.ultimoAcceso}
@@ -677,7 +688,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                             </label>
                             <p id="acceso-ayuda" className="text-muted-foreground text-xs">
                                 {form.data.acceso
-                                    ? 'Ingresa con su correo y su contraseña, y ve lo que su rol le permite.'
+                                    ? 'Ingresa con su correo o su cédula y su contraseña, y ve lo que su rol le permite.'
                                     : 'Solo tiene su carnet: no ingresa ni puede pedir una contraseña.'}
                             </p>
                             <InputError id="acceso-error" message={form.errors.acceso} />
@@ -686,14 +697,15 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
 
                     <Campo
                         id="email"
-                        etiqueta={form.data.acceso ? 'Correo electrónico' : 'Correo electrónico (opcional)'}
-                        requerido={form.data.acceso}
+                        etiqueta={form.data.acceso && !conCedula ? 'Correo electrónico' : 'Correo electrónico (opcional)'}
+                        requerido={form.data.acceso && !conCedula}
+                        ayuda={form.data.acceso && conCedula ? 'Sin correo, ingresa con su cédula.' : undefined}
                         error={form.errors.email}
                     >
                         <Input
-                            {...propsCampo('email', form.errors.email)}
+                            {...propsCampo('email', form.errors.email, form.data.acceso && conCedula ? 'email-ayuda' : undefined)}
                             type="email"
-                            required={form.data.acceso}
+                            required={form.data.acceso && !conCedula}
                             autoComplete="off"
                             spellCheck={false}
                             value={form.data.email}
@@ -706,13 +718,19 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                         <Campo
                             id="password"
                             etiqueta={pideContrasena ? 'Contraseña' : 'Nueva contraseña'}
-                            requerido={pideContrasena}
-                            ayuda={pideContrasena ? 'Compártela con la persona por un medio seguro.' : 'Déjala en blanco para conservar la actual.'}
+                            requerido={pideContrasena && !conCedula}
+                            ayuda={
+                                pideContrasena
+                                    ? conCedula
+                                        ? 'En blanco, su contraseña inicial es su cédula y la cambia en su primer ingreso. O escribe una y compártela por un medio seguro.'
+                                        : 'Compártela con la persona por un medio seguro.'
+                                    : 'Déjala en blanco para conservar la actual.'
+                            }
                             error={form.errors.password}
                         >
                             <PasswordInput
                                 {...propsCampo('password', form.errors.password, 'password-ayuda')}
-                                required={pideContrasena}
+                                required={pideContrasena && !conCedula}
                                 autoComplete="new-password"
                                 placeholder="Mínimo 8 caracteres"
                                 value={form.data.password}
@@ -739,6 +757,27 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                 </span>
                             </div>
                         </Campo>
+                    )}
+
+                    {/* Si olvidó la contraseña y no tiene correo para restablecerla: vuelve a ser su cédula */}
+                    {form.data.acceso && !pideContrasena && conCedula && !form.data.password && (
+                        <div className="flex items-start gap-3">
+                            <Checkbox
+                                id="restablecer"
+                                checked={form.data.restablecer}
+                                onCheckedChange={(v) => form.setData('restablecer', v === true)}
+                                aria-describedby="restablecer-ayuda"
+                                className="mt-0.5"
+                            />
+                            <div className="grid gap-1">
+                                <label htmlFor="restablecer" className="cursor-pointer text-sm leading-none font-medium">
+                                    Volver a la contraseña inicial
+                                </label>
+                                <p id="restablecer-ayuda" className="text-muted-foreground text-xs">
+                                    Su contraseña vuelve a ser su cédula y la cambia al ingresar. Útil si la olvidó y no tiene correo.
+                                </p>
+                            </div>
+                        </div>
                     )}
                 </fieldset>
             </FormularioLateral>

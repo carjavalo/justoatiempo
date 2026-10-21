@@ -59,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                     'inicio' => $inicio,
                     // Las líneas en las que trabaja hoy (por sus asignaciones vigentes)
                     'lineas' => $user->lineas()->map(fn ($l) => ['slug' => $l->slug, 'nombre' => $l->nombre])->values(),
+                    // Si cambia sus nombres y su correo en "Mi cuenta" (quien ve solo lo suyo, no: sus datos los lleva el carnet)
+                    'editaPerfil' => ! $user->soloLoSuyo(),
                     // Si tiene entregas de Drivin a su nombre (para ofrecerle "Mis entregas")
                     'entregas' => $user->puede('entregas.ver') && Orden::where('auxiliar_id', $user->id)->exists(),
                 ] : null,

@@ -19,7 +19,12 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
     // Lo que ya está en pantalla no se repite en el menú: en Mi cuenta, sus pestañas llevan a cada sección
     const opciones = [
         !url.startsWith('/mi-carnet') && { texto: 'Mi carnet', href: route('mi-carnet'), icono: IdCard },
-        !url.startsWith('/settings') && { texto: 'Mi cuenta', href: route('profile.edit'), icono: Settings },
+        // Quien ve solo lo suyo no cambia sus datos (los lleva su carnet): su cuenta es su contraseña
+        !url.startsWith('/settings') && {
+            texto: user.editaPerfil ? 'Mi cuenta' : 'Cambiar contraseña',
+            href: route(user.editaPerfil ? 'profile.edit' : 'password.edit'),
+            icono: Settings,
+        },
     ].filter((o) => o !== false);
 
     return (

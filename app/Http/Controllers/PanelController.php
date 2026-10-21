@@ -41,6 +41,11 @@ class PanelController extends Controller
         $user = $request->user();
         $lineas = $user->lineasVisibles();
 
+        // Solo su carnet (como el auxiliar operativo): ese es su inicio
+        if ($user->soloSuCarnet($lineas)) {
+            return redirect()->route('mi-carnet');
+        }
+
         if (! $user->administraAlgo() && ! ($user->puede(Permisos::TODAS_LAS_LINEAS) && $user->puede('tablero.ver'))) {
             // Trabaja en una sola línea: entra directo a ella
             if ($lineas->count() === 1) {

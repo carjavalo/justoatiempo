@@ -118,7 +118,9 @@ class ImportacionPersonalController extends Controller
         $datos = $request->validate([
             'token' => ['required', 'string'],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')->where('activo', true)],
+            'acceso' => ['boolean'],
         ], ['rol_id.required' => 'Elige el rol de las personas nuevas.']);
+        $acceso = $request->boolean('acceso', true);
         if ($datos['token'] !== $this->token($pendiente)) {
             return to_route('usuarios.importar')->with('error', 'El archivo cambió (se subió otro en otra pestaña): revísalo de nuevo antes de importar.');
         }
@@ -138,7 +140,7 @@ class ImportacionPersonalController extends Controller
             return back()->with('error', 'El archivo no trae personas nuevas ni datos por completar.');
         }
 
-        $r = $this->importador->importar($analisis, $rol, $yo);
+        $r = $this->importador->importar($analisis, $rol, $yo, $acceso);
         $this->descartarArchivo($request);
 
         $partes = array_filter([
@@ -148,8 +150,10 @@ class ImportacionPersonalController extends Controller
         $asignadas = $r['asignadas'] ? ' '.($r['asignadas'] === 1 ? 'Una quedó asignada a su empresa.' : "{$r['asignadas']} quedaron asignadas a su empresa.") : '';
         $asignadas .= $r['sinAsignar'] ? ' '.($r['sinAsignar'] === 1 ? 'Una quedó sin asignar: asígnala en Asignaciones.' : "{$r['sinAsignar']} quedaron sin asignar: asígnalas en Asignaciones.") : '';
 
-        return to_route('usuarios.index', ['acceso' => 'sin'])
-            ->with('success', 'Personal importado: '.implode(' y ', $partes).'.'.$asignadas.' Las personas nuevas tienen su carnet y no entran a la plataforma.');
+        return to_route('usuarios.index', $acceso ? [] : ['acceso' => 'sin'])
+            ->with('success', 'Personal importado: '.implode(' y ', $partes).'.'.$asignadas.($acceso
+                ? ' Las personas nuevas entran con su cédula, y su contraseña inicial es su cédula: la cambian al entrar.'
+                : ' Las personas nuevas tienen su carnet y no entran a la plataforma.'));
     }
 
     public function descartar(Request $request): RedirectResponse

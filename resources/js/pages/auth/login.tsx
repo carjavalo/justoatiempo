@@ -1,5 +1,5 @@
+import { LockKeyhole, UserRound } from '@/components/iconos';
 import { Head, useForm } from '@inertiajs/react';
-import { LockKeyhole, Mail } from '@/components/iconos';
 import { FormEventHandler } from 'react';
 
 import { BotonEnviar } from '@/components/boton-enviar';
@@ -48,7 +48,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
     return (
         <AuthLayout
             title="Inicia sesión"
-            description="Ingresa con el correo y la contraseña que te asignó el administrador."
+            description="Ingresa con tu correo o tu número de cédula y tu contraseña."
             volver={{ texto: 'Volver al sitio web', href: route('home') }}
         >
             <Head title="Iniciar sesión" />
@@ -58,18 +58,24 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
             <form className="flex flex-col gap-6" onSubmit={submit} noValidate>
                 <div className="grid gap-5">
                     <div className="grid gap-2">
-                        <Label htmlFor="email">Correo electrónico</Label>
+                        <Label htmlFor="email">Correo o cédula</Label>
                         <div className="relative">
-                            <Mail weight="bold" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
+                            <UserRound
+                                weight="bold"
+                                className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                                aria-hidden="true"
+                            />
                             <Input
                                 {...propsCampo('email', errors.email)}
-                                type="email"
+                                type="text"
                                 required
+                                autoCapitalize="none"
+                                spellCheck={false}
                                 autoFocus={!correo}
                                 autoComplete="username"
                                 value={data.email}
                                 onChange={(e) => setData('email', e.target.value)}
-                                placeholder="nombre@justoatiempo.com"
+                                placeholder="Tu correo o tu cédula"
                                 className="h-11 rounded-lg pl-9"
                             />
                         </div>
@@ -79,7 +85,11 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                     <div className="grid gap-2">
                         <Label htmlFor="password">Contraseña</Label>
                         <div className="relative">
-                            <LockKeyhole weight="bold" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" aria-hidden="true" />
+                            <LockKeyhole
+                                weight="bold"
+                                className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2"
+                                aria-hidden="true"
+                            />
                             <PasswordInput
                                 {...propsCampo('password', errors.password)}
                                 required
@@ -106,7 +116,11 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                         </Label>
                     </div>
 
-                    <BotonEnviar procesando={processing} textoProcesando="Ingresando…" className="mt-2 h-11 w-full rounded-lg text-[0.95rem] font-semibold">
+                    <BotonEnviar
+                        procesando={processing}
+                        textoProcesando="Ingresando…"
+                        className="mt-2 h-11 w-full rounded-lg text-[0.95rem] font-semibold"
+                    >
                         Ingresar
                     </BotonEnviar>
                 </div>

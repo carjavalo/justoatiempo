@@ -30,8 +30,10 @@ class ProfileUpdateRequest extends FormRequest
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
 
+            // Quien ingresa con su cédula puede no tener correo
             'email' => [
-                'required',
+                Rule::requiredIf(fn () => blank($this->user()->cedula)),
+                'nullable',
                 'string',
                 'lowercase',
                 'email',

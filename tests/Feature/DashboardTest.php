@@ -30,7 +30,7 @@ class DashboardTest extends TestCase
         // TuGo es sede de Ditranza, que recibe la línea logística
         $this->sede = $this->sede('TuGo');
         // Juan entra a la plataforma (ve su desempeño); Andrés es parte del personal sin acceso
-        $this->juan = User::factory()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza']);
+        $this->juan = User::factory()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'rol_id' => $this->rolConTablero()->id]);
         $this->andres = User::factory()->sinAcceso()->create(['cedula' => '222', 'nombres' => 'Andrés', 'primer_apellido' => 'Moreno', 'linea_servicio_id' => null]);
 
         // Ejemplo del SRS: 8 tareas, 5 aprobadas y 3 rechazadas => 62,5 %
@@ -100,11 +100,15 @@ class DashboardTest extends TestCase
     public function test_los_modulos_respetan_los_roles()
     {
         $auxiliar = User::factory()->create();
+        $conTablero = User::factory()->create(['rol_id' => $this->rolConTablero()->id]);
         $coordinador = User::factory()->coordinador()->create();
         $admin = User::factory()->admin()->create();
 
+        // El auxiliar operativo base solo tiene su carnet
         $this->actingAs($auxiliar)->get('/informes')->assertForbidden();
-        $this->actingAs($auxiliar)->get('/mis-entregas')->assertOk();
+        $this->actingAs($auxiliar)->get('/mis-entregas')->assertForbidden();
+        $this->actingAs($auxiliar)->get('/panel')->assertRedirect('/mi-carnet');
+        $this->actingAs($conTablero)->get('/mis-entregas')->assertOk();
         $this->actingAs($coordinador)->get('/auditoria')->assertOk();
         $this->actingAs($coordinador)->get('/vehiculos')->assertForbidden();
         $this->actingAs($admin)->get('/vehiculos')->assertOk();

@@ -68,7 +68,8 @@ class RolesTest extends TestCase
         $this->assertFalse($coordinador->permite('usuarios.ver'));
 
         $auxiliar = RolUsuario::base(Rol::Auxiliar);
-        $this->assertSame([Permisos::ALCANCE_PROPIO, ['tablero.ver', 'entregas.ver']], [$auxiliar->alcance, $auxiliar->permisos]);
+        // El auxiliar operativo solo ve su carnet
+        $this->assertSame([Permisos::ALCANCE_PROPIO, []], [$auxiliar->alcance, $auxiliar->permisos]);
 
         // Quien se crea con un nivel (p. ej. desde la consola) queda con su rol base
         $persona = User::factory()->coordinador()->create();
@@ -189,9 +190,9 @@ class RolesTest extends TestCase
         $conductor = $this->persona($this->rol(['tablero.ver'], Permisos::ALCANCE_PROPIO, 'Conductor'));
         $this->actingAs($conductor)->get('/panel')->assertRedirect('/lineas/logisticos');
 
+        // Sin módulos, su inicio es su carnet
         $visitante = $this->persona($this->rol([], Permisos::ALCANCE_PROPIO, 'Visitante'));
-        $this->actingAs($visitante)->get('/panel')
-            ->assertInertia(fn (Assert $p) => $p->component('panel')->where('asignacion.sinTablero', true));
+        $this->actingAs($visitante)->get('/panel')->assertRedirect('/mi-carnet');
         $this->actingAs($visitante)->get('/lineas/logisticos')->assertForbidden();
         $this->actingAs($visitante)->get('/mi-carnet')->assertOk();
     }

@@ -71,6 +71,8 @@ export interface User {
     lineas: { slug: string; nombre: string }[];
     /** Si tiene entregas de Drivin a su nombre: se le ofrece "Mis entregas". */
     entregas: boolean;
+    /** Si cambia sus nombres y su correo en "Mi cuenta" (quien ve solo lo suyo, solo su contraseña). */
+    editaPerfil: boolean;
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;

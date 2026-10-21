@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CerrarSesionInactiva;
+use App\Http\Middleware\ExigirCambioContrasena;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\TienePermiso;
 use App\Http\Middleware\VistaPreviaPublica;
@@ -32,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             VistaPreviaPublica::class,
             CerrarSesionInactiva::class,
+            ExigirCambioContrasena::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

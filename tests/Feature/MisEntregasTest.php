@@ -18,7 +18,7 @@ class MisEntregasTest extends TestCase
     public function test_el_auxiliar_ve_solo_sus_jornadas_y_el_detalle_de_sus_ordenes(): void
     {
         $tugo = $this->sede('TuGo');
-        $auxiliar = User::factory()->create(['cedula' => '1144203579']);
+        $auxiliar = User::factory()->create(['cedula' => '1144203579', 'rol_id' => $this->rolConTablero()->id]);
         $otro = User::factory()->create(['cedula' => '1111750549']);
         $carga = Carga::create(['archivo_nombre' => 'p.xlsx', 'archivo_path' => 'p', 'archivo_hash' => str_repeat('a', 64)]);
         $orden = fn (User $u, string $fecha, string $codigo, EstadoOrden $estado = EstadoOrden::Aprobada, array $datos = []) => Orden::create([

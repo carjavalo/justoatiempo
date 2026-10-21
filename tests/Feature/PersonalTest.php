@@ -15,6 +15,7 @@ use App\Models\Vehiculo;
 use App\Notifications\RestablecerContrasena;
 use App\Services\Drivin\GeneradorPreliquidacion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -66,9 +67,13 @@ class PersonalTest extends TestCase
         // Sin acceso, la cédula es obligatoria: es la que lo identifica
         $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '']))
             ->assertSessionHasErrors(['cedula' => 'Escribe la cédula: sin acceso a la plataforma, es la que identifica a la persona.']);
-        // Con acceso, correo y contraseña
-        $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '222333', 'acceso' => true]))
-            ->assertSessionHasErrors(['email', 'password']);
+        // Con acceso, sin cédula: correo y contraseña
+        $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '', 'acceso' => true]))
+            ->assertSessionHasErrors(['email' => 'Escribe el correo o la cédula: con uno de los dos entra a la plataforma.', 'password']);
+        // Con acceso y cédula, sin correo ni contraseña: entra con su cédula y esa es su contraseña inicial
+        $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '222333', 'acceso' => true]))->assertSessionHasNoErrors();
+        $nuevo = User::where('cedula', '222333')->sole();
+        $this->assertTrue($nuevo->acceso && $nuevo->debe_cambiar_contrasena && Hash::check('222333', $nuevo->password));
     }
 
     public function test_sin_acceso_no_ingresa_ni_recibe_una_contrasena(): void
@@ -100,10 +105,12 @@ class PersonalTest extends TestCase
         $this->actingAs($persona)->get('/panel')->assertRedirect('/login')
             ->assertSessionHas('status', 'Tu usuario ya no tiene acceso a la plataforma. Si crees que es un error, habla con el administrador.');
 
-        // Para devolvérselo, una contraseña nueva
+        // Al devolvérselo sin escribir una contraseña, vuelve a la inicial: su cédula
         $this->actingAs($this->admin)->put("/usuarios/{$persona->id}", $this->datos([
             'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'cedula' => '1144203579', 'email' => $persona->email, 'acceso' => true,
-        ]))->assertSessionHasErrors(['password' => 'Escribe la contraseña con la que entrará.']);
+        ]))->assertSessionHasNoErrors();
+        $persona->refresh();
+        $this->assertTrue($persona->acceso && $persona->debe_cambiar_contrasena && Hash::check('1144203579', $persona->password));
     }
 
     public function test_nadie_se_quita_su_propio_acceso(): void
@@ -204,10 +211,12 @@ class PersonalTest extends TestCase
         $this->assertFalse(User::where('cedula', '1061428366')->exists(), 'La revisión no registra a nadie');
 
         $token = pathinfo(Storage::files('importaciones')[0], PATHINFO_FILENAME);
-        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertRedirect('/usuarios?acceso=sin');
+        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertRedirect('/usuarios');
 
+        // Entran con su cédula, y su contraseña inicial es su cédula
         $cristian = User::where('cedula', '1061428366')->sole();
-        $this->assertSame(['Cristian Alejandro', 'Aponza', 'Mina', 'Auxiliar logístico', false, null], [$cristian->nombres, $cristian->primer_apellido, $cristian->segundo_apellido, $cristian->cargo, $cristian->acceso, $cristian->email]);
+        $this->assertSame(['Cristian Alejandro', 'Aponza', 'Mina', 'Auxiliar logístico', true, true, null], [$cristian->nombres, $cristian->primer_apellido, $cristian->segundo_apellido, $cristian->cargo, $cristian->acceso, $cristian->debe_cambiar_contrasena, $cristian->email]);
+        $this->assertTrue(Hash::check('1061428366', $cristian->password));
         // Asignada a Ditranza, con sus líneas, desde su ingreso
         $asignacion = $cristian->asignaciones()->with('lineas')->sole();
         $this->assertSame([$ditranza->id, '2026-03-10', [LineaServicio::logistica()->id]], [$asignacion->empresa_id, $asignacion->fecha_inicio->toDateString(), $asignacion->lineas->pluck('id')->all()]);

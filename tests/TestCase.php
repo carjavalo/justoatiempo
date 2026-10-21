@@ -7,6 +7,7 @@ use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\RolUsuario;
 use App\Models\Sede;
+use App\Support\Permisos;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
@@ -24,6 +25,12 @@ abstract class TestCase extends BaseTestCase
     protected function rolBase(Rol $nivel): int
     {
         return RolUsuario::base($nivel)->id;
+    }
+
+    /** Un rol "solo lo suyo" que además abre su tablero y Mis entregas (el auxiliar operativo base solo ve su carnet). */
+    protected function rolConTablero(): RolUsuario
+    {
+        return RolUsuario::firstOrCreate(['nombre' => 'Auxiliar con tablero'], ['permisos' => ['tablero.ver', 'entregas.ver'], 'alcance' => Permisos::ALCANCE_PROPIO, 'activo' => true]);
     }
 
     /** Sede (cliente de la empresa, como TuGo); por defecto, de Ditranza. */

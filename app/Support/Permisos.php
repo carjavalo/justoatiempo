@@ -191,7 +191,8 @@ final class Permisos
                 ]),
                 'alcance' => self::ALCANCE_ASIGNACION,
             ],
-            Rol::Auxiliar => ['permisos' => self::normalizar(['tablero.ver', 'entregas.ver'], self::ALCANCE_PROPIO), 'alcance' => self::ALCANCE_PROPIO],
+            // Entra solo a ver su carnet (sus datos): ningún módulo
+            Rol::Auxiliar => ['permisos' => [], 'alcance' => self::ALCANCE_PROPIO],
         };
     }
 
