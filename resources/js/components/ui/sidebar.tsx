@@ -434,7 +434,15 @@ const SidebarMenuButton = React.forwardRef<
 >(({ asChild = false, isActive = false, variant = 'default', size = 'default', tooltip, className, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
     const { isMobile, state } = useSidebar();
+    // El nombre (tooltip) solo se muestra con el menú contraído; expandido, el lector lo leería dos veces
+    const conTooltip = state === 'collapsed' && !isMobile;
     const [tooltipAbierto, setTooltipAbierto] = React.useState(false);
+    // Al contraer o expandir, ningún nombre queda abierto (si no, al contraer aparecían todos los que se habían señalado)
+    const [conTooltipAntes, setConTooltipAntes] = React.useState(conTooltip);
+    if (conTooltipAntes !== conTooltip) {
+        setConTooltipAntes(conTooltip);
+        setTooltipAbierto(false);
+    }
 
     const button = (
         <Comp
@@ -458,11 +466,9 @@ const SidebarMenuButton = React.forwardRef<
     }
 
     // Siempre el mismo árbol: si cambiara al contraer o expandir, el botón se volvería a crear y perdería el foco.
-    // El tooltip solo se abre con el menú contraído; expandido, el lector leería el nombre dos veces
-    const conTooltip = state === 'collapsed' && !isMobile;
-
+    // Expandido no se guarda que se señaló (no hay nada que mostrar)
     return (
-        <Tooltip open={conTooltip && tooltipAbierto} onOpenChange={setTooltipAbierto}>
+        <Tooltip open={conTooltip && tooltipAbierto} onOpenChange={(abierto) => setTooltipAbierto(conTooltip && abierto)}>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
             <TooltipContent side="right" align="center" {...tooltip} />
         </Tooltip>

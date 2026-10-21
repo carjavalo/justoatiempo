@@ -1,0 +1,1 @@
+import{j as o}from"./app-C0zOFj0_.js";import{c}from"./logo-marca-JBZItyFT.js";function m({message:r,className:t="",...n}){return r?o.jsx("p",{...n,className:c("text-critical text-sm",t),children:r}):null}export{m as I};
