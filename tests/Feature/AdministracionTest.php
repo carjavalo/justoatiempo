@@ -37,20 +37,28 @@ class AdministracionTest extends TestCase
         $this->assertNotNull($user->fresh()->ultimo_acceso_en);
     }
 
-    public function test_el_panel_del_administrador_muestra_las_cuatro_opciones_con_sus_conteos(): void
+    public function test_el_menu_del_administrador_agrupa_los_modulos_y_el_inicio_resume_el_dia(): void
     {
-        $sede = $this->sede('TuGo');
-        $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
-        Sucursal::create(['sede_id' => null, 'nombre' => 'Oficina Cali', 'ciudad' => 'Cali']);
+        $titulos = fn ($items) => collect($items)->pluck('titulo')->all();
 
         $this->actingAs($this->admin)->get('/panel')
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p->component('panel')
-                ->where('resumen.empresas.total', 1)
-                ->where('resumen.sedes.total', 1)
-                ->where('resumen.sucursales.total', 2)
-                ->where('resumen.sucursales.propias', 1)
-                ->where('resumen.usuarios.activos', 1));
+                ->where('menu', fn ($menu) => collect($menu)->pluck('titulo')->all() === [null, 'Operación', 'Personas', 'Clientes', 'Configuración'])
+                ->where('menu.0.items.0.titulo', 'Inicio')
+                ->where('menu.0.items.0.href', '/panel')
+                ->has('menu.1.items', 8)
+                ->where('menu.1.items.0.rutas', ['/lineas/logisticos', '/cargas', '/auditoria', '/evidencias', '/informes', '/seguimiento', '/mis-entregas'])
+                ->where('menu.2.items', fn ($items) => $titulos($items) === ['Usuarios', 'Asignaciones', 'Roles'])
+                ->where('menu.3.items', fn ($items) => $titulos($items) === ['Empresas', 'Sedes', 'Sucursales', 'Solicitudes'])
+                ->where('menu.4.items', fn ($items) => $titulos($items) === ['Líneas de servicio', 'Flota', 'Parámetros'])
+                // Sin empresas, lo primero es registrarlas
+                ->where('pendientes.0.clave', 'empezar')
+                ->has('lineas', 8));
+
+        $this->sede('TuGo');
+        $this->actingAs($this->admin)->get('/panel')
+            ->assertInertia(fn (Assert $p) => $p->where('pendientes', fn ($p) => ! collect($p)->contains('clave', 'empezar')));
     }
 
     public function test_quien_no_es_administrador_ve_su_asignacion_y_no_entra_a_los_modulos(): void

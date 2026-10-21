@@ -21,8 +21,8 @@ interface FilaLinea {
     descripcion: string | null;
     icono: string | null;
     activa: boolean;
-    /** Si ya tiene tablero propio (logística, con Drivin); las demás muestran sus empresas y su personal. */
-    tablero: boolean;
+    /** Si tiene las herramientas de Drivin (logística). Todas tienen tablero, programación e informe diario. */
+    drivin: boolean;
     empresas: number;
     personas: number;
     /** Si quien mira puede entrar a la página de la línea. */
@@ -98,7 +98,7 @@ export default function Servicios({ lineas }: Props) {
                                 Línea
                             </th>
                             <th scope="col" className={claseTh}>
-                                Tablero
+                                Herramientas
                             </th>
                             <th scope="col" className={claseTh}>
                                 Empresas
@@ -144,13 +144,8 @@ export default function Servicios({ lineas }: Props) {
                                         </div>
                                     </th>
                                     <td className={claseTd}>
-                                        <span
-                                            className={cn(
-                                                'rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
-                                                l.tablero ? 'bg-good-soft text-good' : 'bg-muted text-muted-foreground',
-                                            )}
-                                        >
-                                            {l.tablero ? 'Tablero activo' : 'Tablero por definir'}
+                                        <span className="text-muted-foreground text-xs">
+                                            {l.drivin ? 'Drivin, auditoría e informe' : 'Programación, novedades e informe'}
                                         </span>
                                     </td>
                                     <td className={claseTd}>
@@ -177,9 +172,9 @@ export default function Servicios({ lineas }: Props) {
                                         <AccionesFila
                                             nombre={l.nombre}
                                             activo={l.activa}
-                                            // La línea con tablero propio (logística) no se desactiva: de ella dependen sus herramientas
+                                            // Logística no se desactiva: de ella dependen las herramientas de Drivin
                                             urlEstado={
-                                                puede('servicios.estado') && !(l.tablero && l.activa) ? route('servicios.estado', l.id) : undefined
+                                                puede('servicios.estado') && !(l.drivin && l.activa) ? route('servicios.estado', l.id) : undefined
                                             }
                                             onEditar={puede('servicios.editar') ? (boton) => abrir(l, boton) : undefined}
                                             consecuencia="Ya no se ofrecerá al marcar las líneas de una empresa ni al crear asignaciones. Las empresas que la reciben la conservan y su historial se mantiene. Si alguien tiene una asignación vigente o por empezar en ella, primero hay que terminarla."
@@ -213,7 +208,7 @@ export default function Servicios({ lineas }: Props) {
                 descripcion={
                     editando
                         ? 'El nombre nuevo se verá en toda la plataforma y en los carnets; la dirección de su página no cambia.'
-                        : 'Empieza sin tablero propio: su página muestra las empresas que la reciben y su personal.'
+                        : 'Nace con su tablero, su programación diaria, sus novedades y su informe diario.'
                 }
                 onEnviar={guardar}
                 procesando={form.processing}

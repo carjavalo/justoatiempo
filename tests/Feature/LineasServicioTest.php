@@ -67,11 +67,9 @@ class LineasServicioTest extends TestCase
         $this->actingAs($this->admin)->get('/panel')
             ->assertInertia(fn (Assert $p) => $p->has('lineas', 8)
                 ->where('lineas.0.slug', 'logisticos')
-                ->where('lineas.0.tablero', true)
                 ->where('lineas.0.empresas', 1)
                 ->where('lineas.0.personas', 1)
                 ->where('lineas.2.slug', 'aseo-general')
-                ->where('lineas.2.tablero', false)
                 ->where('lineas.2.empresas', 1));
     }
 
@@ -107,7 +105,7 @@ class LineasServicioTest extends TestCase
         $this->actingAs($this->admin)->get('/indicadores')->assertRedirect('/lineas/logisticos');
     }
 
-    public function test_una_linea_sin_tablero_muestra_sus_empresas_y_su_personal(): void
+    public function test_el_tablero_de_una_linea_sin_drivin_muestra_sus_empresas_y_su_personal(): void
     {
         $empresa = Empresa::create(['nombre' => 'Bodegas del Valle']);
         $empresa->lineas()->attach($this->aseo);

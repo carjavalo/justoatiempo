@@ -13,8 +13,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Las líneas de servicio de Justo a Tiempo: las 8 del portafolio y las que se creen. Una línea nueva empieza sin
- * tablero (muestra sus empresas y su personal) y se ofrece en las empresas y en las asignaciones mientras esté activa.
+ * Las líneas de servicio de Justo a Tiempo: las 8 del portafolio y las que se creen. Una línea nueva nace con su
+ * tablero, su programación, sus novedades y su informe diario, y se ofrece en las empresas y en las asignaciones
+ * mientras esté activa.
  */
 class LineaServicioController extends Controller
 {
@@ -38,7 +39,8 @@ class LineaServicioController extends Controller
                 'descripcion' => $l->descripcion,
                 'icono' => $l->icono,
                 'activa' => $l->activa,
-                'tablero' => $l->modulo !== null,
+                // Logística, con las herramientas de Drivin
+                'drivin' => $l->modulo !== null,
                 'empresas' => $l->empresas_count,
                 'personas' => $l->personas_count,
                 'verLinea' => $user->puedeVerLinea($l),

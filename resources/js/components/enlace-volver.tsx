@@ -4,7 +4,7 @@ import { type Volver } from '@/types';
 import { Link } from '@inertiajs/react';
 
 /**
- * Regreso al nivel anterior: flecha y destino escritos ("Volver al panel"), para que nadie dependa
+ * Regreso al nivel anterior: flecha y destino escritos ("Volver al inicio"), para que nadie dependa
  * del botón Atrás del navegador ni adivine a dónde lleva. Es el único acceso a ese nivel en la
  * pantalla: no se repite en migas ni en la marca.
  */

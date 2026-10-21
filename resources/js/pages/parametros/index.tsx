@@ -1,10 +1,10 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
+import { OpcionesRadio } from '@/components/admin/opciones-radio';
 import { claseTd, claseTh, contenedorModulo, EncabezadoModulo, EstadoBadge, Tabla } from '@/components/admin/piezas';
 import { BotonEnviar } from '@/components/boton-enviar';
 import { Award, ClipboardCheck, PackageX, Plus, type TipoIcono } from '@/components/iconos';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePuede } from '@/hooks/use-puede';
@@ -489,69 +489,12 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
         </>
     );
 }
-
-/** Opciones con su explicación, como tarjetas de radio (el primero lleva el id del campo para el foco del error). */
-function GrupoOpciones<T extends string>({
-    id,
-    etiqueta,
-    valor,
-    onCambio,
-    opciones,
-    error,
-}: {
-    id: string;
-    etiqueta: string;
-    valor: T | '';
-    onCambio: (v: T) => void;
-    opciones: { valor: T; texto: string; ayuda: string; marca?: string }[];
-    error?: string;
-}) {
-    return (
-        <fieldset className="grid gap-2" aria-describedby={error ? `${id}-error` : undefined}>
-            <legend className="mb-1.5 text-sm leading-none font-medium">
-                {etiqueta} <span aria-hidden="true">*</span>
-            </legend>
-            {opciones.map((o, i) => {
-                const elegido = valor === o.valor;
-                const idOpcion = i === 0 ? id : `${id}-${o.valor}`;
-                return (
-                    <label
-                        key={o.valor}
-                        htmlFor={idOpcion}
-                        className={cn(
-                            'has-[:focus-visible]:border-ring has-[:focus-visible]:ring-ring/25 flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-[color,border-color,box-shadow] has-[:focus-visible]:ring-[3px]',
-                            elegido ? 'border-primary bg-secondary/60' : 'hover:bg-muted/60',
-                        )}
-                    >
-                        <input
-                            id={idOpcion}
-                            type="radio"
-                            name={id}
-                            value={o.valor}
-                            checked={elegido}
-                            onChange={() => onCambio(o.valor)}
-                            aria-invalid={error ? true : undefined}
-                            className="accent-primary mt-0.5 size-4 shrink-0"
-                        />
-                        <span className="grid gap-0.5">
-                            <span className="flex items-center gap-2 text-sm font-semibold">
-                                {o.marca && <span className={cn('size-2 rounded-full', o.marca)} aria-hidden="true" />}
-                                {o.texto}
-                            </span>
-                            <span className="text-muted-foreground text-xs">{o.ayuda}</span>
-                        </span>
-                    </label>
-                );
-            })}
-            <InputError id={`${id}-error`} message={error} />
-        </fieldset>
-    );
-}
-
 function OpcionesSeveridad({ valor, onCambio, error }: { valor: Severidad | ''; onCambio: (v: Severidad) => void; error?: string }) {
     const marcas: Record<Severidad, string> = { ninguna: 'bg-good', leve: 'bg-warning', grave: 'bg-critical' };
     return (
-        <GrupoOpciones
+        <OpcionesRadio
+            variante="tarjeta"
+            requerido
             id="severidad"
             etiqueta="Gravedad"
             valor={valor}
@@ -564,7 +507,9 @@ function OpcionesSeveridad({ valor, onCambio, error }: { valor: Severidad | ''; 
 
 function OpcionesResponsable({ valor, onCambio, error }: { valor: boolean; onCambio: (v: boolean) => void; error?: string }) {
     return (
-        <GrupoOpciones
+        <OpcionesRadio
+            variante="tarjeta"
+            requerido
             id="imputable"
             etiqueta="¿De quién depende?"
             valor={valor ? 'si' : 'no'}

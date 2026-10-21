@@ -56,9 +56,9 @@ class LineasAdministracionTest extends TestCase
                 ->has('lineas', 8)
                 ->where('lineas.0.slug', 'logisticos')
                 ->where('lineas.0.icono', 'logistica')
-                ->where('lineas.0.tablero', true)
+                ->where('lineas.0.drivin', true)
                 ->where('lineas.2.slug', 'aseo-general')
-                ->where('lineas.2.tablero', false)
+                ->where('lineas.2.drivin', false)
                 ->where('lineas.2.empresas', 1)
                 ->where('lineas.2.personas', 1)
                 ->where('lineas.2.verLinea', true));

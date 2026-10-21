@@ -194,7 +194,7 @@ class User extends Authenticatable
     /** @return Collection<int, Asignacion> Sus asignaciones vigentes, con sus líneas y lugares (se cargan una vez). */
     public function vigentes(): Collection
     {
-        return $this->loadMissing(['asignacionesVigentes.lineas:id,slug,nombre,modulo,orden', 'asignacionesVigentes.empresa:id,nombre', 'asignacionesVigentes.sede:id,nombre', 'asignacionesVigentes.sucursal:id,nombre'])
+        return $this->loadMissing(['asignacionesVigentes.lineas:id,slug,nombre,icono,modulo,orden,activa', 'asignacionesVigentes.empresa:id,nombre', 'asignacionesVigentes.sede:id,nombre', 'asignacionesVigentes.sucursal:id,nombre'])
             ->asignacionesVigentes;
     }
 
@@ -208,6 +208,19 @@ class User extends Authenticatable
     public function lineas(): SupportCollection
     {
         return $this->vigentes()->flatMap(fn (Asignacion $a) => $a->lineas)->unique('id')->sortBy('orden')->values();
+    }
+
+    /**
+     * Las líneas que ve: todas las activas, si su rol las ve todas (y abre su tablero), o aquellas en las que trabaja
+     * y cuyo tablero su rol abre. Las usan el panel, el menú y su inicio.
+     *
+     * @return SupportCollection<int, LineaServicio>
+     */
+    public function lineasVisibles(): SupportCollection
+    {
+        return $this->puede(Permisos::TODAS_LAS_LINEAS) && $this->puede('tablero.ver')
+            ? LineaServicio::activas()->ordenadas()->get()
+            : $this->lineas()->filter(fn (LineaServicio $l) => $l->activa && $this->puedeVerLinea($l))->values();
     }
 
     /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con sus permisos en la plataforma. */
@@ -363,16 +376,16 @@ class User extends Authenticatable
      * Página de inicio: el panel si administra algo, ve todas las líneas o trabaja en varias; si trabaja en una sola
      * (y su rol abre su tablero), esa línea.
      */
-    public function inicio(): array
+    public function inicio(?SupportCollection $lineas = null): array
     {
-        $lineas = $this->lineas()->filter(fn (LineaServicio $l) => $this->puedeVerLinea($l));
+        $lineas ??= $this->lineasVisibles();
         if (! $this->administraAlgo() && ! $this->puede(Permisos::TODAS_LAS_LINEAS) && $lineas->count() === 1) {
             $linea = $lineas->first();
 
             return ['titulo' => $linea->nombre, 'volver' => "Volver a {$linea->nombre}", 'url' => route('lineas.show', $linea, false)];
         }
 
-        return ['titulo' => 'Panel', 'volver' => 'Volver al panel', 'url' => route('panel', [], false)];
+        return ['titulo' => 'Inicio', 'volver' => 'Volver al inicio', 'url' => route('panel', [], false)];
     }
 
     /**
@@ -451,6 +464,17 @@ class User extends Authenticatable
         }
 
         return null;
+    }
+
+    /**
+     * Personas activas sin asignación actual (ni vigente ni programada). No cuenta a quien ve toda la operación
+     * (administración, gerencia): no presta el servicio en un lugar.
+     */
+    public function scopeSinAsignacion(Builder $consulta): Builder
+    {
+        return $consulta->where('users.activo', true)
+            ->whereDoesntHave('asignaciones', fn (Builder $a) => $a->actuales())
+            ->whereDoesntHave('rolUsuario', fn (Builder $r) => $r->where('alcance', Permisos::ALCANCE_TODO));
     }
 
     /** Solo los usuarios que entran en lo que ve (ver alcanza). */

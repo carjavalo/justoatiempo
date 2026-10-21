@@ -229,7 +229,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     const tarjetas: { id: string; titulo: string; valor: number; estado?: string; detalle: string }[] = [
         { id: 'vigentes', titulo: 'Vigentes', valor: resumen.vigentes, estado: 'vigentes', detalle: 'En curso hoy' },
         { id: 'programadas', titulo: 'Programadas', valor: resumen.programadas, estado: 'programadas', detalle: 'Empiezan más adelante' },
-        { id: 'pronto', titulo: 'Terminan esta semana', valor: resumen.terminanPronto, detalle: 'En los próximos 7 días' },
+        { id: 'pronto', titulo: 'Terminan esta semana', valor: resumen.terminanPronto, estado: 'terminan', detalle: 'En los próximos 7 días' },
         { id: 'sin', titulo: 'Sin asignación', valor: resumen.sinAsignacion, estado: 'sin', detalle: 'Personas activas sin dónde trabajar hoy' },
     ];
 
@@ -244,7 +244,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                     accion={puede('asignaciones.crear') && opciones.personas.length > 0 && botonNueva}
                 />
 
-                {/* Resumen: cada cifra filtra la lista (salvo "terminan esta semana", que es solo un aviso) */}
+                {/* Resumen: cada cifra filtra la lista */}
                 <ul role="list" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {tarjetas.map((t) => {
                         const activa = t.estado !== undefined && valores.estado === t.estado;
@@ -310,6 +310,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                             { valor: '', texto: 'Vigentes y programadas' },
                             { valor: 'vigentes', texto: 'Solo vigentes' },
                             { valor: 'programadas', texto: 'Solo programadas' },
+                            { valor: 'terminan', texto: 'Terminan esta semana' },
                             { valor: 'terminadas', texto: 'Terminadas' },
                             { valor: 'sin', texto: 'Personas sin asignación' },
                         ]}

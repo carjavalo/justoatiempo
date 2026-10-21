@@ -16,10 +16,13 @@ use App\Http\Controllers\CargaController;
 use App\Http\Controllers\CarnetController;
 use App\Http\Controllers\ContactoController;
 use App\Http\Controllers\InformeController;
+use App\Http\Controllers\InformeLineaController;
 use App\Http\Controllers\LineaController;
 use App\Http\Controllers\MiCarnetController;
 use App\Http\Controllers\MisEntregasController;
+use App\Http\Controllers\NovedadController;
 use App\Http\Controllers\PanelController;
+use App\Http\Controllers\ProgramacionController;
 use App\Http\Controllers\SeguimientoController;
 use App\Models\LineaServicio;
 use Illuminate\Support\Facades\Route;
@@ -108,17 +111,6 @@ Route::middleware(['auth'])->group(function () {
     // Enlaces guardados del tablero anterior
     Route::get('indicadores', fn () => redirect()->route('lineas.show', LineaServicio::logistica()));
 
-    /*
-     * Módulos en construcción: cada ruta ya existe con su control de acceso
-     * y muestra una vista "próximamente" hasta que se implemente.
-     */
-    $modulo = fn (string $clave, string $titulo, string $descripcion, array $requisitos) => fn () => Inertia::render('modulo-pendiente', [
-        'clave' => $clave,
-        'titulo' => $titulo,
-        'descripcion' => $descripcion,
-        'requisitos' => $requisitos,
-    ]);
-
     // El historial de entregas de quien hace las rutas
     Route::get('mis-entregas', MisEntregasController::class)->middleware('permiso:entregas.ver')->name('mis-entregas');
 
@@ -155,8 +147,28 @@ Route::middleware(['auth'])->group(function () {
     Route::get('seguimiento', [SeguimientoController::class, 'index'])->middleware('permiso:seguimiento.ver')->name('seguimiento.index');
     Route::post('seguimiento/acciones', [SeguimientoController::class, 'registrar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.registrar');
     Route::delete('seguimiento/acciones/{accion}', [SeguimientoController::class, 'eliminar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.eliminar');
-    Route::get('programacion', $modulo('programacion', 'Programación diaria', 'Auxiliares y vehículos requeridos por sede, sucursal y fecha.', ['RF-02']))
-        ->middleware('permiso:programacion.ver')->name('programacion.index');
+
+    // La operación diaria de cada línea de servicio: programación y asistencia, novedades y seguimiento, e informe
+    // diario (el de logística es el de Drivin). Su permiso le aplica en las líneas donde trabaja: ver App\Support\OperacionLinea
+    Route::get('lineas/{linea}/programacion', [ProgramacionController::class, 'index'])->middleware('permiso:programacion.ver')->name('programacion.index');
+    Route::middleware('permiso:programacion.editar')->group(function () {
+        Route::post('lineas/{linea}/programacion', [ProgramacionController::class, 'store'])->name('programacion.store');
+        Route::post('lineas/{linea}/programacion/copiar', [ProgramacionController::class, 'copiar'])->name('programacion.copiar');
+        Route::put('programacion/{programacion}', [ProgramacionController::class, 'update'])->name('programacion.update');
+        Route::delete('programacion/{programacion}', [ProgramacionController::class, 'destroy'])->name('programacion.destroy');
+        Route::post('programacion/{programacion}/personas', [ProgramacionController::class, 'agregarPersonas'])->name('programacion.personas.store');
+        Route::patch('programacion/personas/{fila}', [ProgramacionController::class, 'actualizarPersona'])->name('programacion.personas.update');
+        Route::delete('programacion/personas/{fila}', [ProgramacionController::class, 'quitarPersona'])->name('programacion.personas.destroy');
+    });
+    Route::middleware('permiso:programacion.asistencia')->group(function () {
+        Route::patch('programacion/personas/{fila}/asistencia', [ProgramacionController::class, 'asistencia'])->name('programacion.asistencia');
+        Route::post('programacion/{programacion}/asistencia', [ProgramacionController::class, 'asistenciaTodos'])->name('programacion.asistencia.todos');
+    });
+    Route::get('lineas/{linea}/novedades', [NovedadController::class, 'index'])->middleware('permiso:novedades.ver')->name('novedades.index');
+    Route::post('lineas/{linea}/novedades', [NovedadController::class, 'store'])->middleware('permiso:novedades.registrar')->name('novedades.store');
+    Route::patch('novedades/{novedad}', [NovedadController::class, 'seguimiento'])->middleware('permiso:novedades.cerrar')->name('novedades.seguimiento');
+    Route::get('lineas/{linea}/informe', [InformeLineaController::class, 'index'])->middleware('permiso:informes.ver')->name('lineas.informe');
+    Route::get('lineas/{linea}/informe/descargar', [InformeLineaController::class, 'descargar'])->middleware('permiso:informes.descargar')->name('lineas.informe.descargar');
 
     // Datos maestros. El personal (auxiliares, conductores, operarios) está en Usuarios
     Route::get('vehiculos', [VehiculoController::class, 'index'])->middleware('permiso:vehiculos.ver')->name('vehiculos.index');

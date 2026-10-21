@@ -58,6 +58,7 @@ import {
     HardHatIcon,
     HeartbeatIcon,
     HouseLineIcon,
+    HouseSimpleIcon,
     type Icon as IconoPhosphor,
     type IconProps,
     type IconWeight,
@@ -172,6 +173,7 @@ export const KeyRound = icono(KeyIcon, 'concepto', 'KeyRound');
 export const Landmark = icono(BankIcon, 'concepto', 'Landmark');
 export const Layers = icono(StackIcon, 'concepto', 'Layers');
 export const LayoutGrid = icono(SquaresFourIcon, 'concepto', 'LayoutGrid');
+export const Inicio = icono(HouseSimpleIcon, 'concepto', 'Inicio');
 export const Lightbulb = icono(LightbulbIcon, 'concepto', 'Lightbulb');
 export const Lock = icono(LockIcon, 'concepto', 'Lock');
 export const LockKeyhole = icono(LockKeyIcon, 'concepto', 'LockKeyhole');

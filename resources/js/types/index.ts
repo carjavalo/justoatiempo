@@ -24,10 +24,33 @@ export interface Paginado<T> {
     next_page_url: string | null;
 }
 
+/** Una opción del menú lateral (App\Support\Menu). */
+export interface ItemMenu {
+    titulo: string;
+    href: string;
+    /** Clave del ícono del módulo; en las líneas, la clave de su ícono de línea. */
+    icono: string | null;
+    /** Slug de la línea de servicio (las opciones de "Operación"). */
+    linea: string | null;
+    /** Direcciones en las que la opción queda marcada (y lo que cuelga de ellas). */
+    rutas: string[];
+    /** Pendientes por atender (p. ej. solicitudes). */
+    contador: number | null;
+}
+
+export interface GrupoMenu {
+    titulo: string | null;
+    items: ItemMenu[];
+}
+
 export interface SharedData {
     name: string;
     auth: Auth;
     flash: { success?: string | null; error?: string | null };
+    /** El menú lateral; null con una sola opción (quien trabaja en una sola línea navega con sus pestañas). */
+    menu: GrupoMenu[] | null;
+    /** Si el menú quedó abierto (o contraído a íconos) la última vez. */
+    menuAbierto: boolean;
     [key: string]: unknown;
 }
 

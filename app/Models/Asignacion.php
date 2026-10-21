@@ -71,6 +71,18 @@ class Asignacion extends Model
             ->where(fn (Builder $w) => $w->whereNull('asignaciones.fecha_fin')->orWhereDate('asignaciones.fecha_fin', '>=', $fecha));
     }
 
+    /** Las actuales: las que no han terminado (vigentes y programadas). */
+    public function scopeActuales(Builder $q): Builder
+    {
+        return $q->where(fn (Builder $w) => $w->whereNull('asignaciones.fecha_fin')->orWhereDate('asignaciones.fecha_fin', '>=', today()->toDateString()));
+    }
+
+    /** Las vigentes que terminan en los próximos 7 días. */
+    public function scopeTerminanPronto(Builder $q): Builder
+    {
+        return $q->vigentes()->whereNotNull('asignaciones.fecha_fin')->whereDate('asignaciones.fecha_fin', '<=', today()->addDays(7)->toDateString());
+    }
+
     public function scopeProgramadas(Builder $q): Builder
     {
         return $q->whereDate('asignaciones.fecha_inicio', '>', today()->toDateString());

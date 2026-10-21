@@ -20,7 +20,7 @@ class NavegacionTest extends TestCase
     public function test_cada_quien_sabe_a_donde_vuelve(): void
     {
         $this->actingAs(User::factory()->admin()->create())->get('/empresas')
-            ->assertInertia(fn (Assert $p) => $p->where('auth.user.inicio.volver', 'Volver al panel')->where('auth.user.inicio.url', '/panel'));
+            ->assertInertia(fn (Assert $p) => $p->where('auth.user.inicio.volver', 'Volver al inicio')->where('auth.user.inicio.url', '/panel'));
 
         $this->actingAs(User::factory()->coordinador()->create())->get('/settings/profile')
             ->assertInertia(fn (Assert $p) => $p->where('auth.user.inicio.volver', 'Volver a '.LineaServicio::logistica()->nombre));
@@ -55,7 +55,7 @@ class NavegacionTest extends TestCase
 
         $this->get('/usuario-mal-escrito')
             ->assertNotFound()
-            ->assertInertia(fn (Assert $p) => $p->component('error')->where('publico', false)->where('volver', ['texto' => 'Volver al panel', 'href' => '/panel']));
+            ->assertInertia(fn (Assert $p) => $p->component('error')->where('publico', false)->where('volver', ['texto' => 'Volver al inicio', 'href' => '/panel']));
     }
 
     public function test_la_sesion_vencida_vuelve_a_la_pagina_con_un_aviso(): void

@@ -67,7 +67,7 @@ final class Permisos
             'clave' => 'personal',
             'titulo' => 'Lo personal',
             'modulos' => [
-                'entregas' => ['titulo' => 'Mis entregas', 'descripcion' => 'Su historial de entregas y su efectividad.', 'acciones' => ['ver' => 'Ver'], 'pendiente' => true],
+                'entregas' => ['titulo' => 'Mis entregas', 'descripcion' => 'Su historial de entregas de Drivin, jornada por jornada, con su cumplimiento y sus evidencias.', 'acciones' => ['ver' => 'Ver']],
             ],
         ],
     ];

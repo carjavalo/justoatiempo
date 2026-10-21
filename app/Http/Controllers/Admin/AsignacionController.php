@@ -32,7 +32,7 @@ class AsignacionController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'empresa' => ['nullable', 'integer'],
             'linea' => ['nullable', 'integer'],
-            'estado' => ['nullable', Rule::in(['vigentes', 'programadas', 'terminadas', 'sin'])],
+            'estado' => ['nullable', Rule::in(['vigentes', 'programadas', 'terminan', 'terminadas', 'sin'])],
             'usuario' => ['nullable', 'integer'],
         ]);
         $yo = $request->user();
@@ -44,12 +44,13 @@ class AsignacionController extends Controller
             ->tap(fn (Builder $a) => match ($estado) {
                 'vigentes' => $a->vigentes(),
                 'programadas' => $a->programadas(),
+                'terminan' => $a->terminanPronto(),
                 'terminadas' => $a->terminadas(),
-                default => $a->where(fn (Builder $w) => $w->whereNull('asignaciones.fecha_fin')->orWhereDate('asignaciones.fecha_fin', '>=', today()->toDateString())),
+                default => $a->actuales(),
             })
             ->when($filtros['empresa'] ?? null, fn (Builder $a, int $id) => $a->where('asignaciones.empresa_id', $id))
             ->when($filtros['linea'] ?? null, fn (Builder $a, int $id) => $a->whereHas('lineas', fn ($l) => $l->whereKey($id)));
-        $actuales = fn (Builder $q) => $q->where(fn (Builder $w) => $w->whereNull('asignaciones.fecha_fin')->orWhereDate('asignaciones.fecha_fin', '>=', today()->toDateString()));
+        $actuales = fn (Builder $q) => $q->actuales();
 
         $personas = User::query()
             ->alcanceDe($yo)
@@ -61,8 +62,8 @@ class AsignacionController extends Controller
             ->when($filtros['usuario'] ?? null, fn (Builder $q, int $id) => $q->whereKey($id))
             ->when(
                 $estado === 'sin',
-                // Personas activas que hoy no tienen dónde prestar el servicio
-                fn (Builder $q) => $q->where('activo', true)->whereDoesntHave('asignaciones', $actuales),
+                // Personas activas que hoy no tienen dónde prestar el servicio (el mismo criterio del aviso del inicio)
+                fn (Builder $q) => $q->sinAsignacion(),
                 fn (Builder $q) => $q->when(! ($filtros['usuario'] ?? null), fn ($p) => $p->whereHas('asignaciones', $deLaLista)),
             )
             ->with(['asignaciones' => fn ($q) => $deLaLista($q)
@@ -113,7 +114,7 @@ class AsignacionController extends Controller
                 'vigentes' => $visibles->filter(fn (Asignacion $a) => $a->estado() === 'vigente')->count(),
                 'programadas' => $visibles->filter(fn (Asignacion $a) => $a->estado() === 'programada')->count(),
                 'terminanPronto' => $visibles->filter(fn (Asignacion $a) => $a->estado() === 'vigente' && $a->fecha_fin && $a->fecha_fin->lte(today()->addDays(7)))->count(),
-                'sinAsignacion' => User::query()->alcanceDe($yo)->where('activo', true)->whereDoesntHave('asignaciones', $actuales)->count(),
+                'sinAsignacion' => User::query()->alcanceDe($yo)->sinAsignacion()->count(),
             ],
             // Para el formulario: solo lo que quien asigna puede elegir
             'opciones' => [

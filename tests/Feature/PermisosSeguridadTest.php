@@ -128,7 +128,10 @@ class PermisosSeguridadTest extends TestCase
         // Los módulos que reúnen a todas las empresas no se le abren
         $this->actingAs($talento)->get('/roles')->assertForbidden();
         $this->actingAs($talento)->get('/empresas')->assertForbidden();
-        $this->actingAs($talento)->get('/panel')->assertInertia(fn (Assert $p) => $p->where('resumen.usuarios.total', 3)->missing('resumen.roles'));
+        // Su menú: solo lo que su rol abre (sin roles ni empresas)
+        $this->actingAs($talento)->get('/panel')->assertInertia(fn (Assert $p) => $p
+            ->where('menu', fn ($menu) => collect($menu)->flatMap(fn ($g) => collect($g['items'])->pluck('titulo'))->intersect(['Roles', 'Empresas'])->isEmpty())
+            ->where('menu', fn ($menu) => collect($menu)->flatMap(fn ($g) => collect($g['items'])->pluck('titulo'))->contains('Usuarios')));
     }
 
     public function test_solo_lo_suyo_no_abre_la_operacion_de_los_demas(): void

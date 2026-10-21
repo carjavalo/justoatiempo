@@ -40,6 +40,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // o su línea. Es lo que ve quien vuelve con «Atrás» al inicio de sesión (ver resources/js/lib/sesion.ts).
         $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->inicio()['url'] ?? '/panel');
 
+        // El navegador guarda si el menú lateral está contraído: el servidor lo lee para no hacerlo saltar al cargar
+        $middleware->encryptCookies(except: ['menu_lateral']);
+
         // Cada sección pide un permiso del rol de la persona (App\Support\Permisos)
         $middleware->alias([
             'permiso' => TienePermiso::class,

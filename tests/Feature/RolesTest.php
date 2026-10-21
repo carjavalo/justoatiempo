@@ -172,12 +172,14 @@ class RolesTest extends TestCase
         $this->actingAs($consulta)->get('/empresas')
             ->assertInertia(fn (Assert $p) => $p->component('error')->where('mensaje', 'Tu rol no tiene permiso para entrar a esta sección.'));
 
-        // Su panel muestra solo lo suyo, y las pantallas reciben sus permisos
+        // Su inicio y su menú muestran solo lo suyo, y las pantallas reciben sus permisos
         $this->actingAs($consulta)->get('/panel')
             ->assertInertia(fn (Assert $p) => $p->component('panel')
-                ->has('resumen.usuarios')
-                ->missing('resumen.empresas')
-                ->missing('resumen.roles')
+                ->where('menu', [
+                    ['titulo' => null, 'items' => [['titulo' => 'Inicio', 'href' => '/panel', 'icono' => 'inicio', 'linea' => null, 'rutas' => ['/panel'], 'contador' => null]]],
+                    ['titulo' => 'Personas', 'items' => [['titulo' => 'Usuarios', 'href' => '/usuarios', 'icono' => 'usuarios', 'linea' => null, 'rutas' => ['/usuarios'], 'contador' => null]]],
+                ])
+                ->where('pendientes', [])
                 ->where('lineas', [])
                 ->where('auth.permisos', ['usuarios.ver', 'usuarios.crear']));
     }

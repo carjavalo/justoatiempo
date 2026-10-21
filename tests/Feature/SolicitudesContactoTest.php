@@ -178,7 +178,8 @@ class SolicitudesContactoTest extends TestCase
         SolicitudContacto::create([...collect($this->datos())->except(['autoriza_datos', 'sitio_web'])->all(), 'atendida' => true]);
 
         $this->actingAs($admin)->get('/panel')->assertInertia(fn (Assert $p) => $p
-            ->where('resumen.solicitudes.total', 2)
-            ->where('resumen.solicitudes.pendientes', 1));
+            // En el inicio, lo que pide atención; en el menú, el contador
+            ->where('pendientes', fn ($p) => collect($p)->firstWhere('clave', 'solicitudes')['texto'] === '1 solicitud de cotización sin atender')
+            ->where('menu', fn ($menu) => collect($menu)->flatMap(fn ($g) => $g['items'])->firstWhere('titulo', 'Solicitudes')['contador'] === 1));
     }
 }

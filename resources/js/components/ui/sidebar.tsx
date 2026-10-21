@@ -6,15 +6,16 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
-const SIDEBAR_COOKIE_NAME = 'sidebar:state';
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = '16rem';
+// El servidor la lee (sin cifrar, ver bootstrap/app.php) para dibujar el menú abierto o contraído desde el inicio
+const SIDEBAR_COOKIE_NAME = 'menu_lateral';
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+const SIDEBAR_WIDTH = '17rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
@@ -175,6 +176,7 @@ const Sidebar = React.forwardRef<
                     side={side}
                 >
                     <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+                    <SheetDescription className="sr-only">Las secciones de la plataforma que tu rol abre.</SheetDescription>
                     <div className="flex h-full w-full flex-col">{children}</div>
                 </SheetContent>
             </Sheet>
@@ -432,6 +434,7 @@ const SidebarMenuButton = React.forwardRef<
 >(({ asChild = false, isActive = false, variant = 'default', size = 'default', tooltip, className, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
     const { isMobile, state } = useSidebar();
+    const [tooltipAbierto, setTooltipAbierto] = React.useState(false);
 
     const button = (
         <Comp
@@ -444,8 +447,7 @@ const SidebarMenuButton = React.forwardRef<
         />
     );
 
-    // El tooltip solo aporta con el menú colapsado; expandido, el lector leería el nombre dos veces
-    if (!tooltip || state !== 'collapsed' || isMobile) {
+    if (!tooltip) {
         return button;
     }
 
@@ -455,8 +457,12 @@ const SidebarMenuButton = React.forwardRef<
         };
     }
 
+    // Siempre el mismo árbol: si cambiara al contraer o expandir, el botón se volvería a crear y perdería el foco.
+    // El tooltip solo se abre con el menú contraído; expandido, el lector leería el nombre dos veces
+    const conTooltip = state === 'collapsed' && !isMobile;
+
     return (
-        <Tooltip>
+        <Tooltip open={conTooltip && tooltipAbierto} onOpenChange={setTooltipAbierto}>
             <TooltipTrigger asChild>{button}</TooltipTrigger>
             <TooltipContent side="right" align="center" {...tooltip} />
         </Tooltip>

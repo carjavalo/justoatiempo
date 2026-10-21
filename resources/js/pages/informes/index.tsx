@@ -3,8 +3,6 @@ import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/
 import {
     CalendarDays,
     CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
     ClipboardCheck,
     Download,
     EnRevision,
@@ -17,15 +15,16 @@ import {
     Undo2,
 } from '@/components/iconos';
 import InputError from '@/components/input-error';
+import { DialogoDescarga } from '@/components/linea/dialogo-descarga';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
+import { NavegadorFecha } from '@/components/linea/navegador-fecha';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { usePuede } from '@/hooks/use-puede';
 import { fmt, semaforo } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import { type FormEvent, useState } from 'react';
 
 interface Accion {
@@ -141,38 +140,14 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
             acciones={
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Moverse entre jornadas con informe */}
-                    <div className="flex items-center gap-1">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="bg-card size-9 rounded-lg"
-                            disabled={!anterior}
-                            onClick={() => anterior && ir({ fecha: anterior })}
-                            aria-label={anterior ? `Jornada anterior: ${fmt.fechaMedia(anterior)}` : 'No hay jornadas anteriores'}
-                        >
-                            <ChevronLeft className="size-4" aria-hidden="true" />
-                        </Button>
-                        <label htmlFor="fecha-informe" className="sr-only">
-                            Jornada
-                        </label>
-                        <Input
-                            id="fecha-informe"
-                            type="date"
-                            value={fecha ?? ''}
-                            onChange={(e) => e.target.value && ir({ fecha: e.target.value })}
-                            className="bg-card h-9 w-40 rounded-lg text-xs font-semibold"
-                        />
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="bg-card size-9 rounded-lg"
-                            disabled={!siguiente}
-                            onClick={() => siguiente && ir({ fecha: siguiente })}
-                            aria-label={siguiente ? `Jornada siguiente: ${fmt.fechaMedia(siguiente)}` : 'No hay jornadas siguientes'}
-                        >
-                            <ChevronRight className="size-4" aria-hidden="true" />
-                        </Button>
-                    </div>
+                    <NavegadorFecha
+                        id="fecha-informe"
+                        etiqueta="Jornada"
+                        fecha={fecha}
+                        anterior={anterior}
+                        siguiente={siguiente}
+                        onIr={(f) => ir({ fecha: f })}
+                    />
                     {sedes.length > 1 && (
                         <div className="w-52">
                             <label htmlFor="filtro-sede" className="sr-only">
@@ -220,7 +195,7 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                 <>
                     <p className="text-muted-foreground -mt-2 flex items-center gap-2 text-sm">
                         <CalendarDays className="size-4" aria-hidden="true" />
-                        Operación del <strong className="text-foreground font-semibold first-letter:uppercase">{fmt.fechaLarga(fecha)}</strong>
+                        Operación del <strong className="text-foreground font-semibold">{fmt.fechaLarga(fecha)}</strong>
                     </p>
 
                     {/* Como la hoja "Dashboard Gerencial" */}
@@ -294,7 +269,14 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                 </>
             )}
 
-            {descargar && <DialogoDescarga fecha={fecha} sede={sede} onCerrar={() => setDescargar(false)} />}
+            {descargar && (
+                <DialogoDescarga
+                    descripcion="Con las hojas Informe Diario, Seguimiento, Resumen por ciudad y Dashboard Gerencial."
+                    fecha={fecha}
+                    url={(desde, hasta) => route('informes.descargar', { desde, hasta, ...(sede ? { sede } : {}) })}
+                    onCerrar={() => setDescargar(false)}
+                />
+            )}
             {accion && <DialogoAccion {...accion} tiposAccion={tiposAccion} umbrales={umbrales} onCerrar={() => setAccion(null)} />}
             {observacion && <DialogoObservacion fila={observacion} onCerrar={() => setObservacion(null)} />}
         </MarcoLinea>
@@ -776,77 +758,6 @@ function DialogoObservacion({ fila, onCerrar }: { fila: Fila; onCerrar: () => vo
                         </Button>
                         <Button type="submit" disabled={form.processing} className="rounded-lg">
                             {form.processing ? 'Guardando…' : 'Guardar'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function DialogoDescarga({ fecha, sede, onCerrar }: { fecha: string | null; sede: number | null; onCerrar: () => void }) {
-    const { errors } = usePage<{ errors: Record<string, string> }>().props;
-    const [desde, setDesde] = useState(fecha ?? '');
-    const [hasta, setHasta] = useState(fecha ?? '');
-    const invalido = !desde || !hasta || hasta < desde;
-
-    const descargar = (e: FormEvent) => {
-        e.preventDefault();
-        if (invalido) return;
-        // Descarga directa del archivo (no es una página)
-        window.location.href = route('informes.descargar', { desde, hasta, ...(sede ? { sede } : {}) });
-        onCerrar();
-    };
-
-    return (
-        <Dialog open onOpenChange={(v) => !v && onCerrar()}>
-            <DialogContent className="max-w-md rounded-2xl">
-                <form onSubmit={descargar} className="grid gap-4">
-                    <DialogHeader className="text-left">
-                        <DialogTitle className="text-lg font-extrabold">Descargar el informe en Excel</DialogTitle>
-                        <DialogDescription>
-                            Con las hojas Informe Diario, Seguimiento, Resumen por ciudad y Dashboard Gerencial. Puedes descargar una jornada o un
-                            periodo de hasta tres meses.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="grid gap-1.5">
-                            <label htmlFor="descarga-desde" className="text-sm font-medium">
-                                Desde
-                            </label>
-                            <Input
-                                id="descarga-desde"
-                                type="date"
-                                required
-                                value={desde}
-                                onChange={(e) => setDesde(e.target.value)}
-                                className="h-10 rounded-lg"
-                            />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label htmlFor="descarga-hasta" className="text-sm font-medium">
-                                Hasta
-                            </label>
-                            <Input
-                                id="descarga-hasta"
-                                type="date"
-                                required
-                                min={desde || undefined}
-                                value={hasta}
-                                onChange={(e) => setHasta(e.target.value)}
-                                aria-describedby={errors.hasta ? 'descarga-hasta-error' : undefined}
-                                className="h-10 rounded-lg"
-                            />
-                            <InputError id="descarga-hasta-error" message={errors.hasta} />
-                        </div>
-                    </div>
-                    <DialogFooter className="gap-2 sm:gap-0">
-                        <Button type="button" variant="outline" onClick={onCerrar} className="rounded-lg">
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={invalido} className="rounded-lg">
-                            <Download className="size-4" aria-hidden="true" />
-                            Descargar
                         </Button>
                     </DialogFooter>
                 </form>
