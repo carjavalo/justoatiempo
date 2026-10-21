@@ -66,7 +66,7 @@ class AsignacionController extends Controller
                 fn (Builder $q) => $q->when(! ($filtros['usuario'] ?? null), fn ($p) => $p->whereHas('asignaciones', $deLaLista)),
             )
             ->with(['asignaciones' => fn ($q) => $deLaLista($q)
-                ->with(['lineas:id,slug,nombre,orden', 'empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre'])
+                ->with(['lineas:id,slug,nombre,icono,orden', 'empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre'])
                 ->orderBy('fecha_inicio')])
             ->orderByDesc('activo')
             ->orderBy('primer_apellido')
@@ -199,7 +199,7 @@ class AsignacionController extends Controller
             'sede' => $a->sede?->nombre,
             'sucursalId' => $a->sucursal_id,
             'sucursal' => $a->sucursal?->nombre,
-            'lineas' => $a->lineas->map(fn (LineaServicio $l) => ['id' => $l->id, 'slug' => $l->slug, 'nombre' => $l->nombre]),
+            'lineas' => $a->lineas->map(fn (LineaServicio $l) => ['id' => $l->id, 'slug' => $l->slug, 'nombre' => $l->nombre, 'icono' => $l->icono]),
             'fechaInicio' => $a->fecha_inicio->toDateString(),
             'fechaFin' => $a->fecha_fin?->toDateString(),
             'duracion' => $a->duracion,
@@ -220,7 +220,7 @@ class AsignacionController extends Controller
     {
         $lineas = LineaServicio::ordenadas()
             ->when(! $yo->rolPermite(Permisos::TODAS_LAS_LINEAS) && ! $yo->sinLimites(), fn ($q) => $q->whereIn('id', $yo->lineasIds()))
-            ->get(['id', 'slug', 'nombre']);
+            ->get(['id', 'slug', 'nombre', 'icono', 'activa']);
         $alcance = $yo->alcanceEn();
 
         $empresas = Empresa::with('lineas:id')->orderBy('nombre')->get(['id', 'nombre', 'activo'])
@@ -234,7 +234,7 @@ class AsignacionController extends Controller
             'empresas' => $empresas->values()->map(fn (Empresa $e) => ['id' => $e->id, 'nombre' => $e->nombre, 'activo' => $e->activo, 'lineas' => $e->lineas->pluck('id')])->all(),
             'sedes' => $sedes->values()->map(fn (Sede $s) => ['id' => $s->id, 'nombre' => $s->nombre, 'empresaId' => $s->empresa_id, 'activo' => $s->activo])->all(),
             'sucursales' => $sucursales->values()->map(fn (Sucursal $s) => ['id' => $s->id, 'nombre' => $s->nombre, 'ciudad' => $s->ciudad, 'sedeId' => $s->sede_id, 'activo' => $s->activo])->all(),
-            'lineas' => $lineas->map(fn (LineaServicio $l) => ['id' => $l->id, 'slug' => $l->slug, 'nombre' => $l->nombre])->all(),
+            'lineas' => $lineas->map(fn (LineaServicio $l) => ['id' => $l->id, 'slug' => $l->slug, 'nombre' => $l->nombre, 'icono' => $l->icono, 'activa' => $l->activa])->all(),
             'sinEmpresa' => $yo->sinLimites() || $lineas->contains(fn ($l) => $yo->alcanceEn($l)->todo),
         ];
     }

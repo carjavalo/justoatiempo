@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\Asignacion;
 use App\Models\Empresa;
+use App\Models\LineaServicio;
 use App\Models\Orden;
 use App\Support\Nit;
 use Closure;
@@ -72,7 +73,18 @@ class EmpresaRequest extends FormRequest
         return [function (Validator $validator) {
             /** @var Empresa|null $empresa */
             $empresa = $this->route('empresa');
-            if (! $empresa || $validator->errors()->isNotEmpty()) {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            // Una línea inactiva no se le agrega a ninguna empresa (la que ya la recibe la conserva)
+            $inactivas = LineaServicio::whereIn('id', $this->lineas())->where('activa', false)
+                ->when($empresa, fn ($q) => $q->whereNotIn('id', $empresa->lineas()->pluck('lineas_servicio.id')))
+                ->pluck('nombre');
+            if ($inactivas->isNotEmpty()) {
+                $validator->errors()->add('lineas', '«'.$inactivas->implode('», «').($inactivas->count() === 1 ? '» está inactiva: actívala en Líneas de servicio antes de marcarla.' : '» están inactivas: actívalas en Líneas de servicio antes de marcarlas.'));
+            }
+            if (! $empresa) {
                 return;
             }
 

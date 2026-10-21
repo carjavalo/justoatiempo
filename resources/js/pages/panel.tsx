@@ -1,6 +1,6 @@
 import { ArrowRight, Bandeja, Building2, CalendarRange, Layers, LayoutGrid, Lightbulb, MapPinned, Store, type TipoIcono, UserCheck, UsersRound } from '@/components/iconos';
 import AppLayout from '@/layouts/app-layout';
-import { SERVICIOS } from '@/lib/portafolio';
+import { iconoLinea } from '@/lib/iconos-linea';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -13,12 +13,14 @@ interface Resumen {
     sucursales?: { total: number; activas: number; propias: number };
     solicitudes?: { total: number; pendientes: number };
     roles?: { total: number; activos: number };
+    servicios?: { activas: number };
     asignaciones?: { vigentes: number; personas: number };
 }
 
 interface LineaPanel {
     slug: string;
     nombre: string;
+    icono: string | null;
     empresas: number;
     personas: number;
     tablero: boolean;
@@ -77,13 +79,13 @@ export default function Panel({ resumen, lineas, asignacion }: Props) {
 }
 
 function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
-    const { usuarios, asignaciones, roles, empresas, sedes, sucursales, solicitudes } = resumen;
+    const { usuarios, asignaciones, roles, servicios, empresas, sedes, sucursales, solicitudes } = resumen;
     type Opcion = { id: string; titulo: string; texto: string; href: string; icono: TipoIcono; dato: string; pendiente?: boolean };
     const todas: (Opcion | undefined)[] = [
         usuarios && {
             id: 'usuarios',
             titulo: 'Usuarios',
-            texto: 'Crea accesos y asigna a cada persona su rol, su línea de servicio y dónde trabaja.',
+            texto: 'Los accesos de cada persona, con su rol, su carnet y su ARL.',
             href: route('usuarios.index'),
             icono: UsersRound,
             dato: usuarios.total ? plural(usuarios.activos, 'usuario activo', 'usuarios activos') : 'Aún no hay usuarios',
@@ -105,6 +107,14 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
             href: route('roles.index'),
             icono: UserCheck,
             dato: plural(roles.activos, 'rol activo', 'roles activos'),
+        },
+        servicios && {
+            id: 'servicios',
+            titulo: 'Líneas de servicio',
+            texto: 'Las líneas que presta Justo a Tiempo (logística, aseo, zonas verdes…) y las nuevas que se agreguen.',
+            href: route('servicios.index'),
+            icono: Layers,
+            dato: plural(servicios.activas, 'línea activa', 'líneas activas'),
         },
         empresas && {
             id: 'empresas',
@@ -216,19 +226,19 @@ function OpcionesAdmin({ resumen }: { resumen: Resumen }) {
     );
 }
 
-/** Las 8 líneas del portafolio: se entra a cada una para ver su operación por empresa. */
+/** Las líneas de servicio activas: se entra a cada una para ver su operación por empresa. */
 function LineasServicio({ lineas }: { lineas: LineaPanel[] }) {
     return (
         <section aria-labelledby="titulo-lineas" className="flex flex-col gap-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <h2 id="titulo-lineas" className="text-lg font-extrabold tracking-tight">
-                    Líneas de servicio
+                    Operación por línea
                 </h2>
-                <p className="text-muted-foreground text-sm">Entra a cada línea para ver su operación por empresa.</p>
+                <p className="text-muted-foreground text-sm">Entra a cada una para ver sus empresas y su personal.</p>
             </div>
             <ul role="list" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {lineas.map((l) => {
-                    const Icono = SERVICIOS.find((s) => s.id === l.slug)?.icono ?? Layers;
+                    const Icono = iconoLinea(l);
                     return (
                         <li
                             key={l.slug}

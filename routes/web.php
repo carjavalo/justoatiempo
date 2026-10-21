@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AsignacionController;
 use App\Http\Controllers\Admin\EmpresaController;
+use App\Http\Controllers\Admin\LineaServicioController;
 use App\Http\Controllers\Admin\RolController;
 use App\Http\Controllers\Admin\SedeController;
 use App\Http\Controllers\Admin\SolicitudController;
@@ -62,6 +63,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('roles', [RolController::class, 'store'])->middleware('permiso:roles.crear')->name('roles.store');
     Route::put('roles/{rol}', [RolController::class, 'update'])->middleware('permiso:roles.editar')->name('roles.update');
     Route::patch('roles/{rol}/estado', [RolController::class, 'estado'])->middleware('permiso:roles.estado')->name('roles.estado');
+
+    // Líneas de servicio: las del portafolio y las nuevas (por id: su slug es el de la URL de su tablero)
+    Route::get('lineas-de-servicio', [LineaServicioController::class, 'index'])->middleware('permiso:servicios.ver')->name('servicios.index');
+    Route::post('lineas-de-servicio', [LineaServicioController::class, 'store'])->middleware('permiso:servicios.crear')->name('servicios.store');
+    Route::put('lineas-de-servicio/{servicio:id}', [LineaServicioController::class, 'update'])->middleware('permiso:servicios.editar')->name('servicios.update');
+    Route::patch('lineas-de-servicio/{servicio:id}/estado', [LineaServicioController::class, 'estado'])->middleware('permiso:servicios.estado')->name('servicios.estado');
 
     Route::get('empresas', [EmpresaController::class, 'index'])->middleware('permiso:empresas.ver')->name('empresas.index');
     Route::post('empresas', [EmpresaController::class, 'store'])->middleware('permiso:empresas.crear')->name('empresas.store');

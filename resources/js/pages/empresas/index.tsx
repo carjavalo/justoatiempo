@@ -11,7 +11,7 @@ import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { digitoVerificacion, formatearNit, partesNit } from '@/lib/nit';
-import { SERVICIOS } from '@/lib/portafolio';
+import { iconoLinea } from '@/lib/iconos-linea';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -35,6 +35,8 @@ interface LineaCatalogo {
     id: number;
     slug: string;
     nombre: string;
+    icono: string | null;
+    activa: boolean;
 }
 
 interface Props {
@@ -281,8 +283,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                         En cada línea marcada, la empresa aparece en su tablero y puede tener personal asignado.
                     </p>
                     <ul role="list" className="grid gap-1.5">
-                        {lineas.map((l, i) => {
-                            const Icono = SERVICIOS.find((s) => s.id === l.slug)?.icono;
+                        {lineas.filter((l) => l.activa || editando?.lineas.includes(l.id)).map((l, i) => {
+                            const Icono = iconoLinea(l);
                             // La primera casilla lleva el id "lineas" para recibir el foco si el campo tiene error
                             const id = i === 0 ? 'lineas' : `linea-${l.id}`;
                             const marcada = form.data.lineas.includes(l.id);
@@ -295,9 +297,9 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                     )}
                                 >
                                     <Checkbox id={id} checked={marcada} onCheckedChange={(v) => alternarLinea(l.id, v === true)} aria-invalid={form.errors.lineas ? true : undefined} />
-                                    {Icono && <Icono className="text-primary size-4" aria-hidden="true" />}
+                                    <Icono className="text-primary size-4" aria-hidden="true" />
                                     <label htmlFor={id} className="flex-1 cursor-pointer text-sm">
-                                        {l.nombre}
+                                        {l.activa ? l.nombre : `${l.nombre} (inactiva)`}
                                     </label>
                                 </li>
                             );

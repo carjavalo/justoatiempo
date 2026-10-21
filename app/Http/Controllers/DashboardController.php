@@ -77,7 +77,7 @@ class DashboardController extends Controller
         $kpisPrevios = $this->kpis($base($prevDesde, $prevHasta));
 
         return Inertia::render('lineas/logistica', [
-            'linea' => ['slug' => $linea->slug, 'nombre' => $linea->nombre],
+            'linea' => ['slug' => $linea->slug, 'nombre' => $linea->nombre, 'icono' => $linea->icono],
             // Dónde está asignado en esta línea: "Ditranza · TuGo · Cali Sur" o "Ditranza y Sodimac"
             'alcanceFijo' => $alcance->todo ? null : $this->alcanceFijo($user, $linea),
             'filtros' => [

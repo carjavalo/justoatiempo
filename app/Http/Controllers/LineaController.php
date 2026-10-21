@@ -47,7 +47,7 @@ class LineaController extends Controller
             ->toBase()->pluck('total', 'empresa_id');
 
         return Inertia::render('lineas/linea', [
-            'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre],
+            'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre, 'descripcion' => $linea->descripcion, 'icono' => $linea->icono],
             'empresas' => $empresas->map(fn ($e) => [
                 'id' => $e->id,
                 'nombre' => $e->nombre,

@@ -35,6 +35,7 @@ final class Permisos
                 'usuarios' => ['titulo' => 'Usuarios', 'descripcion' => 'Accesos de las personas, con su carnet y su ARL.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'asignaciones' => ['titulo' => 'Asignaciones', 'descripcion' => 'Dónde presta el servicio cada persona, qué líneas hace allí y por cuánto tiempo.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'terminar' => 'Terminar']],
                 'roles' => ['titulo' => 'Roles', 'descripcion' => 'Los roles de la empresa y sus permisos.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
+                'servicios' => ['titulo' => 'Líneas de servicio', 'descripcion' => 'Las líneas que presta Justo a Tiempo (logística, aseo…) y las nuevas.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'empresas' => ['titulo' => 'Empresas', 'descripcion' => 'Empresas clientes y las líneas que reciben.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'sedes' => ['titulo' => 'Sedes', 'descripcion' => 'Sedes de cada empresa y su meta de efectividad.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
                 'sucursales' => ['titulo' => 'Sucursales', 'descripcion' => 'Puntos de cada sede y los propios de Justo a Tiempo.', 'acciones' => ['ver' => 'Ver', 'crear' => 'Crear', 'editar' => 'Editar', 'estado' => 'Activar y desactivar']],
@@ -76,7 +77,7 @@ final class Permisos
      * a esa persona le muestra solo los de su empresa (App\Models\User::alcanza).
      */
     public const MEZCLAN_EMPRESAS = [
-        'roles', 'empresas', 'sedes', 'sucursales', 'solicitudes',
+        'roles', 'servicios', 'empresas', 'sedes', 'sucursales', 'solicitudes',
         'cargas', 'auditoria', 'informes', 'seguimiento', 'programacion', 'empleados', 'vehiculos', 'parametros',
     ];
 

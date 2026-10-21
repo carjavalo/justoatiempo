@@ -21,7 +21,7 @@ function saludo() {
 }
 
 type Props = DashboardProps & {
-    linea: { slug: string; nombre: string };
+    linea: { slug: string; nombre: string; icono: string | null };
     /** A lo que está limitada la persona, lo más específico: "TuGo · Cali Sur", "TuGo" o "Ditranza". */
     alcanceFijo: string | null;
 };
@@ -84,6 +84,7 @@ export default function TableroLogistica(props: Props) {
         <MarcoLinea
             slug={linea.slug}
             nombre={linea.nombre}
+            icono={linea.icono}
             titulo={gerencial ? linea.nombre : 'Mi desempeño'}
             seccion="tablero"
             pestanas

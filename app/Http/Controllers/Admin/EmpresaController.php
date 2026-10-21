@@ -60,7 +60,8 @@ class EmpresaController extends Controller
             'empresas' => $empresas,
             'total' => Empresa::count(),
             'filtros' => ['q' => $filtros['q'] ?? '', 'estado' => $filtros['estado'] ?? ''],
-            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre']),
+            // Una línea inactiva solo se muestra en la empresa que ya la recibe
+            'lineas' => LineaServicio::ordenadas()->get(['id', 'slug', 'nombre', 'icono', 'activa']),
         ]);
     }
 

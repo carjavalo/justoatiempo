@@ -63,6 +63,7 @@ class PanelController extends Controller
                 return ['vigentes' => $vigentes->count(), 'personas' => $vigentes->pluck('user_id')->unique()->count()];
             })() : null,
             'roles' => $user->puede('roles.ver') ? ['total' => RolUsuario::count(), 'activos' => RolUsuario::where('activo', true)->count()] : null,
+            'servicios' => $user->puede('servicios.ver') ? ['activas' => LineaServicio::activas()->count()] : null,
             'empresas' => $user->puede('empresas.ver') ? (function () {
                 $e = Empresa::selectRaw('count(*) as total, sum(activo) as activas')->first();
 
@@ -83,8 +84,8 @@ class PanelController extends Controller
                 : null,
         ], fn ($dato) => $dato !== null);
 
-        // Las líneas que ve: todas, o las suyas (si su rol abre su tablero)
-        $lineas = ($verTodasLasLineas ? LineaServicio::ordenadas()->get() : $misLineas)
+        // Las líneas que ve: todas las activas, o las suyas (si su rol abre su tablero)
+        $lineas = ($verTodasLasLineas ? LineaServicio::activas()->ordenadas()->get() : $misLineas)
             ->map(fn (LineaServicio $l) => $this->tarjetaLinea($l, $user))
             ->values();
 
@@ -102,6 +103,7 @@ class PanelController extends Controller
         return [
             'slug' => $linea->slug,
             'nombre' => $linea->nombre,
+            'icono' => $linea->icono,
             'empresas' => $linea->empresas()->where('activo', true)->when(! $alcance->todo, fn ($q) => $q->whereIn('empresas.id', $alcance->empresas()))->count(),
             'personas' => $alcance->filtrarAsignaciones(Asignacion::vigentes()->whereHas('lineas', fn ($q) => $q->whereKey($linea->id)))
                 ->whereHas('usuario', fn ($q) => $q->where('activo', true))

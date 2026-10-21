@@ -1,6 +1,7 @@
-import { ClipboardCheck, Layers, LayoutGrid, type TipoIcono, UploadCloud } from '@/components/iconos';
+import { ClipboardCheck, LayoutGrid, type TipoIcono, UploadCloud } from '@/components/iconos';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
+import { iconoLinea } from '@/lib/iconos-linea';
 import { SERVICIOS } from '@/lib/portafolio';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type SharedData, type Volver } from '@/types';
@@ -22,6 +23,8 @@ interface Props {
     slug: string;
     /** Nombre guardado en la base de datos; si no llega, el del portafolio. */
     nombre?: string;
+    /** Clave del ícono elegido para la línea; si no llega, el de su servicio en el portafolio. */
+    icono?: string | null;
     /** Título de la pestaña del navegador. */
     titulo: string;
     /** Pestaña activa (solo en la línea de logística, para quien usa sus herramientas). */
@@ -49,6 +52,7 @@ interface Props {
 export function MarcoLinea({
     slug,
     nombre,
+    icono,
     titulo,
     seccion,
     paginaDeLaPestana = true,
@@ -60,9 +64,8 @@ export function MarcoLinea({
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const puede = usePuede();
-    const servicio = SERVICIOS.find((s) => s.id === slug);
-    const Icono = servicio?.icono ?? Layers;
-    const nombreLinea = nombre ?? servicio?.nombre ?? 'Línea de servicio';
+    const Icono = iconoLinea({ icono, slug });
+    const nombreLinea = nombre ?? SERVICIOS.find((s) => s.id === slug)?.nombre ?? 'Línea de servicio';
     const pestana = PESTANAS_LOGISTICA.find((p) => p.id === seccion);
     // Para quien trabaja en esta línea, la línea es su inicio: sus pestañas ya son la navegación
     const esInicio = auth.user.inicio.url === new URL(route('lineas.show', slug)).pathname;

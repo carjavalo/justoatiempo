@@ -1,0 +1,67 @@
+import {
+    ApoyoPlantas,
+    AseoConstruccion,
+    AseoIndustrial,
+    Cog,
+    ConjuntoResidencial,
+    Factory,
+    GraduationCap,
+    Hammer,
+    HardHat,
+    HeartPulse,
+    Landmark,
+    Layers,
+    PackageOpen,
+    ServicioLogistico,
+    ShieldCheck,
+    Shirt,
+    ShoppingBag,
+    Sparkles,
+    SprayCan,
+    Sprout,
+    Store,
+    type TipoIcono,
+    TreePine,
+    Truck,
+    UsersRound,
+    UtensilsCrossed,
+    Warehouse,
+    Zap,
+} from '@/components/iconos';
+import { SERVICIOS } from '@/lib/portafolio';
+
+/** Íconos que se le pueden poner a una línea de servicio. Las claves son las de App\Models\LineaServicio::ICONOS. */
+export const ICONOS_LINEA: { clave: string; nombre: string; icono: TipoIcono }[] = [
+    { clave: 'logistica', nombre: 'Paquete', icono: ServicioLogistico },
+    { clave: 'personal', nombre: 'Personas', icono: UsersRound },
+    { clave: 'aseo', nombre: 'Atomizador', icono: SprayCan },
+    { clave: 'escoba', nombre: 'Escoba', icono: AseoIndustrial },
+    { clave: 'rodillo', nombre: 'Rodillo', icono: AseoConstruccion },
+    { clave: 'planta', nombre: 'Planta', icono: Sprout },
+    { clave: 'arbol', nombre: 'Árbol', icono: TreePine },
+    { clave: 'operario', nombre: 'Operario', icono: ApoyoPlantas },
+    { clave: 'camion', nombre: 'Camión', icono: Truck },
+    { clave: 'bodega', nombre: 'Bodega', icono: Warehouse },
+    { clave: 'contenedor', nombre: 'Contenedor', icono: PackageOpen },
+    { clave: 'fabrica', nombre: 'Fábrica', icono: Factory },
+    { clave: 'casco', nombre: 'Casco', icono: HardHat },
+    { clave: 'martillo', nombre: 'Martillo', icono: Hammer },
+    { clave: 'seguridad', nombre: 'Escudo', icono: ShieldCheck },
+    { clave: 'uniforme', nombre: 'Uniforme', icono: Shirt },
+    { clave: 'tienda', nombre: 'Tienda', icono: Store },
+    { clave: 'compras', nombre: 'Bolsa de compras', icono: ShoppingBag },
+    { clave: 'alimentos', nombre: 'Cubiertos', icono: UtensilsCrossed },
+    { clave: 'salud', nombre: 'Salud', icono: HeartPulse },
+    { clave: 'educacion', nombre: 'Educación', icono: GraduationCap },
+    { clave: 'publico', nombre: 'Edificio público', icono: Landmark },
+    { clave: 'residencial', nombre: 'Conjunto residencial', icono: ConjuntoResidencial },
+    { clave: 'engranaje', nombre: 'Engranaje', icono: Cog },
+    { clave: 'energia', nombre: 'Rayo', icono: Zap },
+    { clave: 'brillo', nombre: 'Brillo', icono: Sparkles },
+    { clave: 'capas', nombre: 'Capas', icono: Layers },
+];
+
+/** El ícono de una línea: el que se le eligió o, si no llega (páginas de logística), el de su servicio en el portafolio. */
+export function iconoLinea(linea: { icono?: string | null; slug?: string }): TipoIcono {
+    return ICONOS_LINEA.find((i) => i.clave === linea.icono)?.icono ?? SERVICIOS.find((s) => s.id === linea.slug)?.icono ?? Layers;
+}

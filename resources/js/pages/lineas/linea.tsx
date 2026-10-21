@@ -1,7 +1,6 @@
 import { EstadoBadge } from '@/components/admin/piezas';
 import { Building2, LayoutGrid, MapPinned, UsersRound } from '@/components/iconos';
 import { MarcoLinea } from '@/components/linea/marco-linea';
-import { SERVICIOS } from '@/lib/portafolio';
 import { usePuede } from '@/hooks/use-puede';
 import { Link } from '@inertiajs/react';
 
@@ -15,7 +14,7 @@ interface Empresa {
 }
 
 interface Props {
-    linea: { id: number; slug: string; nombre: string };
+    linea: { id: number; slug: string; nombre: string; descripcion: string | null; icono: string | null };
     empresas: Empresa[];
     /** Personas activas de la línea por rol de la empresa ("Conductor", "Auxiliar operativo"…). */
     personal: { rol: string; total: number }[];
@@ -32,7 +31,6 @@ const claseEnlace = 'text-primary focus-visible:ring-ring rounded-sm font-semibo
  * y con qué personal. El tablero se agrega cuando se defina cómo controla su operación.
  */
 export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeUsuarios }: Props) {
-    const servicio = SERVICIOS.find((s) => s.id === linea.slug);
     const totalPersonas = personal.reduce((suma, p) => suma + p.total, 0);
     // Lo que su rol le deja registrar mientras la línea no tiene tablero
     const puede = usePuede();
@@ -45,8 +43,8 @@ export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeU
     const listaRegistrables = registrables.length > 1 ? `${registrables.slice(0, -1).join(', ')} y ${registrables.at(-1)}` : registrables[0];
 
     return (
-        <MarcoLinea slug={linea.slug} nombre={linea.nombre} titulo={linea.nombre}>
-            {servicio && <p className="text-muted-foreground -mt-2 max-w-3xl text-sm leading-relaxed md:text-base">{servicio.descripcion}</p>}
+        <MarcoLinea slug={linea.slug} nombre={linea.nombre} icono={linea.icono} titulo={linea.nombre}>
+            {linea.descripcion && <p className="text-muted-foreground -mt-2 max-w-3xl text-sm leading-relaxed md:text-base">{linea.descripcion}</p>}
 
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                 {/* Empresas que reciben la línea */}

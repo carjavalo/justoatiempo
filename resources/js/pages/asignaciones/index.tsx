@@ -14,7 +14,7 @@ import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { aFecha, fmt } from '@/lib/formato';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
-import { SERVICIOS } from '@/lib/portafolio';
+import { iconoLinea } from '@/lib/iconos-linea';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -30,7 +30,7 @@ interface Asignacion {
     sede: string | null;
     sucursalId: number | null;
     sucursal: string | null;
-    lineas: { id: number; slug: string; nombre: string }[];
+    lineas: { id: number; slug: string; nombre: string; icono: string | null }[];
     fechaInicio: string;
     fechaFin: string | null;
     duracion: string;
@@ -68,7 +68,8 @@ interface Props {
         empresas: (Opcion & { lineas: number[] })[];
         sedes: (Opcion & { empresaId: number })[];
         sucursales: (Opcion & { ciudad: string; sedeId: number | null })[];
-        lineas: { id: number; slug: string; nombre: string }[];
+        /** Una línea inactiva solo se muestra en la asignación que ya la tiene. */
+        lineas: { id: number; slug: string; nombre: string; icono: string | null; activa: boolean }[];
         /** Si puede asignar a toda una línea, sin empresa. */
         sinEmpresa: boolean;
         duraciones: { valor: string; texto: string }[];
@@ -195,8 +196,8 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     const sedesFormulario = empresaId ? opciones.sedes.filter((s) => s.empresaId === empresaId && (s.activo || s.id === sedeId)) : [];
     const sucursalesFormulario =
         empresaId && !sedeId ? [] : opciones.sucursales.filter((u) => u.sedeId === sedeId && (u.activo || String(u.id) === form.data.sucursal_id));
-    // Todas las líneas se pueden asignar; si la empresa aún no recibe alguna, se le agrega al guardar
-    const lineasFormulario = opciones.lineas;
+    // Todas las líneas activas se pueden asignar; si la empresa aún no recibe alguna, se le agrega al guardar
+    const lineasFormulario = opciones.lineas.filter((l) => l.activa || editando?.asignacion.lineas.some((x) => x.id === l.id));
     const empresasFormulario = opciones.empresas.filter((e) => e.activo || e.id === empresaId);
 
     const cambiarEmpresa = (valor: string) => {
@@ -444,7 +445,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                         Líneas de servicio que hará <span aria-hidden="true">*</span>
                     </legend>
                     <p id="lineas-ayuda" className="text-muted-foreground -mt-1 mb-1 text-xs">
-                        Puede hacer varias.{empresaElegida && ` Si ${empresaElegida.nombre} aún no recibe alguna, se le agrega al guardar.`}
+                        Puede hacer varias.
                     </p>
                     {lineasFormulario.length === 0 ? (
                         <p className="text-muted-foreground rounded-lg border border-dashed px-3 py-3 text-sm">
@@ -453,7 +454,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                     ) : (
                         <ul role="list" className="grid gap-1.5">
                             {lineasFormulario.map((l, i) => {
-                                const Icono = SERVICIOS.find((s) => s.id === l.slug)?.icono ?? Layers;
+                                const Icono = iconoLinea(l);
                                 // La primera casilla lleva el id "lineas" para recibir el foco si el campo tiene error
                                 const id = i === 0 ? 'lineas' : `linea-${l.id}`;
                                 const marcada = form.data.lineas.includes(l.id);
@@ -466,8 +467,8 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                                         <Checkbox id={id} checked={marcada} onCheckedChange={(v) => alternarLinea(l.id, v === true)} aria-invalid={form.errors.lineas ? true : undefined} />
                                         <Icono className="text-primary size-4" aria-hidden="true" />
                                         <label htmlFor={id} className="flex-1 cursor-pointer text-sm">
-                                            {l.nombre}
-                                            {nueva && <span className="text-muted-foreground block text-xs">{empresaElegida.nombre} aún no la recibe</span>}
+                                            {l.activa ? l.nombre : `${l.nombre} (inactiva)`}
+                                            {nueva && <span className="text-muted-foreground block text-xs">{empresaElegida.nombre} aún no la recibe: se le agrega al guardar</span>}
                                         </label>
                                     </li>
                                 );
@@ -679,7 +680,7 @@ function FilaAsignacion({
 
             <ul role="list" aria-label="Líneas de servicio" className="flex flex-wrap gap-1.5">
                 {a.lineas.map((l) => {
-                    const Icono = SERVICIOS.find((s) => s.id === l.slug)?.icono ?? Layers;
+                    const Icono = iconoLinea(l);
                     return (
                         <li key={l.id} className="bg-muted/70 inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium">
                             <Icono className="text-primary size-3.5 shrink-0" aria-hidden="true" />

@@ -114,7 +114,14 @@ class AsignacionRequest extends FormRequest
                 }
             }
 
-            // Cualquier línea se puede asignar: si la empresa aún no la recibe, se le agrega al guardar (ver el controlador)
+            // Cualquier línea activa se puede asignar: si la empresa aún no la recibe, se le agrega al guardar (ver el
+            // controlador). Una inactiva solo se conserva en la asignación que ya la tenía.
+            $inactivas = LineaServicio::whereIn('id', $lineas)->where('activa', false)
+                ->when($actual, fn ($q) => $q->whereNotIn('id', $actual->lineas()->pluck('lineas_servicio.id')))
+                ->pluck('nombre');
+            if ($inactivas->isNotEmpty()) {
+                $validator->errors()->add('lineas', '«'.$inactivas->implode('», «').($inactivas->count() === 1 ? '» está inactiva: actívala en Líneas de servicio antes de asignarla.' : '» están inactivas: actívalas en Líneas de servicio antes de asignarlas.'));
+            }
 
             // Solo dentro de lo que ve quien asigna
             if ($validator->errors()->isEmpty() && ($fuera = $yo->motivoFueraDeAlcance($empresaId, $sedeId, $sucursalId, $lineas))) {
