@@ -38,9 +38,14 @@ class Orden extends Model
 
     protected static function booted(): void
     {
-        // RF-07: toda orden rechazada genera devolución
         static::saving(function (Orden $orden) {
+            // RF-07: toda orden rechazada genera devolución
             $orden->devolucion = $orden->estado === EstadoOrden::Rechazada;
+            // Las entregas se cuentan por producto: toda orden lleva al menos uno
+            if ((int) $orden->productos < 1) {
+                $orden->productos = 1;
+                $orden->productos_entregados = $orden->estado === EstadoOrden::Aprobada ? 1 : 0;
+            }
         });
     }
 

@@ -41,7 +41,7 @@ class InformeDiarioTest extends TestCase
         $this->juan = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null]);
         $this->coordinador = User::factory()->coordinador()->create();
 
-        // Como Juan Plaza el 2 de octubre: 6 órdenes (8 productos), 1 rechazada; 2 sin imágenes
+        // Como Juan Plaza el 2 de octubre: 6 órdenes (8 productos), 1 rechazada con 3 productos; 2 sin imágenes
         $carga = Carga::create(['archivo_nombre' => 'p.xlsx', 'archivo_path' => 'p', 'archivo_hash' => str_repeat('a', 64)]);
         foreach (range(1, 6) as $i) {
             Orden::create([
@@ -66,18 +66,27 @@ class InformeDiarioTest extends TestCase
                 ->where('informes.0.sucursal', 'Cali Sur')
                 ->where('informes.0.ciudad', 'Cali')
                 ->where('informes.0.lineas.0.auxiliar', 'Juan Fernando Plaza')
-                ->where('informes.0.lineas.0.asignadas', 6)
+                // Por producto, como el informe real de ese día: 8 asignadas, 5 realizadas y 3 devoluciones (62,5 %)
+                ->where('informes.0.lineas.0.asignadas', 8)
                 ->where('informes.0.lineas.0.realizadas', 5)
-                ->where('informes.0.lineas.0.pendientes', 1)
-                ->where('informes.0.lineas.0.productos', 8)
-                ->where('informes.0.lineas.0.productosEntregados', 5)
-                ->where('informes.0.lineas.0.cumplimiento', 83.33)
-                ->where('informes.0.lineas.0.novedades', 'Sin evidencias en 2 órdenes · 1 devolución (Cliente reprograma fecha de recibo)')
+                ->where('informes.0.lineas.0.pendientes', 3)
+                ->where('informes.0.lineas.0.devoluciones', 3)
+                ->where('informes.0.lineas.0.ordenes', 6)
+                ->where('informes.0.lineas.0.cumplimiento', 62.5)
+                ->where('informes.0.lineas.0.novedades', 'Sin evidencias en 2 órdenes · 3 devoluciones (Cliente reprograma fecha de recibo)')
                 ->where('informes.0.lineas.0.pod', false)
-                // Menos del 70 % no; sin evidencias, retroalimentación
-                ->where('informes.0.lineas.0.sugerencia', TipoAccion::Retroalimentacion->value)
-                ->where('resumen.cumplimiento', 83.33)
+                // Por debajo del 70 %: llamado de atención
+                ->where('informes.0.lineas.0.sugerencia', TipoAccion::LlamadoAtencion->value)
+                ->where('resumen.cumplimiento', 62.5)
                 ->where('porCiudad.0.ciudad', 'Cali'));
+
+        // El tablero cuenta igual que el informe
+        $this->get('/lineas/logisticos')->assertInertia(fn (Assert $p) => $p
+            ->where('kpis.asignadas', 8)
+            ->where('kpis.aprobadas', 5)
+            ->where('kpis.devoluciones', 3)
+            ->where('kpis.efectividad', 62.5)
+            ->where('motivos.0.total', 3));
 
         // El auxiliar solo ve lo suyo: el informe no se le abre
         $this->actingAs(User::factory()->create())->get('/informes')->assertForbidden();
@@ -122,12 +131,12 @@ class InformeDiarioTest extends TestCase
         ])->assertSessionHas('success', 'Llamado de atención escrito registrada para Juan Fernando Plaza.');
 
         $accion = AccionDesempeno::sole();
-        $this->assertSame([$this->juan->id, $this->informe->id, 83.33, $this->coordinador->id], [$accion->user_id, $accion->informe_id, (float) $accion->efectividad_referencia, $accion->registrado_por]);
+        $this->assertSame([$this->juan->id, $this->informe->id, 62.5, $this->coordinador->id], [$accion->user_id, $accion->informe_id, (float) $accion->efectividad_referencia, $accion->registrado_por]);
 
         $this->get('/informes')->assertInertia(fn (Assert $p) => $p->where('informes.0.lineas.0.acciones.0.tipoLabel', 'Llamado de atención escrito'));
         $this->get('/seguimiento')->assertInertia(fn (Assert $p) => $p->component('seguimiento/index')
             ->where('personas.0.nombre', 'Juan Fernando Plaza')
-            ->where('personas.0.cumplimiento', 83.33)
+            ->where('personas.0.cumplimiento', 62.5)
             ->where('personas.0.sinEvidencia', 2)
             ->where('personas.0.conteo.llamado_escrito', 1));
 
@@ -148,7 +157,7 @@ class InformeDiarioTest extends TestCase
         $this->assertSame(['Informe Diario', 'Seguimiento', 'Resumen por ciudad', 'Dashboard Gerencial'], $libro->getSheetNames());
         $hoja = $libro->getSheetByName('Informe Diario');
         $this->assertSame('Fecha operación', $hoja->getCell('A4')->getValue());
-        $this->assertSame(['TuGo · Cali Sur', 'Juan Fernando Plaza', 'Cali', 'RUTA / SNX708', 6, 5, 1], [
+        $this->assertSame(['TuGo · Cali Sur', 'Juan Fernando Plaza', 'Cali', 'RUTA / SNX708', 8, 5, 3], [
             $hoja->getCell('B5')->getValue(), $hoja->getCell('C5')->getValue(), $hoja->getCell('D5')->getValue(), $hoja->getCell('E5')->getValue(),
             $hoja->getCell('F5')->getValue(), $hoja->getCell('G5')->getValue(), $hoja->getCell('H5')->getValue(),
         ]);

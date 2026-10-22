@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\EstadoInforme;
-use App\Enums\EstadoOrden;
 use App\Models\InformeDiario;
 use App\Models\Orden;
 use Illuminate\Support\Carbon;
@@ -17,10 +16,30 @@ use RuntimeException;
  */
 class ConsolidadorInforme
 {
-    /** RF-06: efectividad = aprobadas / asignadas × 100, redondeada a 2 decimales. */
+    /** RF-06: efectividad = entregas realizadas / asignadas × 100, redondeada a 2 decimales. */
     public static function efectividad(int $aprobadas, int $asignadas): float
     {
         return $asignadas > 0 ? round($aprobadas / $asignadas * 100, 2) : 0.0;
+    }
+
+    /**
+     * Las entregas se cuentan por producto, como en el informe que se llenaba a mano: una orden con 3 productos son 3
+     * entregas. Las devoluciones son los productos de las órdenes rechazadas. Sirve con órdenes guardadas o por importar.
+     *
+     * @param  Collection<int, Orden|array<string, mixed>>  $ordenes
+     * @return array{asignadas: int, realizadas: int, devoluciones: int, efectividad: float}
+     */
+    public static function entregas(Collection $ordenes): array
+    {
+        $asignadas = (int) $ordenes->sum(fn ($o) => data_get($o, 'productos'));
+        $realizadas = (int) $ordenes->sum(fn ($o) => data_get($o, 'productos_entregados'));
+
+        return [
+            'asignadas' => $asignadas,
+            'realizadas' => $realizadas,
+            'devoluciones' => (int) $ordenes->filter(fn ($o) => data_get($o, 'devolucion'))->sum(fn ($o) => data_get($o, 'productos')),
+            'efectividad' => self::efectividad($realizadas, $asignadas),
+        ];
     }
 
     /**
@@ -81,16 +100,16 @@ class ConsolidadorInforme
                 $informe->lineas()->create([...$this->calcularLinea($grupo), 'observacion' => $observaciones[$llave] ?? null]);
             }
 
-            $aprobadas = $ordenes->where('estado', EstadoOrden::Aprobada)->count();
+            $e = self::entregas($ordenes);
 
             $informe->fill([
-                'total_asignadas' => $ordenes->count(),
-                'total_aprobadas' => $aprobadas,
-                'total_rechazadas' => $ordenes->where('estado', '!=', EstadoOrden::Aprobada)->count(),
-                'total_devoluciones' => $ordenes->where('devolucion', true)->count(),
+                'total_asignadas' => $e['asignadas'],
+                'total_aprobadas' => $e['realizadas'],
+                'total_rechazadas' => $e['asignadas'] - $e['realizadas'],
+                'total_devoluciones' => $e['devoluciones'],
                 'total_averias' => $ordenes->where('averia', true)->count(),
                 'total_faltantes' => $ordenes->where('faltante', true)->count(),
-                'efectividad' => self::efectividad($aprobadas, $ordenes->count()),
+                'efectividad' => $e['efectividad'],
             ])->save();
 
             return $informe->fresh('lineas');
@@ -116,7 +135,7 @@ class ConsolidadorInforme
     private function calcularLinea(Collection $grupo): array
     {
         $primera = $grupo->first();
-        $aprobadas = $grupo->where('estado', EstadoOrden::Aprobada)->count();
+        $e = self::entregas($grupo);
         $auditadas = $grupo->filter(fn (Orden $o) => $o->auditoria?->auditado_en !== null);
         // Sin evidencias: Drivin dice que no tiene imágenes, o la auditoría no encontró ninguna
         $sinEvidencia = $grupo->filter(fn (Orden $o) => $o->tiene_imagenes === false || ($o->auditoria?->auditado_en && $o->auditoria->sin_evidencia))->count();
@@ -127,13 +146,13 @@ class ConsolidadorInforme
             'placa' => $primera->placa,
             'auxiliar_id' => $primera->auxiliar_id,
             'auxiliar_nombre' => $primera->auxiliar_nombre,
-            'asignadas' => $grupo->count(),
-            'aprobadas' => $aprobadas,
-            'rechazadas' => $grupo->count() - $aprobadas,
-            'productos' => $grupo->sum('productos'),
-            'productos_entregados' => $grupo->sum('productos_entregados'),
-            'efectividad' => self::efectividad($aprobadas, $grupo->count()),
-            'devoluciones' => $grupo->where('devolucion', true)->count(),
+            // Entregas por producto; las órdenes, para ver en cuántas paradas iban
+            'ordenes' => $grupo->count(),
+            'asignadas' => $e['asignadas'],
+            'aprobadas' => $e['realizadas'],
+            'rechazadas' => $e['asignadas'] - $e['realizadas'],
+            'efectividad' => $e['efectividad'],
+            'devoluciones' => $e['devoluciones'],
             'averias' => $grupo->where('averia', true)->count(),
             'faltantes' => $grupo->where('faltante', true)->count(),
             'ordenes_sin_evidencia' => $sinEvidencia,
@@ -172,10 +191,11 @@ class ConsolidadorInforme
         if ($borrosas > 0) {
             $partes[] = 'Fotos borrosas o ilegibles en '.$cuantas($borrosas, 'orden', 'órdenes');
         }
+        // Las devoluciones, por producto como la columna del informe
         $devueltas = $grupo->where('devolucion', true);
         if ($devueltas->isNotEmpty()) {
             $motivos = $devueltas->pluck('motivo_texto')->filter()->unique()->take(3)->implode(', ');
-            $partes[] = $cuantas($devueltas->count(), 'devolución', 'devoluciones').($motivos !== '' ? " ({$motivos})" : '');
+            $partes[] = $cuantas(self::entregas($grupo)['devoluciones'], 'devolución', 'devoluciones').($motivos !== '' ? " ({$motivos})" : '');
         }
         if (($averias = $grupo->where('averia', true)->count()) > 0) {
             $partes[] = $cuantas($averias, 'avería', 'averías');

@@ -109,11 +109,12 @@ class DashboardController extends Controller
     {
         $r = $q->clone()
             ->leftJoin('auditorias_pod as a', 'a.orden_id', '=', 'ordenes.id')
+            // Entregas por producto (como el informe diario); auditorías, averías y faltantes, por orden
             ->selectRaw("
-                COUNT(*) as asignadas,
-                SUM(ordenes.estado = 'aprobada') as aprobadas,
-                SUM(ordenes.estado <> 'aprobada') as rechazadas,
-                SUM(ordenes.devolucion) as devoluciones,
+                SUM(ordenes.productos) as asignadas,
+                SUM(ordenes.productos_entregados) as aprobadas,
+                SUM(ordenes.productos) - SUM(ordenes.productos_entregados) as rechazadas,
+                SUM(CASE WHEN ordenes.devolucion = 1 THEN ordenes.productos ELSE 0 END) as devoluciones,
                 SUM(ordenes.averia) as averias,
                 SUM(ordenes.faltante) as faltantes,
                 COUNT(a.id) as auditadas,
@@ -149,7 +150,7 @@ class DashboardController extends Controller
     private function tendencia(Builder $q): array
     {
         return $q->clone()
-            ->selectRaw("fecha_operacion as fecha, COUNT(*) as asignadas, SUM(estado = 'aprobada') as aprobadas")
+            ->selectRaw('fecha_operacion as fecha, SUM(productos) as asignadas, SUM(productos_entregados) as aprobadas')
             ->groupBy('fecha_operacion')
             ->orderBy('fecha_operacion')
             ->get()
@@ -167,7 +168,8 @@ class DashboardController extends Controller
     {
         return $q->clone()
             ->where('estado', '<>', 'aprobada')
-            ->selectRaw("COALESCE(motivo_texto, 'Sin motivo registrado') as motivo, COUNT(*) as total")
+            // Las entregas (productos) que no se hicieron por cada motivo
+            ->selectRaw("COALESCE(motivo_texto, 'Sin motivo registrado') as motivo, SUM(productos) - SUM(productos_entregados) as total")
             ->groupBy('motivo')
             ->orderByDesc('total')
             ->get()
@@ -194,7 +196,7 @@ class DashboardController extends Controller
     {
         return $q->clone()
             ->join('sedes as c', 'c.id', '=', 'ordenes.sede_id')
-            ->selectRaw("c.id, c.nombre, c.color, c.meta_efectividad as meta, COUNT(*) as asignadas, SUM(ordenes.estado = 'aprobada') as aprobadas")
+            ->selectRaw('c.id, c.nombre, c.color, c.meta_efectividad as meta, SUM(ordenes.productos) as asignadas, SUM(ordenes.productos_entregados) as aprobadas')
             ->groupBy('c.id', 'c.nombre', 'c.color', 'c.meta_efectividad')
             ->orderByDesc('asignadas')
             ->get()
@@ -222,15 +224,15 @@ class DashboardController extends Controller
         $filas = $q->clone()
             ->join('users as e', 'e.id', '=', 'ordenes.auxiliar_id')
             ->leftJoin('auditorias_pod as a', 'a.orden_id', '=', 'ordenes.id')
-            ->selectRaw("
+            ->selectRaw('
                 e.id, e.name, e.cedula,
-                COUNT(*) as asignadas,
-                SUM(ordenes.estado = 'aprobada') as aprobadas,
+                SUM(ordenes.productos) as asignadas,
+                SUM(ordenes.productos_entregados) as aprobadas,
                 COUNT(a.id) as auditadas,
                 SUM(a.cumple_protocolo) as cumplen,
                 SUM(a.sin_evidencia) as sin_evidencia,
                 COUNT(DISTINCT ordenes.fecha_operacion) as jornadas
-            ")
+            ')
             ->groupBy('e.id', 'e.name', 'e.cedula')
             ->get();
 

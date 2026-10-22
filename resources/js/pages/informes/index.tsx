@@ -46,8 +46,8 @@ interface Fila {
     realizadas: number;
     pendientes: number;
     cumplimiento: number;
-    productos: number;
-    productosEntregados: number;
+    /** En cuántas órdenes (paradas) iban las entregas, que se cuentan por producto. */
+    ordenes: number;
     novedades: string;
     observacion: string | null;
     averias: number;
@@ -371,7 +371,7 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
             {informe.sinAuditar > 0 && !cerrado && (
                 <p className="bg-warning-soft/60 text-warning mx-5 mb-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium">
                     <ClipboardCheck className="size-4" aria-hidden="true" />
-                    {plural(informe.sinAuditar, 'entrega aprobada sin auditar', 'entregas aprobadas sin auditar')}.
+                    {plural(informe.sinAuditar, 'orden aprobada sin auditar', 'órdenes aprobadas sin auditar')}.
                     {puede('auditoria.ver') && (
                         <Link href={route('auditoria.index')} className="underline underline-offset-4">
                             Ir a Auditoría POD
@@ -413,7 +413,7 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
                                 <td className={cn(claseTd, 'text-xs')}>
                                     <p className="font-semibold">RUTA{l.placa && ` / ${l.placa}`}</p>
                                 </td>
-                                {/* Asignadas, realizadas y pendientes (por orden), con los productos que llevaban */}
+                                {/* Asignadas, realizadas y pendientes (por producto), con las órdenes en que iban */}
                                 <td className={cn(claseTd, 'tabular-nums')}>
                                     <p className="font-semibold">
                                         {l.realizadas} de {l.asignadas}
@@ -421,10 +421,8 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
                                     <p className={cn('text-xs', l.pendientes > 0 ? 'text-warning font-medium' : 'text-muted-foreground')}>
                                         {l.pendientes === 0 ? 'Sin pendientes' : plural(l.pendientes, 'pendiente', 'pendientes')}
                                     </p>
-                                    {l.productos > 0 && (
-                                        <p className="text-muted-foreground text-[0.7rem]">
-                                            {fmt.numero(l.productosEntregados)} de {plural(l.productos, 'producto', 'productos')}
-                                        </p>
+                                    {l.ordenes > 0 && (
+                                        <p className="text-muted-foreground text-[0.7rem]">En {plural(l.ordenes, 'orden', 'órdenes')}</p>
                                     )}
                                 </td>
                                 <td className={claseTd}>

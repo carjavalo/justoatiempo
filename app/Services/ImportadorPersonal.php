@@ -16,8 +16,8 @@ use RuntimeException;
 
 /**
  * Importa el Excel del personal (como "AUXILIARES ACTIVOS.xlsx": cédula, nombres, apellidos, cargo, operación, ciudad,
- * teléfono, correo, nacimiento e ingreso) a Usuarios, sin acceso a la plataforma: cada persona queda con su carnet
- * y, si la operación corresponde a una empresa, asignada a ella con sus líneas.
+ * teléfono, correo, nacimiento e ingreso) a Usuarios: cada persona queda con su carnet (y, si se elige, entra con su
+ * cédula) y, si la operación corresponde a una empresa, asignada a ella con sus líneas.
  *
  * Quien ya existe (por cédula) no se reemplaza: solo se le completan los datos que le falten, si quien importa
  * puede editarla. Nunca se muestra a alguien que quien importa no alcanza a ver.

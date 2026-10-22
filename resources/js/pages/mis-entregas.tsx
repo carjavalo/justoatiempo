@@ -7,12 +7,13 @@ import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Link } from '@inertiajs/react';
 
+/** Las entregas se cuentan por producto; las órdenes son las paradas en que iban. */
 interface Jornada {
     fecha: string;
     ordenes: number;
-    entregadas: number;
-    devueltas: number;
-    productos: number;
+    entregas: number;
+    realizadas: number;
+    devoluciones: number;
     sinImagenes: number;
     cumplimiento: number;
 }
@@ -62,7 +63,7 @@ const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n
 
 /**
  * Mis entregas: el historial de quien hace las rutas, jornada por jornada, con el detalle de sus órdenes y sus
- * evidencias. Se cuenta por orden (NP), como el informe diario.
+ * evidencias. Las entregas se cuentan por producto, como el informe diario.
  */
 export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props) {
     const nivel = semaforo(resumen?.cumplimiento ?? null);
@@ -95,14 +96,10 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                             />
                             <Dato
                                 titulo="Entregas"
-                                valor={`${fmt.numero(resumen.entregadas)} de ${fmt.numero(resumen.ordenes)}`}
-                                detalle={plural(resumen.devueltas, 'devolución', 'devoluciones')}
+                                valor={`${fmt.numero(resumen.realizadas)} de ${fmt.numero(resumen.entregas)}`}
+                                detalle={plural(resumen.devoluciones, 'devolución', 'devoluciones')}
                             />
-                            <Dato
-                                titulo="Jornadas"
-                                valor={fmt.numero(resumen.jornadas)}
-                                detalle={plural(resumen.productos, 'producto', 'productos')}
-                            />
+                            <Dato titulo="Jornadas" valor={fmt.numero(resumen.jornadas)} detalle={plural(resumen.ordenes, 'orden', 'órdenes')} />
                             <Dato
                                 titulo="Sin imágenes"
                                 valor={fmt.numero(resumen.sinImagenes)}
@@ -153,7 +150,7 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                                                 </th>
                                                 <td className={cn(claseTd, 'tabular-nums')}>
                                                     <p className="font-semibold">
-                                                        {fmt.numero(j.entregadas)} de {fmt.numero(j.ordenes)}
+                                                        {fmt.numero(j.realizadas)} de {fmt.numero(j.entregas)}
                                                     </p>
                                                     {j.sinImagenes > 0 && (
                                                         <p className="text-critical text-xs">
@@ -178,7 +175,7 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                                 titulo={<span className="first-letter:uppercase">{fmt.fechaLarga(fecha)}</span>}
                                 descripcion={
                                     jornada
-                                        ? `${plural(jornada.entregadas, 'entrega', 'entregas')} de ${plural(jornada.ordenes, 'orden', 'órdenes')} · ${plural(jornada.productos, 'producto', 'productos')}`
+                                        ? `${fmt.numero(jornada.realizadas)} de ${plural(jornada.entregas, 'entrega', 'entregas')} · ${plural(jornada.ordenes, 'orden', 'órdenes')}`
                                         : plural(ordenes.length, 'orden', 'órdenes')
                                 }
                                 cuerpoClassName="px-0 pb-0"

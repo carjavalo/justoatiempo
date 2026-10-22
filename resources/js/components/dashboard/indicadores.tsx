@@ -157,7 +157,7 @@ export function TilesKpi({ kpis, previos, vista }: { kpis: Kpis; previos: Kpis; 
                 icono={ClipboardCheck}
                 titulo="Cumplimiento protocolo POD"
                 valor={kpis.cumplimientoPod === null ? <SinDato /> : fmt.pct(kpis.cumplimientoPod)}
-                detalle={`${fmt.numero(kpis.sinEvidencia)} entregas sin evidencia`}
+                detalle={`${fmt.numero(kpis.sinEvidencia)} ${kpis.sinEvidencia === 1 ? 'orden' : 'órdenes'} sin evidencia`}
                 variacionValor={variacion(kpis.cumplimientoPod, previos.cumplimientoPod, 'puntos')}
                 sufijo=" pts"
                 tono="steel"

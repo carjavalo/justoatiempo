@@ -33,9 +33,11 @@ interface Grupo {
     vehiculoRegistrado: boolean;
     auxiliar: string | null;
     auxiliarReconocido: boolean;
+    /** Las entregas se cuentan por producto, como en el informe; las órdenes son las paradas. */
+    ordenes: number;
     asignadas: number;
-    aprobadas: number;
-    rechazadas: number;
+    realizadas: number;
+    devoluciones: number;
     faltantes: number;
     averias: number;
     efectividad: number;
@@ -51,7 +53,7 @@ interface Analisis {
     totalAdvertencias: number;
     fechas: Record<string, number>;
     grupos: Grupo[];
-    totales: { ordenes: number; aprobadas: number; rechazadas: number; pendientes: number; faltantes: number; averias: number; efectividad: number };
+    totales: { ordenes: number; asignadas: number; realizadas: number; devoluciones: number; faltantes: number; averias: number; efectividad: number };
 }
 
 interface Props {
@@ -165,7 +167,7 @@ function Resumen({ analisis }: { analisis: Analisis }) {
             <Cifra
                 etiqueta="Efectividad prevista"
                 valor={analisis.totales.ordenes ? fmt.pct(analisis.totales.efectividad) : '—'}
-                detalle={`${fmt.numero(analisis.totales.aprobadas)} aprobadas · ${fmt.numero(analisis.totales.rechazadas)} rechazadas`}
+                detalle={`${fmt.numero(analisis.totales.realizadas)} de ${fmt.numero(analisis.totales.asignadas)} entregas realizadas`}
             />
         </dl>
     );
@@ -352,7 +354,7 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
                                     Asignadas
                                 </th>
                                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
-                                    Aprobadas
+                                    Realizadas
                                 </th>
                                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
                                     Devoluciones
@@ -388,9 +390,12 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
                                         {g.auxiliar ?? '—'}
                                         {g.auxiliar && <Marca ok={g.auxiliarReconocido} texto="auxiliar no reconocido" />}
                                     </td>
-                                    <td className="tabular px-3 py-3 text-right">{g.asignadas}</td>
-                                    <td className="tabular px-3 py-3 text-right font-semibold">{g.aprobadas}</td>
-                                    <td className="tabular px-3 py-3 text-right">{g.rechazadas}</td>
+                                    <td className="tabular px-3 py-3 text-right">
+                                        {g.asignadas}
+                                        <span className="text-muted-foreground block text-[0.7rem]">En {g.ordenes === 1 ? '1 orden' : `${g.ordenes} órdenes`}</span>
+                                    </td>
+                                    <td className="tabular px-3 py-3 text-right font-semibold">{g.realizadas}</td>
+                                    <td className="tabular px-3 py-3 text-right">{g.devoluciones}</td>
                                     <td className="tabular px-3 py-3 text-right">{g.faltantes}</td>
                                     <td className="tabular px-3 py-3 text-right">{g.averias}</td>
                                     <td className="py-3 pr-5 pl-3">
@@ -407,9 +412,9 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
                                 <th scope="row" colSpan={4} className="py-3 pl-5 text-left">
                                     Total
                                 </th>
-                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.ordenes)}</td>
-                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.aprobadas)}</td>
-                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.rechazadas)}</td>
+                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.asignadas)}</td>
+                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.realizadas)}</td>
+                                <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.devoluciones)}</td>
                                 <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.faltantes)}</td>
                                 <td className="tabular px-3 py-3 text-right">{fmt.numero(totales.averias)}</td>
                                 <td className="tabular py-3 pr-5 pl-3 text-right">{fmt.pct(totales.efectividad)}</td>

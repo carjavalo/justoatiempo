@@ -37,7 +37,8 @@ interface Props {
         anuladaPor: string | null;
         anulada: string | null;
     };
-    totales: { ordenes: number; aprobadas: number; rechazadas: number; faltantes: number; averias: number; efectividad: number } | null;
+    /** Lo que mostró la revisión al importar; aquí solo se usa la efectividad. */
+    totales: { efectividad: number } | null;
     advertencias: Advertencia[];
     errores: ErrorFila[];
     informes: Informe[];

@@ -9,7 +9,7 @@ class InformeLinea extends Model
 {
     protected $fillable = [
         'informe_id', 'ruta', 'vehiculo_id', 'placa', 'auxiliar_id', 'auxiliar_nombre',
-        'asignadas', 'aprobadas', 'rechazadas', 'productos', 'productos_entregados', 'efectividad', 'devoluciones',
+        'ordenes', 'asignadas', 'aprobadas', 'rechazadas', 'efectividad', 'devoluciones',
         'averias', 'faltantes', 'ordenes_sin_evidencia', 'pod_cumple', 'novedades', 'observacion',
     ];
 

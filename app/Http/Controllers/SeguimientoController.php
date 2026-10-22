@@ -42,14 +42,15 @@ class SeguimientoController extends Controller
             ->whereNotNull('ordenes.auxiliar_id')
             ->leftJoin('auditorias_pod as a', 'a.orden_id', '=', 'ordenes.id')
             ->groupBy('ordenes.auxiliar_id')
-            ->selectRaw("ordenes.auxiliar_id,
-                COUNT(*) as asignadas,
-                SUM(ordenes.estado = 'aprobada') as realizadas,
+            // Entregas por producto, como el informe diario
+            ->selectRaw('ordenes.auxiliar_id,
+                SUM(ordenes.productos) as asignadas,
+                SUM(ordenes.productos_entregados) as realizadas,
                 COUNT(DISTINCT ordenes.fecha_operacion) as jornadas,
                 SUM(ordenes.tiene_imagenes = 0 OR a.sin_evidencia = 1) as sin_evidencia,
                 COUNT(a.auditado_en) as auditadas,
                 SUM(a.cumple_protocolo) as cumplen,
-                MAX(ordenes.fecha_operacion) as ultima")
+                MAX(ordenes.fecha_operacion) as ultima')
             ->toBase()
             ->get()
             ->keyBy('auxiliar_id');

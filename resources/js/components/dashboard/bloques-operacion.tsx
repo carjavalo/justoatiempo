@@ -91,10 +91,10 @@ export function CumplimientoProtocolo({ protocolo }: { protocolo: Protocolo }) {
     return (
         <Panel
             titulo="Protocolo de evidencias (POD)"
-            descripcion={protocolo.auditadas ? `${fmt.numero(protocolo.auditadas)} entregas auditadas en el periodo · meta ${META_POD} % por componente` : undefined}
+            descripcion={protocolo.auditadas ? `${fmt.numero(protocolo.auditadas)} órdenes auditadas en el periodo · meta ${META_POD} % por componente` : undefined}
         >
             {protocolo.auditadas === 0 ? (
-                <Vacio>Aún no hay entregas auditadas en este periodo.</Vacio>
+                <Vacio>Aún no hay órdenes auditadas en este periodo.</Vacio>
             ) : (
                 <>
                     <ul role="list" className="grid gap-4 sm:grid-cols-2">
@@ -135,7 +135,7 @@ export function CumplimientoProtocolo({ protocolo }: { protocolo: Protocolo }) {
                             El punto más débil es <strong>{peor.nombre.toLowerCase()}</strong>.{' '}
                             {protocolo.sinDestapar > 0 && (
                                 <>
-                                    {fmt.numero(protocolo.sinDestapar)} entregas se recibieron sin destapar con nota firmada en la remesa.
+                                    {fmt.numero(protocolo.sinDestapar)} órdenes se recibieron sin destapar con nota firmada en la remesa.
                                 </>
                             )}
                         </p>

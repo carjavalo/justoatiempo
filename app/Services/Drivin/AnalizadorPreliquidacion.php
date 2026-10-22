@@ -97,7 +97,7 @@ class AnalizadorPreliquidacion
             'totalAdvertencias' => 0,
             'fechas' => [],
             'grupos' => [],
-            'totales' => ['ordenes' => 0, 'aprobadas' => 0, 'rechazadas' => 0, 'pendientes' => 0, 'faltantes' => 0, 'averias' => 0, 'efectividad' => 0.0],
+            'totales' => ['ordenes' => 0, 'asignadas' => 0, 'realizadas' => 0, 'devoluciones' => 0, 'faltantes' => 0, 'averias' => 0, 'efectividad' => 0.0],
         ];
 
         if ($faltantes !== []) {
@@ -593,7 +593,7 @@ class AnalizadorPreliquidacion
             ->groupBy(fn ($o) => implode('|', [$o['fecha_operacion'], $o['sede_id'], $o['sucursal_id'], $o['ruta'], $o['placa'], $o['auxiliar_nombre']]))
             ->map(function (Collection $g) use ($nombresSedes, $nombresSucursales) {
                 $p = $g->first();
-                $aprobadas = $g->where('estado', 'aprobada')->count();
+                $e = ConsolidadorInforme::entregas($g);
 
                 return [
                     'fecha' => $p['fecha_operacion'],
@@ -604,14 +604,15 @@ class AnalizadorPreliquidacion
                     'vehiculoRegistrado' => $p['vehiculo_id'] !== null,
                     'auxiliar' => $p['auxiliar_nombre'],
                     'auxiliarReconocido' => $p['auxiliar_id'] !== null,
-                    'productos' => $g->sum('productos'),
+                    'ordenes' => $g->count(),
                     'sinImagenes' => $g->where('tiene_imagenes', false)->count(),
-                    'asignadas' => $g->count(),
-                    'aprobadas' => $aprobadas,
-                    'rechazadas' => $g->where('estado', 'rechazada')->count(),
+                    // Entregas por producto, como quedarán en el informe
+                    'asignadas' => $e['asignadas'],
+                    'realizadas' => $e['realizadas'],
+                    'devoluciones' => $e['devoluciones'],
                     'faltantes' => $g->where('faltante', true)->count(),
                     'averias' => $g->where('averia', true)->count(),
-                    'efectividad' => ConsolidadorInforme::efectividad($aprobadas, $g->count()),
+                    'efectividad' => $e['efectividad'],
                 ];
             })
             ->sortBy([['fecha', 'asc'], ['sede', 'asc'], ['sucursal', 'asc'], ['auxiliar', 'asc']])
@@ -622,16 +623,17 @@ class AnalizadorPreliquidacion
     private function totales(array $ordenes): array
     {
         $c = collect($ordenes);
-        $aprobadas = $c->where('estado', 'aprobada')->count();
+        $e = ConsolidadorInforme::entregas($c);
 
         return [
+            // Las órdenes que se importan; las entregas (por producto), como en el informe
             'ordenes' => $c->count(),
-            'aprobadas' => $aprobadas,
-            'rechazadas' => $c->where('estado', 'rechazada')->count(),
-            'pendientes' => $c->where('estado', 'pendiente')->count(),
+            'asignadas' => $e['asignadas'],
+            'realizadas' => $e['realizadas'],
+            'devoluciones' => $e['devoluciones'],
             'faltantes' => $c->where('faltante', true)->count(),
             'averias' => $c->where('averia', true)->count(),
-            'efectividad' => ConsolidadorInforme::efectividad($aprobadas, $c->count()),
+            'efectividad' => $e['efectividad'],
         ];
     }
 }

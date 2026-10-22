@@ -17,8 +17,8 @@ use RuntimeException;
 
 /**
  * Importar el Excel del personal (auxiliares, conductores, operarios) en dos pasos: se sube y se revisa qué pasará
- * con cada fila; al confirmar, se registran las personas nuevas sin acceso a la plataforma y se completan los datos
- * de las que ya estaban.
+ * con cada fila; al confirmar, se registran las personas nuevas (si se elige, entran con su cédula) y se completan
+ * los datos de las que ya estaban.
  */
 class ImportacionPersonalController extends Controller
 {

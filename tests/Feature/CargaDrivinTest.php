@@ -100,13 +100,17 @@ class CargaDrivinTest extends TestCase
                 ->where('analisis.columnasFaltantes', [])
                 ->where('analisis.filasLeidas', 3)
                 ->where('analisis.totales.ordenes', 2)
-                ->where('analisis.totales.aprobadas', 1)
+                // Las entregas se cuentan por producto, como el informe: 3 asignadas, 2 realizadas
+                ->where('analisis.totales.asignadas', 3)
+                ->where('analisis.totales.realizadas', 2)
+                ->where('analisis.totales.devoluciones', 1)
                 ->where('analisis.totalErrores', 0)
                 ->where('analisis.grupos.0.sede', 'TuGo')
                 ->where('analisis.grupos.0.sucursal', 'Cali Sur')
                 ->where('analisis.grupos.0.auxiliarReconocido', true)
                 ->where('analisis.grupos.0.vehiculoRegistrado', true)
-                ->where('analisis.grupos.0.efectividad', 50)
+                ->where('analisis.grupos.0.ordenes', 2)
+                ->where('analisis.grupos.0.efectividad', 66.67)
             );
     }
 
@@ -145,13 +149,15 @@ class CargaDrivinTest extends TestCase
         $this->assertNotNull($primera->vehiculo_id);
         $this->assertNotNull($primera->auxiliar_id);
 
+        // Por producto: 5 asignadas (PDVT4 lleva 2) y 2 realizadas (PDVT1 y el sofá de PDVT4; la mesa no llegó)
         $informe = InformeDiario::firstOrFail();
-        $this->assertSame(4, $informe->total_asignadas);
+        $this->assertSame(5, $informe->total_asignadas);
         $this->assertSame(2, $informe->total_aprobadas);
-        $this->assertEquals(50, $informe->efectividad); // RF-06
+        $this->assertEquals(40, $informe->efectividad); // RF-06
         $this->assertSame(1, $informe->total_averias);
         $this->assertSame(1, $informe->total_faltantes);
         $this->assertSame(2, $informe->total_devoluciones);
+        $this->assertSame(4, $informe->lineas()->first()->ordenes);
     }
 
     public function test_no_se_importa_dos_veces_el_mismo_archivo_ni_la_misma_orden()

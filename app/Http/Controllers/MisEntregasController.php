@@ -16,6 +16,10 @@ use Inertia\Response;
  */
 class MisEntregasController extends Controller
 {
+    /** Lo que se cuenta de un grupo de órdenes: las entregas por producto y, aparte, las órdenes (paradas). */
+    private const CONTEO = "count(*) as ordenes, sum(productos) as entregas, sum(productos_entregados) as realizadas,
+        sum(case when estado = 'rechazada' then productos else 0 end) as devoluciones, sum(tiene_imagenes = 0) as sin_imagenes";
+
     public function __invoke(Request $request): Response
     {
         $user = $request->user();
@@ -24,20 +28,13 @@ class MisEntregasController extends Controller
 
         // Una fila por jornada, de la más reciente a la más antigua
         $jornadas = $suyas()
-            ->selectRaw("fecha_operacion, count(*) as ordenes, sum(estado = 'aprobada') as entregadas, sum(estado = 'rechazada') as devueltas, sum(productos) as productos, sum(tiene_imagenes = 0) as sin_imagenes, count(distinct ruta) as rutas")
+            // Las entregas se cuentan por producto, como el informe diario
+            ->selectRaw(self::CONTEO.', fecha_operacion, count(distinct ruta) as rutas')
             ->groupBy('fecha_operacion')
             ->orderByDesc('fecha_operacion')
             ->paginate(15, pageName: 'pagina')
             ->withQueryString()
-            ->through(fn ($j) => [
-                'fecha' => Carbon::parse($j->fecha_operacion)->toDateString(),
-                'ordenes' => (int) $j->ordenes,
-                'entregadas' => (int) $j->entregadas,
-                'devueltas' => (int) $j->devueltas,
-                'productos' => (int) $j->productos,
-                'sinImagenes' => (int) $j->sin_imagenes,
-                'cumplimiento' => ConsolidadorInforme::efectividad((int) $j->entregadas, (int) $j->ordenes),
-            ]);
+            ->through(fn ($j) => ['fecha' => Carbon::parse($j->fecha_operacion)->toDateString(), ...self::conteo($j)]);
 
         // Los últimos 30 días hasta su última jornada (si dejó de tener rutas, igual ve cómo le fue)
         $ultima = $suyas()->max('fecha_operacion');
@@ -45,18 +42,13 @@ class MisEntregasController extends Controller
         if ($ultima) {
             $hasta = Carbon::parse($ultima);
             $r = $suyas()->whereBetween('fecha_operacion', [$hasta->copy()->subDays(29)->toDateString(), $hasta->toDateString()])
-                ->selectRaw("count(*) as ordenes, sum(estado = 'aprobada') as entregadas, sum(estado = 'rechazada') as devueltas, sum(productos) as productos, sum(tiene_imagenes = 0) as sin_imagenes, count(distinct fecha_operacion) as jornadas")
+                ->selectRaw(self::CONTEO.', count(distinct fecha_operacion) as jornadas')
                 ->toBase()->first();
             $resumen = [
                 'desde' => $hasta->copy()->subDays(29)->toDateString(),
                 'hasta' => $hasta->toDateString(),
                 'jornadas' => (int) $r->jornadas,
-                'ordenes' => (int) $r->ordenes,
-                'entregadas' => (int) $r->entregadas,
-                'devueltas' => (int) $r->devueltas,
-                'productos' => (int) $r->productos,
-                'sinImagenes' => (int) $r->sin_imagenes,
-                'cumplimiento' => ConsolidadorInforme::efectividad((int) $r->entregadas, (int) $r->ordenes),
+                ...self::conteo($r),
             ];
         }
 
@@ -97,5 +89,18 @@ class MisEntregasController extends Controller
             'fecha' => $fecha,
             'ordenes' => $detalle,
         ]);
+    }
+
+    /** @return array{ordenes: int, entregas: int, realizadas: int, devoluciones: int, sinImagenes: int, cumplimiento: float} */
+    private static function conteo(object $r): array
+    {
+        return [
+            'ordenes' => (int) $r->ordenes,
+            'entregas' => (int) $r->entregas,
+            'realizadas' => (int) $r->realizadas,
+            'devoluciones' => (int) $r->devoluciones,
+            'sinImagenes' => (int) $r->sin_imagenes,
+            'cumplimiento' => ConsolidadorInforme::efectividad((int) $r->realizadas, (int) $r->entregas),
+        ];
     }
 }

@@ -89,7 +89,7 @@ export default function ImportarPersonal({ revision, roles, rolPorDefecto, empre
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Importar personal"
-                    descripcion="Sube el Excel del personal (como «Auxiliares activos»). Cada persona queda en Usuarios con su carnet y sin acceso a la plataforma; a quien ya estaba registrado solo se le completan los datos que le falten."
+                    descripcion="Sube el Excel del personal (como «Auxiliares activos»). Cada persona queda en Usuarios con su carnet y, si lo eliges, entra con su cédula; a quien ya estaba registrado solo se le completan los datos que le falten."
                 />
 
                 {revision ? (
