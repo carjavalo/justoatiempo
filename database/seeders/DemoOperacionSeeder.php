@@ -211,7 +211,7 @@ class DemoOperacionSeeder extends Seeder
             ['1000000012', 'Sebastián', 'Valencia'],
         ];
 
-        $empresa = Empresa::where('nombre', 'Ditranza')->firstOrFail();
+        $empresa = Empresa::where('nombre', 'Ditransa')->firstOrFail();
         foreach ($extra as [$cedula, $nombres, $apellido]) {
             OperacionSeeder::personal($cedula, $nombres, $apellido, $empresa)
                 ->update(['fecha_ingreso' => Carbon::parse('2025-01-15')->addDays(mt_rand(0, 400))]);

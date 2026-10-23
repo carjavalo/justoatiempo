@@ -27,7 +27,7 @@ class DashboardTest extends TestCase
     {
         parent::setUp();
 
-        // TuGo es sede de Ditranza, que recibe la línea logística
+        // TuGo es sede de Ditransa, que recibe la línea logística
         $this->sede = $this->sede('TuGo');
         // Juan entra a la plataforma (ve su desempeño); Andrés es parte del personal sin acceso
         $this->juan = User::factory()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'rol_id' => $this->rolConTablero()->id]);

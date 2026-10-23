@@ -12,8 +12,8 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
-    /** Empresa de prueba que recibe la línea logística (como Ditranza). */
-    protected function empresa(string $nombre = 'Ditranza', array $datos = []): Empresa
+    /** Empresa de prueba que recibe la línea logística (como Ditransa). */
+    protected function empresa(string $nombre = 'Ditransa', array $datos = []): Empresa
     {
         $empresa = Empresa::firstOrCreate(['nombre' => $nombre], $datos);
         $empresa->lineas()->syncWithoutDetaching([LineaServicio::logistica()->id]);
@@ -33,7 +33,7 @@ abstract class TestCase extends BaseTestCase
         return RolUsuario::firstOrCreate(['nombre' => 'Auxiliar con tablero'], ['permisos' => ['tablero.ver', 'entregas.ver'], 'alcance' => Permisos::ALCANCE_PROPIO, 'activo' => true]);
     }
 
-    /** Sede (cliente de la empresa, como TuGo); por defecto, de Ditranza. */
+    /** Sede (cliente de la empresa, como TuGo); por defecto, de Ditransa. */
     protected function sede(string $nombre, array $datos = [], ?Empresa $empresa = null): Sede
     {
         return Sede::create(['nombre' => $nombre, 'meta_efectividad' => 95, ...$datos, 'empresa_id' => ($empresa ?? $this->empresa())->id]);

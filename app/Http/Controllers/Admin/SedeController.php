@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Sedes de cada empresa: los clientes que la empresa atiende (TuGo y Sodimac, de Ditranza). */
+/** Sedes de cada empresa: los clientes que la empresa atiende (TuGo y Sodimac, de Ditransa). */
 class SedeController extends Controller
 {
     public function index(Request $request): Response

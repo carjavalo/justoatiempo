@@ -171,8 +171,8 @@ function dibujarLineas(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
 }
 
 /**
- * Lo que dice la franja: con una asignación, "EMPRESA DITRANZA · SEDE TUGO · SUCURSAL CALI SUR"; con varias, sus
- * empresas ("EMPRESAS DITRANZA · SODIMAC"); sin empresa, toda la línea; sin asignaciones, "EMPRESA SIN ASIGNAR".
+ * Lo que dice la franja: con una asignación, "EMPRESA DITRANSA · SEDE TUGO · SUCURSAL CALI SUR"; con varias, sus
+ * empresas ("EMPRESAS DITRANSA · SODIMAC"); sin empresa, toda la línea; sin asignaciones, "EMPRESA SIN ASIGNAR".
  */
 export function partesAsignacion(datos: Pick<DatosCarnet, 'asignaciones'>): [string, string][] {
     const asignaciones = datos.asignaciones;

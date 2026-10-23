@@ -78,7 +78,7 @@ class DashboardController extends Controller
 
         return Inertia::render('lineas/logistica', [
             'linea' => ['slug' => $linea->slug, 'nombre' => $linea->nombre, 'icono' => $linea->icono],
-            // Dónde está asignado en esta línea: "Ditranza · TuGo · Cali Sur" o "Ditranza y Sodimac"
+            // Dónde está asignado en esta línea: "Ditransa · TuGo · Cali Sur" o "Ditransa y Sodimac"
             'alcanceFijo' => $alcance->todo ? null : $this->alcanceFijo($user, $linea),
             'filtros' => [
                 'desde' => $desde->toDateString(),
@@ -177,7 +177,7 @@ class DashboardController extends Controller
             ->all();
     }
 
-    /** Dónde está asignado en la línea: un lugar ("Ditranza · TuGo · Cali Sur") o sus empresas ("Ditranza y Sodimac"). */
+    /** Dónde está asignado en la línea: un lugar ("Ditransa · TuGo · Cali Sur") o sus empresas ("Ditransa y Sodimac"). */
     private function alcanceFijo(User $user, LineaServicio $linea): ?string
     {
         $asignaciones = $user->vigentes()->filter(fn ($a) => $a->lineas->contains('id', $linea->id));

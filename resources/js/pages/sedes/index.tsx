@@ -59,7 +59,7 @@ const ORDEN_CAMPOS = Object.keys(VACIO);
 const formatoMeta = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
 
 /**
- * Sedes: los clientes que atiende cada empresa (TuGo y Sodimac, de Ditranza). Cada una tiene su meta de
+ * Sedes: los clientes que atiende cada empresa (TuGo y Sodimac, de Ditransa). Cada una tiene su meta de
  * efectividad pactada y sus sucursales.
  */
 export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto }: Props) {
@@ -113,7 +113,7 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Sedes"
-                    descripcion="Las sedes de cada empresa (por ejemplo, TuGo y Sodimac, de Ditranza), con su meta de efectividad."
+                    descripcion="Las sedes de cada empresa (por ejemplo, TuGo y Sodimac, de Ditransa), con su meta de efectividad."
                     accion={total > 0 && puede('sedes.crear') && botonNueva('Nueva sede')}
                 />
 

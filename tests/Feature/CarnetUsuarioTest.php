@@ -195,7 +195,7 @@ class CarnetUsuarioTest extends TestCase
         $caliSur = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
         $usuario->asignaciones()->update(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $caliSur->id, 'fecha_fin' => '2099-12-31']);
         $this->actingAs($this->admin)->get("/usuarios/{$usuario->id}/carnet")->assertInertia(fn (Assert $p) => $p
-            ->where('persona.asignaciones.0.empresa', 'Ditranza')
+            ->where('persona.asignaciones.0.empresa', 'Ditransa')
             ->where('persona.asignaciones.0.sede', 'TuGo')
             ->where('persona.asignaciones.0.sucursal', 'Cali Sur')
             ->where('persona.asignaciones.0.hasta', '2099-12-31'));
@@ -258,7 +258,7 @@ class CarnetUsuarioTest extends TestCase
 
     public function test_al_escanear_el_qr_se_ve_la_informacion_de_la_persona_y_su_arl(): void
     {
-        $empresa = $this->empresa('Ditranza');
+        $empresa = $this->empresa('Ditransa');
         $sede = $this->sede('TuGo', [], $empresa);
         $usuario = User::factory()->create([
             'nombres' => 'Johnny', 'primer_apellido' => 'Correa', 'cargo' => 'Gerente general', 'cedula' => '1144123456',
@@ -280,7 +280,7 @@ class CarnetUsuarioTest extends TestCase
                 ->where('cargo', 'Gerente general')
                 ->where('cedula', '1144123456')
                 ->where('email', 'johnny@example.com')
-                ->where('asignaciones', [['empresa' => 'Ditranza', 'sede' => 'TuGo', 'sucursal' => null, 'lineas' => [LineaServicio::logistica()->nombre], 'hasta' => null]])
+                ->where('asignaciones', [['empresa' => 'Ditransa', 'sede' => 'TuGo', 'sucursal' => null, 'lineas' => [LineaServicio::logistica()->nombre], 'hasta' => null]])
                 ->where('foto', fn ($url) => str_contains($url, "/carnet/{$codigo}/foto"))
                 ->where('arl.pdf', true)
                 ->where('arl.url', fn ($url) => str_contains($url, "/carnet/{$codigo}/arl")));

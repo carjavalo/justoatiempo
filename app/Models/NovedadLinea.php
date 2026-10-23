@@ -84,7 +84,7 @@ class NovedadLinea extends Model
         return $this->hasMany(AccionDesempeno::class, 'novedad_id');
     }
 
-    /** "Ditranza · TuGo · Cali Sur". */
+    /** "Ditransa · TuGo · Cali Sur". */
     public function lugar(): string
     {
         return implode(' · ', array_filter([$this->empresa?->nombre, $this->sede?->nombre, $this->sucursal?->nombre]));

@@ -153,7 +153,7 @@ class LineasAdministracionTest extends TestCase
         // No se le agrega a otra empresa, pero la que ya la recibe la conserva
         $this->actingAs($this->admin)->post('/empresas', ['nombre' => 'Sodimac', 'lineas' => [$this->aseo->id]])
             ->assertSessionHasErrors(['lineas' => '«Aseo general» está inactiva: actívala en Líneas de servicio antes de marcarla.']);
-        $this->actingAs($this->admin)->put("/empresas/{$recibe->id}", ['nombre' => 'Ditranza', 'lineas' => [LineaServicio::logistica()->id, $this->aseo->id]])
+        $this->actingAs($this->admin)->put("/empresas/{$recibe->id}", ['nombre' => 'Ditransa', 'lineas' => [LineaServicio::logistica()->id, $this->aseo->id]])
             ->assertSessionHasNoErrors();
         $this->assertTrue($recibe->lineas()->whereKey($this->aseo->id)->exists());
         $this->assertFalse(Empresa::where('nombre', 'Sodimac')->exists());

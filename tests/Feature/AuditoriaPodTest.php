@@ -80,6 +80,8 @@ class AuditoriaPodTest extends TestCase
                 ->where('resumen.aprobadas', 2)
                 ->where('resumen.pendientes', 2)
                 ->has('ordenes', 2)
+                // Se audita por orden, y cada una dice cuántos productos (entregas del informe) lleva
+                ->where('ordenes.0.productos', 1)
                 ->where('seleccionada.codigo', 'PDVT1001')
                 ->where('seleccionada.auditoria.sin_evidencia', true) // sin archivos: se detecta sola
                 ->where('siguiente.codigo', 'PDVT1002')

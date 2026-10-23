@@ -32,6 +32,8 @@ export interface OrdenCola {
     sucursal: string | null;
     auxiliar: string | null;
     placa: string | null;
+    /** Productos de la orden: las entregas que cuenta el informe. */
+    productos: number;
     evidencias: number;
     estadoAuditoria: EstadoAuditoria;
 }

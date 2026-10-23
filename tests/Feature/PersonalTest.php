@@ -188,14 +188,14 @@ class PersonalTest extends TestCase
 
     public function test_importa_el_excel_del_personal(): void
     {
-        $ditranza = Empresa::create(['nombre' => 'Ditranza']);
-        $ditranza->lineas()->attach(LineaServicio::logistica());
+        $ditransa = Empresa::create(['nombre' => 'Ditransa']);
+        $ditransa->lineas()->attach(LineaServicio::logistica());
         // Ya estaba registrada (sin teléfono): solo se le completa lo que falta
         $juan = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan', 'primer_apellido' => 'Plaza', 'telefono' => null, 'cargo' => 'Auxiliar', 'linea_servicio_id' => null]);
 
         $archivo = $this->excelPersonal([
             [1, 1144203579, 'JUAN ', 'FERNANDO', 'PLAZA', 'BENAVIDES', 'AUXILIAR LOGISTICO', 'DITRANSA', 'CALI', 3022501982, 'plaza@gmail.com', '1997-09-23', '2026-01-15'],
-            [2, 1061428366, 'CRISTIAN', 'ALEJANDRO', 'APONZA', 'MINA', 'AUXILIAR LOGISTICO', 'DITRANSA', 'CALI', 3177666236, 'NO TIENE', '2004-04-15', '2026-03-10'],
+            [2, 1061428366, 'CRISTIAN', 'ALEJANDRO', 'APONZA', 'MINA', 'AUXILIAR LOGISTICO', 'DITRANZA', 'CALI', 3177666236, 'NO TIENE', '2004-04-15', '2026-03-10'],
             [3, 1111750549, 'WISTHON ', '-', 'MONDRAGON', 'MOSQUERA', 'AUXILIAR LOGISTICO', 'DITRANSA', 'CALI', 3216330781, 'wiston@gmail.com', '2026-05-15', '2026-02-24'],
             [4, null, 'SIN', '', 'CEDULA', '', 'AUXILIAR LOGISTICO', 'DITRANSA', 'CALI', null, null, null, null],
         ]);
@@ -205,8 +205,10 @@ class PersonalTest extends TestCase
             ->where('revision.resumen.nueva', 2)
             ->where('revision.resumen.completa', 1)
             ->where('revision.resumen.error', 1)
-            // "DITRANSA" es Ditranza (un nombre casi igual)
-            ->where('revision.operaciones.0.empresaId', $ditranza->id)
+            // "DITRANSA" es Ditransa y "DITRANZA", mal escrito en el Excel, también (un nombre casi igual)
+            ->where('revision.operaciones.0.empresaId', $ditransa->id)
+            ->where('revision.operaciones.1.valor', 'DITRANZA')
+            ->where('revision.operaciones.1.empresaId', $ditransa->id)
             ->where('revision.filas.2.avisos.0', 'La fecha de nacimiento no es válida (menos de 14 años): se omite.'));
         $this->assertFalse(User::where('cedula', '1061428366')->exists(), 'La revisión no registra a nadie');
 
@@ -217,9 +219,9 @@ class PersonalTest extends TestCase
         $cristian = User::where('cedula', '1061428366')->sole();
         $this->assertSame(['Cristian Alejandro', 'Aponza', 'Mina', 'Auxiliar logístico', true, true, null], [$cristian->nombres, $cristian->primer_apellido, $cristian->segundo_apellido, $cristian->cargo, $cristian->acceso, $cristian->debe_cambiar_contrasena, $cristian->email]);
         $this->assertTrue(Hash::check('1061428366', $cristian->password));
-        // Asignada a Ditranza, con sus líneas, desde su ingreso
+        // Asignada a Ditransa, con sus líneas, desde su ingreso
         $asignacion = $cristian->asignaciones()->with('lineas')->sole();
-        $this->assertSame([$ditranza->id, '2026-03-10', [LineaServicio::logistica()->id]], [$asignacion->empresa_id, $asignacion->fecha_inicio->toDateString(), $asignacion->lineas->pluck('id')->all()]);
+        $this->assertSame([$ditransa->id, '2026-03-10', [LineaServicio::logistica()->id]], [$asignacion->empresa_id, $asignacion->fecha_inicio->toDateString(), $asignacion->lineas->pluck('id')->all()]);
         $this->assertNull(User::where('cedula', '1111750549')->value('fecha_nacimiento'));
 
         // A Juan solo se le completa lo que faltaba (su segundo apellido, su teléfono, su correo): sus nombres y su cargo se conservan

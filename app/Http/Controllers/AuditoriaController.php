@@ -283,6 +283,8 @@ class AuditoriaController extends Controller
                 'sucursal' => $o->sucursal?->nombre,
                 'auxiliar' => $o->auxiliar?->name ?? $o->auxiliar_nombre,
                 'placa' => $o->placa,
+                // La auditoría es por orden; cada orden lleva uno o varios productos (las entregas del informe)
+                'productos' => (int) $o->productos,
                 'evidencias' => (int) $o->evidencias_count,
                 'estadoAuditoria' => $this->estadoAuditoria($o),
             ])->values(),

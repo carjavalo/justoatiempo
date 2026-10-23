@@ -55,7 +55,7 @@ class Programacion extends Model
         return $this->belongsTo(User::class, 'creado_por');
     }
 
-    /** "Ditranza · TuGo · Cali Sur". */
+    /** "Ditransa · TuGo · Cali Sur". */
     public function lugar(): string
     {
         return implode(' · ', array_filter([$this->empresa?->nombre, $this->sede?->nombre, $this->sucursal?->nombre]));

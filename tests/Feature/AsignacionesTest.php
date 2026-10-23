@@ -78,7 +78,7 @@ class AsignacionesTest extends TestCase
         // De ella salen sus líneas y su carnet
         $this->assertSame([$this->logistica->id, $this->aseo->id], $ana->fresh()->lineasIds());
         $this->actingAs($this->admin)->get("/usuarios/{$ana->id}/carnet")->assertInertia(fn (Assert $p) => $p
-            ->where('persona.asignaciones.0.empresa', 'Ditranza')
+            ->where('persona.asignaciones.0.empresa', 'Ditransa')
             ->where('persona.asignaciones.0.sucursal', 'Cali Sur')
             ->where('persona.asignaciones.0.lineas', [$this->logistica->nombre, $this->aseo->nombre])
             ->where('persona.asignaciones.0.hasta', '2027-01-20'));
@@ -93,10 +93,10 @@ class AsignacionesTest extends TestCase
         $this->actingAs($this->admin)->post('/asignaciones', $this->datos($ana, ['empresa_id' => $empresa->id, 'lineas' => [$this->aseo->id]]))
             ->assertSessionHasNoErrors();
 
-        // Desde ahora Ditranza recibe aseo general: aparece en esa línea, con su personal
+        // Desde ahora Ditransa recibe aseo general: aparece en esa línea, con su personal
         $this->assertTrue($empresa->lineas()->whereKey($this->aseo->id)->exists());
         $this->actingAs($this->admin)->get('/lineas/aseo-general')
-            ->assertInertia(fn (Assert $p) => $p->where('empresas.0.nombre', 'Ditranza')->where('empresas.0.personas', 1));
+            ->assertInertia(fn (Assert $p) => $p->where('empresas.0.nombre', 'Ditransa')->where('empresas.0.personas', 1));
     }
 
     public function test_calcula_el_fin_segun_la_duracion(): void
@@ -163,7 +163,7 @@ class AsignacionesTest extends TestCase
         $this->actingAs($this->admin)->post('/asignaciones', $this->datos($ana, ['empresa_id' => $otra->id, 'lineas' => [$this->aseo->id]]))->assertSessionHasNoErrors();
 
         $ana = $ana->fresh();
-        $this->assertSame(['Ditranza', 'Bodegas del Valle'], $ana->vigentes()->map(fn ($a) => $a->empresa->nombre)->all());
+        $this->assertSame(['Ditransa', 'Bodegas del Valle'], $ana->vigentes()->map(fn ($a) => $a->empresa->nombre)->all());
         // Trabaja en dos líneas: al ingresar ve el panel con las dos
         $this->actingAs($ana)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 2));
         $this->actingAs($ana)->get('/lineas/aseo-general')->assertOk();

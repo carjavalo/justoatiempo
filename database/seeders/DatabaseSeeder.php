@@ -58,7 +58,7 @@ class DatabaseSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        // Los dos prestan el servicio logístico en TuGo · Cali Sur (de Ditranza)
+        // Los dos prestan el servicio logístico en TuGo · Cali Sur (de Ditransa)
         foreach ([$coordinador, $auxiliar] as $persona) {
             if ($persona->asignaciones()->exists()) {
                 continue;

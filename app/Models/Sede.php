@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Sede de una empresa: cada cliente que la empresa atiende (TuGo y Sodimac, de Ditranza). En Drivin es la
+ * Sede de una empresa: cada cliente que la empresa atiende (TuGo y Sodimac, de Ditransa). En Drivin es la
  * columna "Cliente corporativo"; tiene su meta de efectividad pactada y sus sucursales.
  */
 class Sede extends Model

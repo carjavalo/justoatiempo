@@ -29,7 +29,7 @@ class CargaDrivinTest extends TestCase
         parent::setUp();
         Storage::fake('local');
 
-        // Ditranza atiende a TuGo y a Sodimac (sedes), cada una con su sucursal
+        // Ditransa atiende a TuGo y a Sodimac (sedes), cada una con su sucursal
         $tugo = $this->sede('TuGo', ['codigo' => 'TUGO']);
         $tugo->sucursales()->create(['nombre' => 'Cali Sur', 'alias_drivin' => 'CALI SUR CROSS', 'ciudad' => 'Cali']);
         $sodimac = $this->sede('Sodimac', ['codigo' => 'SODIMAC']);

@@ -7,14 +7,14 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Jerarquía de tres niveles, como la maneja Justo a Tiempo:
- *   Empresa (p. ej. Ditranza: NIT, contacto, líneas de servicio)
+ *   Empresa (p. ej. Ditransa: NIT, contacto, líneas de servicio)
  *   └─ Sede (los clientes de la empresa: TuGo, Sodimac; meta de efectividad y código en Drivin)
  *      └─ Sucursal (Cali Sur, Cañasgordas…; alias en Drivin). Sin sede = sucursal propia de Justo a Tiempo.
  *
  * Antes había dos niveles: "clientes" (TuGo) y "sedes" (Cali Sur). Aquí "clientes" pasa a ser "sedes",
  * "sedes" pasa a ser "sucursales" y se crea "empresas" encima. Cada sede existente recibe una empresa con
  * sus mismos datos (nada se pierde). Para agruparlas bajo la empresa real (p. ej. TuGo y Sodimac bajo
- * Ditranza) se edita cada sede en el panel y se le cambia la empresa: pasa con su operación y su personal.
+ * Ditransa) se edita cada sede en el panel y se le cambia la empresa: pasa con su operación y su personal.
  *
  * MariaDB 10.4 no renombra índices y los nombres de llaves foráneas son únicos en toda la base: por eso
  * se sueltan y se vuelven a crear con los nombres nuevos.

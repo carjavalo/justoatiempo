@@ -465,7 +465,7 @@ class ImportadorPersonal
 
     /**
      * La empresa que corresponde al texto de "operación": el mismo nombre, o uno casi igual ("DITRANSA" y
-     * "Ditranza"), si solo hay una así.
+     * "Ditransa"), si solo hay una así.
      *
      * @param  Collection<int, Empresa>  $empresas
      */

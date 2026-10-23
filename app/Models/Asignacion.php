@@ -132,7 +132,7 @@ class Asignacion extends Model
         };
     }
 
-    /** "Ditranza · TuGo · Cali Sur" (sin empresa: "Toda la línea"). */
+    /** "Ditransa · TuGo · Cali Sur" (sin empresa: "Toda la línea"). */
     public function lugar(): string
     {
         $partes = array_filter([$this->empresa?->nombre ?? 'Toda la línea', $this->sede?->nombre, $this->sucursal?->nombre]);

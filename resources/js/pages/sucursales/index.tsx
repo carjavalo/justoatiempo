@@ -84,7 +84,7 @@ const CIUDADES = [
     'Villavicencio',
 ];
 
-/** Nombre de la sede con su empresa ("TuGo · Ditranza"): dos empresas pueden atender a clientes parecidos. */
+/** Nombre de la sede con su empresa ("TuGo · Ditransa"): dos empresas pueden atender a clientes parecidos. */
 const nombreSede = (s: Sede) => [s.nombre, s.empresa].filter(Boolean).join(' · ') + (s.activo ? '' : ' (inactiva)');
 
 export default function Sucursales({ sucursales, total, filtros, sedes }: Props) {

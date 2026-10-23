@@ -34,7 +34,7 @@ interface Persona {
     realizadas: number;
     cumplimiento: number;
     sinEvidencia: number;
-    /** Porcentaje de entregas auditadas que cumplen el protocolo (null sin auditorías). */
+    /** Porcentaje de órdenes auditadas que cumplen el protocolo (null sin auditorías). */
     protocolo: number | null;
     ultimaJornada: string;
     conteo: Record<string, number>;

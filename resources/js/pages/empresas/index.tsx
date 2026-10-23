@@ -111,7 +111,7 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
 
             <div className={contenedorModulo}>
                 {/* Sin empresas, la acción vive en el estado vacío: un solo botón para crear */}
-                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditranza), con su contacto y las líneas de servicio que reciben." accion={total > 0 && puede('empresas.crear') && botonNueva('Nueva empresa')} />
+                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditransa), con su contacto y las líneas de servicio que reciben." accion={total > 0 && puede('empresas.crear') && botonNueva('Nueva empresa')} />
 
                 {total === 0 ? (
                     <EstadoVacio

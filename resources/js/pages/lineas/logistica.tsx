@@ -22,7 +22,7 @@ function saludo() {
 
 type Props = DashboardProps & {
     linea: { slug: string; nombre: string; icono: string | null };
-    /** A lo que está limitada la persona, lo más específico: "TuGo · Cali Sur", "TuGo" o "Ditranza". */
+    /** A lo que está limitada la persona, lo más específico: "TuGo · Cali Sur", "TuGo" o "Ditransa". */
     alcanceFijo: string | null;
 };
 
@@ -149,7 +149,7 @@ export default function TableroLogistica(props: Props) {
                 <div className="border-warning/30 bg-warning-soft flex items-center gap-3 rounded-xl border px-4 py-3 text-sm">
                     <AlertTriangle className="text-warning size-4 shrink-0" aria-hidden="true" />
                     <p>
-                        <strong>{fmt.numero(kpis.sinAuditar)} entregas aprobadas</strong> aún no tienen auditoría de evidencias en este periodo.
+                        <strong>{fmt.numero(kpis.sinAuditar)} órdenes aprobadas</strong> aún no tienen auditoría de evidencias en este periodo.
                     </p>
                 </div>
             )}

@@ -67,7 +67,7 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                 <div className="bg-card w-full max-w-md rounded-2xl border p-4 xl:w-96">
                     <div className="flex items-baseline justify-between gap-2 text-sm">
                         <p className="font-semibold">
-                            {fmt.numero(resumen.auditadas)} de {fmt.numero(resumen.aprobadas)} entregas auditadas
+                            {fmt.numero(resumen.auditadas)} de {fmt.numero(resumen.aprobadas)} órdenes auditadas
                         </p>
                         {resumen.cumplimiento !== null && <p className="text-muted-foreground text-xs">{fmt.pct(resumen.cumplimiento)} cumple</p>}
                     </div>
@@ -178,7 +178,7 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                                 <ClipboardCheck className="size-7" aria-hidden="true" />
                             </span>
                             <h2 className="mt-4 text-lg font-bold">
-                                {resumen.aprobadas ? 'No hay órdenes con este filtro' : 'No hay entregas aprobadas en esta jornada'}
+                                {resumen.aprobadas ? 'No hay órdenes con este filtro' : 'No hay órdenes aprobadas en esta jornada'}
                             </h2>
                             <p className="text-muted-foreground mt-1 max-w-md text-sm">
                                 {resumen.aprobadas && filtros.estado === 'pendientes'

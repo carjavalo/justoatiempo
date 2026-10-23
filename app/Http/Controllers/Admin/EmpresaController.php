@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-/** Empresas clientes (p. ej. Ditranza): el contrato, con su NIT, su contacto y las líneas que reciben. */
+/** Empresas clientes (p. ej. Ditransa): el contrato, con su NIT, su contacto y las líneas que reciben. */
 class EmpresaController extends Controller
 {
     public function index(Request $request): Response

@@ -1,1 +1,0 @@
-import{j as t,$ as n}from"./app-C57Re8F1.js";import{c as s}from"./logo-marca-B1VvlrD8.js";function u({className:o="",children:r,...e}){return t.jsx(n,{className:s("text-foreground decoration-muted-foreground underline underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current!",o),...e,children:r})}export{u as T};

@@ -54,14 +54,14 @@ class PermisosSeguridadTest extends TestCase
 
     public function test_quien_ve_solo_su_empresa_no_se_quita_ese_limite(): void
     {
-        $ditranza = $this->empresa();
+        $ditransa = $this->empresa();
         $otra = $this->empresa('Logística Sur');
         $rol = $this->rol(
             ['usuarios.ver', 'usuarios.crear', 'asignaciones.ver', 'asignaciones.crear', 'asignaciones.editar', 'asignaciones.terminar', 'tablero.ver', 'cargas.ver'],
             Permisos::ALCANCE_ASIGNACION,
             'Supervisor cliente',
         );
-        $supervisora = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditranza->id]);
+        $supervisora = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditransa->id]);
         $this->actingAs($supervisora)->get('/cargas')->assertForbidden();
 
         // Ni asignándose a sí misma a toda la línea…
@@ -81,7 +81,7 @@ class PermisosSeguridadTest extends TestCase
         $this->actingAs($gemela)->get('/cargas')->assertForbidden();
 
         // Dentro de su empresa, sí
-        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($gemela, ['empresa_id' => $ditranza->id]))->assertSessionHasNoErrors();
+        $this->actingAs($supervisora)->post('/asignaciones', $this->asignacion($gemela, ['empresa_id' => $ditransa->id]))->assertSessionHasNoErrors();
         $this->actingAs($gemela->fresh())->get('/cargas')->assertForbidden();
     }
 
@@ -102,17 +102,17 @@ class PermisosSeguridadTest extends TestCase
 
     public function test_quien_ve_solo_su_empresa_administra_solo_a_su_personal(): void
     {
-        $ditranza = $this->empresa();
+        $ditransa = $this->empresa();
         $otra = $this->empresa('Logística Sur');
         $rol = $this->rol(['usuarios.ver', 'usuarios.estado', 'tablero.ver', 'roles.ver', 'empresas.ver', 'asignaciones.ver'], Permisos::ALCANCE_ASIGNACION, 'Talento cliente');
-        $talento = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditranza->id]);
-        $deDitranza = User::factory()->create(['empresa_id' => $ditranza->id]);
+        $talento = User::factory()->create(['rol_id' => $rol->id, 'empresa_id' => $ditransa->id]);
+        $deDitransa = User::factory()->create(['empresa_id' => $ditransa->id]);
         $deOtra = User::factory()->create(['empresa_id' => $otra->id]);
         // Quien aún no tiene asignación sí se ve: hay que poder asignarlo
         $sinAsignar = User::factory()->create(['rol_id' => $this->rol([], Permisos::ALCANCE_PROPIO, 'Visitante')->id, 'linea_servicio_id' => null]);
 
         $this->actingAs($talento)->get('/usuarios')->assertInertia(fn (Assert $p) => $p
-            ->where('usuarios.data', fn ($filas) => collect($filas)->pluck('id')->sort()->values()->all() === collect([$talento->id, $deDitranza->id, $sinAsignar->id])->sort()->values()->all()));
+            ->where('usuarios.data', fn ($filas) => collect($filas)->pluck('id')->sort()->values()->all() === collect([$talento->id, $deDitransa->id, $sinAsignar->id])->sort()->values()->all()));
         foreach (['carnet', 'foto', 'arl'] as $parte) {
             $this->actingAs($talento)->get("/usuarios/{$deOtra->id}/{$parte}")->assertNotFound();
         }

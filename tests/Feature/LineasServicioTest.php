@@ -59,8 +59,8 @@ class LineasServicioTest extends TestCase
 
     public function test_el_panel_del_administrador_lista_las_ocho_lineas_con_sus_conteos(): void
     {
-        $ditranza = $this->empresa();
-        $ditranza->lineas()->attach($this->aseo);
+        $ditransa = $this->empresa();
+        $ditransa->lineas()->attach($this->aseo);
         Empresa::create(['nombre' => 'Inactiva', 'activo' => false])->lineas()->attach($this->aseo);
         User::factory()->coordinador()->create();
 
@@ -144,7 +144,7 @@ class LineasServicioTest extends TestCase
         $this->ordenes($ajena, 7);
 
         $this->actingAs($this->admin)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->has('sedes', 2)->where('sedes.0.empresa', 'Ditranza')->where('kpis.asignadas', 5)->where('filtros.sede', null));
+            ->assertInertia(fn (Assert $p) => $p->has('sedes', 2)->where('sedes.0.empresa', 'Ditransa')->where('kpis.asignadas', 5)->where('filtros.sede', null));
 
         // Se filtra por una sede de la línea; una ajena se ignora
         $this->actingAs($this->admin)->get("/lineas/logisticos?sede={$sodimac->id}")
@@ -166,28 +166,28 @@ class LineasServicioTest extends TestCase
         // Asignado a la empresa: ve sus dos sedes
         $deEmpresa = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
         $this->actingAs($deEmpresa)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->has('sedes', 2)->where('kpis.asignadas', 9)->where('alcanceFijo', 'Ditranza'));
+            ->assertInertia(fn (Assert $p) => $p->has('sedes', 2)->where('kpis.asignadas', 9)->where('alcanceFijo', 'Ditransa'));
 
         // Asignado a la sede: aunque pida la otra, sigue viendo solo la suya
         $deSede = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id]);
         $this->actingAs($deSede)->get("/lineas/logisticos?sede={$sodimac->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('sedes', 1)->where('filtros.sede', $tugo->id)->where('kpis.asignadas', 7)->where('alcanceFijo', 'Ditranza · TuGo'));
+            ->assertInertia(fn (Assert $p) => $p->has('sedes', 1)->where('filtros.sede', $tugo->id)->where('kpis.asignadas', 7)->where('alcanceFijo', 'Ditransa · TuGo'));
 
         // Asignado a la sucursal: solo su sucursal
         $deSucursal = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id, 'sede_id' => $tugo->id, 'sucursal_id' => $caliSur->id]);
         $this->actingAs($deSucursal)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'Ditranza · TuGo · Cali Sur')->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver')));
+            ->assertInertia(fn (Assert $p) => $p->where('kpis.asignadas', 3)->where('alcanceFijo', 'Ditransa · TuGo · Cali Sur')->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver')));
     }
 
     public function test_con_alcance_fijo_no_se_ven_acciones_ni_cargas_de_otras_operaciones(): void
     {
         $tugo = $this->sede('TuGo');
         $this->ordenes($tugo, 2);
-        $ajeno = User::factory()->sinAcceso()->create(['cedula' => '999', 'nombres' => 'Ajeno', 'primer_apellido' => 'A Ditranza', 'linea_servicio_id' => null]);
+        $ajeno = User::factory()->sinAcceso()->create(['cedula' => '999', 'nombres' => 'Ajeno', 'primer_apellido' => 'A Ditransa', 'linea_servicio_id' => null]);
         AccionDesempeno::create(['user_id' => $ajeno->id, 'linea_servicio_id' => LineaServicio::logistica()->id, 'fecha' => '2026-10-02', 'tipo' => TipoAccion::LlamadoAtencion, 'descripcion' => 'Llegó tarde a otra operación']);
 
-        $deDitranza = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
-        $this->actingAs($deDitranza)->get('/lineas/logisticos')
+        $deDitransa = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
+        $this->actingAs($deDitransa)->get('/lineas/logisticos')
             ->assertInertia(fn (Assert $p) => $p->has('acciones', 0)->where('pendientes.ultimaCarga', null));
 
         // El personal propio sí ve las acciones generales y la última carga
@@ -222,12 +222,12 @@ class LineasServicioTest extends TestCase
 
     public function test_la_empresa_guarda_las_lineas_que_recibe(): void
     {
-        $this->actingAs($this->admin)->post('/empresas', ['nombre' => 'Ditranza', 'lineas' => [$this->logistica->id, $this->aseo->id]])
+        $this->actingAs($this->admin)->post('/empresas', ['nombre' => 'Ditransa', 'lineas' => [$this->logistica->id, $this->aseo->id]])
             ->assertSessionHasNoErrors();
         $empresa = Empresa::sole();
         $this->assertEqualsCanonicalizing([$this->logistica->id, $this->aseo->id], $empresa->lineas()->pluck('lineas_servicio.id')->all());
 
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza', 'lineas' => [$this->aseo->id]])
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditransa', 'lineas' => [$this->aseo->id]])
             ->assertSessionHasNoErrors();
         $this->assertSame([$this->aseo->id], $empresa->lineas()->pluck('lineas_servicio.id')->all());
 
@@ -243,12 +243,12 @@ class LineasServicioTest extends TestCase
         $empresa->lineas()->attach($this->aseo);
         User::factory()->create(['empresa_id' => $empresa->id, 'linea_servicio_id' => $this->aseo->id]);
 
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza', 'lineas' => [$this->logistica->id]])
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditransa', 'lineas' => [$this->logistica->id]])
             ->assertSessionHasErrors(['lineas' => "No puedes quitar «{$this->aseo->nombre}»: 1 persona está asignada a esta empresa en esa línea."]);
         $this->assertSame(2, $empresa->lineas()->count());
 
         // La que no tiene personal sí se puede quitar
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza', 'lineas' => [$this->aseo->id]])
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditransa', 'lineas' => [$this->aseo->id]])
             ->assertSessionHasNoErrors();
     }
 
@@ -257,7 +257,7 @@ class LineasServicioTest extends TestCase
         $empresa = $this->empresa();
         $this->ordenes($this->sede('TuGo', [], $empresa), 1);
 
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza', 'lineas' => []])
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditransa', 'lineas' => []])
             ->assertSessionHasErrors(['lineas' => "No puedes quitar «{$this->logistica->nombre}»: las sedes de esta empresa ya tienen operación registrada en esa línea."]);
         $this->assertSame(1, $empresa->lineas()->count());
     }

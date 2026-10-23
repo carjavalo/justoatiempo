@@ -87,14 +87,14 @@ class AdministracionTest extends TestCase
     public function test_crea_una_empresa_y_calcula_el_digito_de_verificacion_del_nit(): void
     {
         $this->actingAs($this->admin)->from('/empresas')->post('/empresas', [
-            'nombre' => 'Ditranza S.A.S',
+            'nombre' => 'Ditransa S.A.S',
             'nit' => '900.123.456',
-            'contacto_email' => 'Compras@Ditranza.com',
+            'contacto_email' => 'Compras@Ditransa.com',
         ])->assertRedirect('/empresas')->assertSessionHas('success');
 
         $empresa = Empresa::sole();
         $this->assertSame('900123456-8', $empresa->nit);
-        $this->assertSame('compras@ditranza.com', $empresa->contacto_email);
+        $this->assertSame('compras@ditransa.com', $empresa->contacto_email);
         $this->assertTrue($empresa->activo);
     }
 
@@ -112,11 +112,11 @@ class AdministracionTest extends TestCase
 
     public function test_edita_y_desactiva_una_empresa(): void
     {
-        $empresa = Empresa::create(['nombre' => 'Ditranza', 'nit' => '900123456-8']);
+        $empresa = Empresa::create(['nombre' => 'Ditransa', 'nit' => '900123456-8']);
 
         // Conservar su propio NIT no cuenta como repetido
-        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditranza S.A.S', 'nit' => '900123456-8'])->assertSessionHasNoErrors();
-        $this->assertSame('Ditranza S.A.S', $empresa->fresh()->nombre);
+        $this->actingAs($this->admin)->put("/empresas/{$empresa->id}", ['nombre' => 'Ditransa S.A.S', 'nit' => '900123456-8'])->assertSessionHasNoErrors();
+        $this->assertSame('Ditransa S.A.S', $empresa->fresh()->nombre);
 
         $this->actingAs($this->admin)->patch("/empresas/{$empresa->id}/estado", ['activo' => false]);
         $this->assertFalse($empresa->fresh()->activo);
@@ -128,7 +128,7 @@ class AdministracionTest extends TestCase
         $this->sede('Sodimac');
 
         $this->actingAs($this->admin)->get('/empresas')
-            ->assertInertia(fn (Assert $p) => $p->has('empresas.data', 1)->where('empresas.data.0.nombre', 'Ditranza')->where('empresas.data.0.sedes', 2));
+            ->assertInertia(fn (Assert $p) => $p->has('empresas.data', 1)->where('empresas.data.0.nombre', 'Ditransa')->where('empresas.data.0.sedes', 2));
     }
 
     // --- Sedes (los clientes de cada empresa) ------------------------------------------
@@ -153,7 +153,7 @@ class AdministracionTest extends TestCase
 
     public function test_una_empresa_inactiva_no_recibe_sedes_nuevas(): void
     {
-        $empresa = Empresa::create(['nombre' => 'Ditranza', 'activo' => false]);
+        $empresa = Empresa::create(['nombre' => 'Ditransa', 'activo' => false]);
 
         $this->actingAs($this->admin)->post('/sedes', ['nombre' => 'TuGo', 'empresa_id' => $empresa->id, 'meta_efectividad' => 95])
             ->assertSessionHasErrors(['empresa_id' => 'Esta empresa está inactiva: actívala antes de asignarle sedes.']);
@@ -165,14 +165,14 @@ class AdministracionTest extends TestCase
         $empresaVieja = $this->empresa('TuGo');
         $sede = $this->sede('TuGo', [], $empresaVieja);
         $persona = User::factory()->create(['empresa_id' => $empresaVieja->id, 'sede_id' => $sede->id]);
-        $ditranza = $this->empresa();
+        $ditransa = $this->empresa();
 
-        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'TuGo', 'empresa_id' => $ditranza->id, 'meta_efectividad' => 95])
+        $this->actingAs($this->admin)->put("/sedes/{$sede->id}", ['nombre' => 'TuGo', 'empresa_id' => $ditransa->id, 'meta_efectividad' => 95])
             ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'La sede TuGo ahora es de Ditranza, con sus sucursales y su personal.');
-        $this->assertSame($ditranza->id, $sede->fresh()->empresa_id);
+            ->assertSessionHas('success', 'La sede TuGo ahora es de Ditransa, con sus sucursales y su personal.');
+        $this->assertSame($ditransa->id, $sede->fresh()->empresa_id);
         // Sus asignaciones pasan con ella: nadie queda en una sede de otra empresa
-        $this->assertSame($ditranza->id, $persona->asignaciones()->sole()->empresa_id);
+        $this->assertSame($ditransa->id, $persona->asignaciones()->sole()->empresa_id);
     }
 
     public function test_no_se_traslada_una_sede_a_una_empresa_que_no_recibe_la_linea_de_su_personal(): void
@@ -200,10 +200,10 @@ class AdministracionTest extends TestCase
     {
         $this->sede('TuGo');
         $this->sede('Falabella', [], $this->empresa('Logística Sur'));
-        $ditranza = Empresa::firstWhere('nombre', 'Ditranza');
+        $ditransa = Empresa::firstWhere('nombre', 'Ditransa');
 
-        $this->actingAs($this->admin)->get("/sedes?empresa={$ditranza->id}")
-            ->assertInertia(fn (Assert $p) => $p->component('sedes/index')->has('sedes.data', 1)->where('sedes.data.0.nombre', 'TuGo')->where('sedes.data.0.empresa', 'Ditranza'));
+        $this->actingAs($this->admin)->get("/sedes?empresa={$ditransa->id}")
+            ->assertInertia(fn (Assert $p) => $p->component('sedes/index')->has('sedes.data', 1)->where('sedes.data.0.nombre', 'TuGo')->where('sedes.data.0.empresa', 'Ditransa'));
     }
 
     // --- Sucursales --------------------------------------------------------------------
@@ -254,7 +254,7 @@ class AdministracionTest extends TestCase
         $this->actingAs($this->admin)->get('/sucursales?sede=propias')
             ->assertInertia(fn (Assert $p) => $p->component('sucursales/index')->has('sucursales.data', 1)->where('sucursales.data.0.nombre', 'Oficina'));
         $this->actingAs($this->admin)->get("/sucursales?sede={$sede->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('sucursales.data', 1)->where('sucursales.data.0.sede', 'TuGo')->where('sucursales.data.0.empresa', 'Ditranza'));
+            ->assertInertia(fn (Assert $p) => $p->has('sucursales.data', 1)->where('sucursales.data.0.sede', 'TuGo')->where('sucursales.data.0.empresa', 'Ditransa'));
     }
 
     public function test_una_sucursal_con_usuarios_no_cambia_de_sede(): void
@@ -326,7 +326,7 @@ class AdministracionTest extends TestCase
         User::factory()->create(['name' => 'Sin asignar', 'email' => 'sin@example.com', 'linea_servicio_id' => null]);
 
         $this->actingAs($this->admin)->get('/usuarios?q=asignada@example.com')
-            ->assertInertia(fn (Assert $p) => $p->where('usuarios.data.0.asignaciones', [['lugar' => 'Ditranza · TuGo', 'lineas' => [LineaServicio::logistica()->nombre]]]));
+            ->assertInertia(fn (Assert $p) => $p->where('usuarios.data.0.asignaciones', [['lugar' => 'Ditransa · TuGo', 'lineas' => [LineaServicio::logistica()->nombre]]]));
         $this->actingAs($this->admin)->get('/usuarios?q=sin@example.com')
             ->assertInertia(fn (Assert $p) => $p->where('usuarios.data.0.asignaciones', []));
     }
@@ -421,7 +421,7 @@ class AdministracionTest extends TestCase
         // El tablero de la línea sí lo ve, pero solo con su empresa y sin las herramientas
         $this->actingAs($deEmpresa)->get('/lineas/logisticos')
             // Sus herramientas (cargas, auditoría) reúnen todas las empresas: no le aplican
-            ->assertInertia(fn (Assert $p) => $p->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver'))->where('alcanceFijo', 'Ditranza'));
+            ->assertInertia(fn (Assert $p) => $p->where('auth.permisos', fn ($permisos) => ! collect($permisos)->contains('cargas.ver'))->where('alcanceFijo', 'Ditransa'));
         $this->actingAs($propio)->get('/lineas/logisticos')
             ->assertInertia(fn (Assert $p) => $p->where('auth.permisos', fn ($permisos) => collect($permisos)->contains('cargas.ver'))->where('alcanceFijo', null));
     }

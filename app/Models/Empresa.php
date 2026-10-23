@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Empresa cliente de Justo a Tiempo (p. ej. Ditranza): el contrato, con su NIT, su contacto y las
+ * Empresa cliente de Justo a Tiempo (p. ej. Ditransa): el contrato, con su NIT, su contacto y las
  * líneas de servicio que recibe. Atiende a sus propios clientes, que en la plataforma son sus sedes.
  */
 class Empresa extends Model

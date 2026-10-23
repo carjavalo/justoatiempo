@@ -30,14 +30,21 @@ export function consultaFiltros(f: FiltrosAuditoria): Record<string, string> {
     return q;
 }
 
-/** Cola de la jornada: cada orden es un enlace; la abierta lleva aria-current. */
+const productos = (n: number) => `${n} ${n === 1 ? 'producto' : 'productos'}`;
+
+/**
+ * Cola de la jornada: cada orden es un enlace; la abierta lleva aria-current. Se audita por orden, pero el informe cuenta
+ * productos: por eso se muestran los dos (WOL163: 8 órdenes con 15 productos).
+ */
 export function Cola({ ordenes, seleccionadaId, filtros }: { ordenes: OrdenCola[]; seleccionadaId: number | null; filtros: FiltrosAuditoria }) {
     const query = new URLSearchParams(consultaFiltros(filtros)).toString();
+    const totalProductos = ordenes.reduce((s, o) => s + o.productos, 0);
 
     return (
         <nav aria-labelledby="titulo-cola" className="bg-card flex min-h-0 flex-col rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <h2 id="titulo-cola" className="border-b px-4 py-3 text-sm font-bold">
                 Órdenes <span className="text-muted-foreground font-medium">({ordenes.length})</span>
+                {ordenes.length > 0 && <span className="text-muted-foreground block text-xs font-medium">con {productos(totalProductos)} en total</span>}
             </h2>
             {ordenes.length === 0 ? (
                 <p className="text-muted-foreground px-4 py-8 text-center text-sm">No hay órdenes con este filtro.</p>
@@ -62,7 +69,10 @@ export function Cola({ ordenes, seleccionadaId, filtros }: { ordenes: OrdenCola[
                                         <span className="font-mono text-sm font-semibold">{o.codigo}</span>
                                         <EstadoAuditoriaBadge estado={o.estadoAuditoria} />
                                     </span>
-                                    <span className="mt-1 block truncate text-xs font-medium">{o.destinatario ?? 'Sin destinatario'}</span>
+                                    <span className="mt-1 flex items-center justify-between gap-2 text-xs font-medium">
+                                        <span className="truncate">{o.destinatario ?? 'Sin destinatario'}</span>
+                                        <span className="text-muted-foreground shrink-0">{productos(o.productos)}</span>
+                                    </span>
                                     <span className="text-muted-foreground mt-0.5 flex items-center justify-between gap-2 text-xs">
                                         <span className="truncate">
                                             {o.auxiliar ?? 'Sin auxiliar'}
