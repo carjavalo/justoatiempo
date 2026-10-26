@@ -30,7 +30,7 @@ class ContactoTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->component('welcome')->has('servicios', 9));
+            ->assertInertia(fn (Assert $p) => $p->component('welcome')->has('servicios', 8)->where('servicios.4', 'Limpieza de obra y posobra'));
     }
 
     public function test_guarda_la_solicitud_con_el_consentimiento(): void

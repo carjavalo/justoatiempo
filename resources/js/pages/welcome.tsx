@@ -23,7 +23,7 @@ export default function Welcome({ servicios }: { servicios: string[] }) {
             <Head title="Servicios operativos, logísticos y de aseo">
                 <meta
                     name="description"
-                    content="Justo a Tiempo SP S.A.S: suministro de personal operativo, servicios logísticos, aseo general e industrial, aseo de construcción, zonas verdes y apoyo a plantas. Cobertura nacional."
+                    content="Justo a Tiempo SP S.A.S: servicios logísticos y suministro de personal operativo, aseo general e industrial, limpieza de obra y posobra, zonas verdes y jardines, y espacios públicos. Cobertura nacional."
                 />
                 <meta property="og:title" content={`${EMPRESA.nombre} · Soluciones operativas integrales`} />
                 <meta property="og:description" content={EMPRESA.lema} />

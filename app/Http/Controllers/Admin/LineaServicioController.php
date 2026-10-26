@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Las líneas de servicio de Justo a Tiempo: las 8 del portafolio y las que se creen. Una línea nueva nace con su
+ * Las líneas de servicio de Justo a Tiempo: las del portafolio y las que se creen. Una línea nueva nace con su
  * tablero, su programación, sus novedades y su informe diario, y se ofrece en las empresas y en las asignaciones
  * mientras esté activa.
  */

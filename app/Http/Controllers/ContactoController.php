@@ -24,10 +24,9 @@ class ContactoController extends Controller
         'Suministro de personal operativo',
         'Aseo general',
         'Aseo industrial',
-        'Aseo de construcción y postobra',
-        'Mantenimiento de zonas verdes',
+        'Limpieza de obra y posobra',
+        'Mantenimiento de zonas verdes y jardines',
         'Limpieza y mantenimiento de espacios públicos',
-        'Apoyo operativo para plantas y centros logísticos',
         'Otro',
     ];
 

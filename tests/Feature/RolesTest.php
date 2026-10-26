@@ -247,7 +247,7 @@ class RolesTest extends TestCase
             ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta herramienta es de otra línea de servicio.'));
 
         // Su panel muestra todas las líneas
-        $this->actingAs($todas)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', LineaServicio::count()));
+        $this->actingAs($todas)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', LineaServicio::activas()->count()));
     }
 
     // --- Nadie da ni toma más acceso del que tiene -------------------------------------

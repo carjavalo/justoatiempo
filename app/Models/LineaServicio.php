@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
 /**
- * Línea de servicio (logística, aseo general…). Las 8 del portafolio vienen de fábrica; las demás se crean desde
+ * Línea de servicio (logística, aseo general…). Las del portafolio vienen de fábrica; las demás se crean desde
  * la plataforma. Se identifica en la URL por su slug, que no cambia aunque se le cambie el nombre.
  */
 class LineaServicio extends Model

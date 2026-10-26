@@ -1,0 +1,1 @@
+import{r as t}from"./app-DtBHW816.js";function s(o,r,e){const i=[e,r?`${o}-error`:null].filter(Boolean).join(" ");return{id:o,"aria-invalid":r?!0:void 0,"aria-describedby":i||void 0}}function a(o,r){t.useEffect(()=>{var i;const e=r.find(n=>o[n]);e&&((i=document.getElementById(e))==null||i.focus())},[o])}export{s as p,a as u};

@@ -74,7 +74,7 @@ class LineasAdministracionTest extends TestCase
         $this->assertSame(['vigilancia-y-porteria', 9, true, null, 'seguridad'], [$linea->slug, $linea->orden, $linea->activa, $linea->modulo, $linea->icono]);
 
         // Sale en el panel, tiene su página y se le asignan personas (la empresa pasa a recibirla)
-        $this->actingAs($this->admin)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 9)->where('lineas.8.icono', 'seguridad'));
+        $this->actingAs($this->admin)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 8)->where('lineas.7.icono', 'seguridad'));
         $this->actingAs($this->admin)->get('/lineas/vigilancia-y-porteria')->assertOk()
             ->assertInertia(fn (Assert $p) => $p->component('lineas/linea')->where('linea.descripcion', 'Control de acceso y rondas.'));
         $empresa = $this->empresa();
@@ -143,7 +143,7 @@ class LineasAdministracionTest extends TestCase
         $ana = User::factory()->create(['linea_servicio_id' => null]);
 
         // Fuera del panel
-        $this->actingAs($this->admin)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 7));
+        $this->actingAs($this->admin)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 6));
 
         // No se asigna
         $this->actingAs($this->admin)->post('/asignaciones', [

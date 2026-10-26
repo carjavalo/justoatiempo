@@ -166,7 +166,7 @@ class PermisosSeguridadTest extends TestCase
         $this->assertSame(['tablero.ver', Permisos::TODAS_LAS_LINEAS], $rol->permisos);
 
         $gerente = User::factory()->create(['rol_id' => $rol->id]);
-        $this->actingAs($gerente)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', LineaServicio::count()));
+        $this->actingAs($gerente)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', LineaServicio::activas()->count()));
         $this->actingAs($gerente)->get('/lineas/aseo-general')->assertOk();
     }
 

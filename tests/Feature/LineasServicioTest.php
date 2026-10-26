@@ -57,7 +57,7 @@ class LineasServicioTest extends TestCase
 
     // --- Entrada a las líneas ----------------------------------------------------------
 
-    public function test_el_panel_del_administrador_lista_las_ocho_lineas_con_sus_conteos(): void
+    public function test_el_panel_del_administrador_lista_las_lineas_activas_con_sus_conteos(): void
     {
         $ditransa = $this->empresa();
         $ditransa->lineas()->attach($this->aseo);
@@ -65,7 +65,7 @@ class LineasServicioTest extends TestCase
         User::factory()->coordinador()->create();
 
         $this->actingAs($this->admin)->get('/panel')
-            ->assertInertia(fn (Assert $p) => $p->has('lineas', 8)
+            ->assertInertia(fn (Assert $p) => $p->has('lineas', 7)
                 ->where('lineas.0.slug', 'logisticos')
                 ->where('lineas.0.empresas', 1)
                 ->where('lineas.0.personas', 1)
@@ -94,9 +94,11 @@ class LineasServicioTest extends TestCase
         $this->actingAs($deAseo)->get('/auditoria')->assertForbidden();
         $this->actingAs($deAseo)->get('/lineas/aseo-general')->assertOk();
 
-        foreach (LineaServicio::pluck('slug') as $slug) {
+        foreach (LineaServicio::activas()->pluck('slug') as $slug) {
             $this->actingAs($this->admin)->get("/lineas/{$slug}")->assertOk();
         }
+        // La retirada (sus actividades quedaron en logística y personal) ya no tiene página
+        $this->actingAs($this->admin)->get('/lineas/apoyo-plantas')->assertNotFound();
         $this->actingAs($this->admin)->get('/lineas/no-existe')->assertNotFound();
     }
 

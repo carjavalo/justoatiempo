@@ -3,7 +3,6 @@
  * Justo a Tiempo SP S.A.S". Para cambiar textos o imágenes de la página principal, se edita aquí.
  */
 import {
-    ApoyoPlantas,
     AseoConstruccion,
     AseoIndustrial,
     Award,
@@ -64,16 +63,25 @@ export interface LineaServicio {
     nombre: string;
     icono: TipoIcono;
     /**
-     * Foto del servicio: todas con la misma proporción vertical (0,62). Las de logística, personal y apoyo a
-     * plantas son fotos reales de la operación (images/operacion); las demás, ilustrativas con el logo oficial.
+     * Foto del servicio: todas con la misma proporción vertical (0,62). Las de logística y personal son fotos reales
+     * de la operación (images/operacion); las demás, ilustrativas con el logo oficial.
      */
     imagen: string;
     descripcion: string;
     /** Cómo nombra el portafolio la lista: actividades, perfiles, incluye o servicios. */
     tituloLista: string;
     items: string[];
+    /** El ítem que la empresa quiere destacar (el perfil prioritario). */
+    destacado?: string;
+    /** Aclaración bajo la lista (p. ej. los perfiles que solo se ofrecen bajo requerimiento). */
+    nota?: string;
 }
 
+/**
+ * Las líneas de servicio, con los nombres y actividades del "Documento definitivo de ajustes para la página web".
+ * El apoyo operativo para plantas y centros logísticos ya no es una línea aparte: sus actividades quedaron en
+ * servicios logísticos y en suministro de personal operativo.
+ */
 export const SERVICIOS: LineaServicio[] = [
     {
         id: 'logisticos',
@@ -85,20 +93,20 @@ export const SERVICIOS: LineaServicio[] = [
         tituloLista: 'Actividades',
         items: [
             'Cargue y descargue',
-            'Picking',
-            'Packing',
             'Recepción de mercancía',
             'Almacenamiento',
-            'Inventarios',
-            'Cross docking',
             'Organización de bodegas',
-            'Paletización',
-            'Estibado',
-            'Despachos',
-            'Distribución',
-            'Clasificación',
+            'Control de inventarios',
+            'Picking (preparación de pedidos)',
+            'Packing (acondicionamiento de pedidos)',
+            'Clasificación de mercancías',
             'Etiquetado',
             'Embalaje',
+            'Paletización',
+            'Estibado de mercancías',
+            'Cross docking',
+            'Despacho de mercancías',
+            'Distribución de mercancías',
         ],
     },
     {
@@ -109,16 +117,18 @@ export const SERVICIOS: LineaServicio[] = [
         descripcion: 'Talento humano para necesidades operativas temporales, permanentes o por proyectos, adaptado a los procesos internos de cada cliente.',
         tituloLista: 'Perfiles',
         items: [
-            'Operarios',
             'Auxiliares logísticos',
             'Auxiliares de bodega',
+            'Auxiliares de cargue y descargue',
+            'Auxiliares de distribución y entrega',
+            'Auxiliares de inventario',
+            'Auxiliares de empaque y acondicionamiento',
             'Auxiliares de producción',
-            'Auxiliares de distribución',
-            'Ayudantes de obra',
             'Operarios de planta',
-            'Personal de inventarios',
-            'Personal de empaque',
+            'Operarios generales',
         ],
+        destacado: 'Auxiliares logísticos',
+        nota: 'Auxiliares de producción, operarios de planta y operarios generales: disponibles bajo requerimiento.',
     },
     {
         id: 'aseo-general',
@@ -128,7 +138,16 @@ export const SERVICIOS: LineaServicio[] = [
         descripcion:
             'Limpieza y desinfección para empresas, oficinas, edificios, instituciones educativas, conjuntos residenciales, establecimientos comerciales y demás instalaciones.',
         tituloLista: 'Incluye',
-        items: ['Limpieza de oficinas', 'Limpieza de baños', 'Lavado de pisos', 'Limpieza de vidrios', 'Recolección de residuos', 'Limpieza de zonas comunes', 'Cafetería', 'Desinfección'],
+        items: [
+            'Limpieza de oficinas',
+            'Lavado de pisos',
+            'Limpieza de baños',
+            'Limpieza de vidrios',
+            'Limpieza de zonas comunes',
+            'Aseo de áreas de cafetería',
+            'Recolección de residuos ordinarios',
+            'Desinfección de superficies',
+        ],
     },
     {
         id: 'aseo-industrial',
@@ -137,25 +156,41 @@ export const SERVICIOS: LineaServicio[] = [
         imagen: '/images/servicios/aseo-industrial.jpg',
         descripcion: 'Procesos especializados de limpieza en ambientes industriales y logísticos bajo protocolos de seguridad.',
         tituloLista: 'Incluye',
-        items: ['Limpieza de plantas', 'Limpieza de maquinaria', 'Limpieza de bodegas', 'Limpieza de muelles', 'Limpieza de patios', 'Manejo de residuos', 'Limpieza de estanterías'],
+        items: [
+            'Limpieza de plantas de producción',
+            'Limpieza de bodegas y centros logísticos',
+            'Limpieza de patios industriales',
+            'Limpieza de estanterías',
+            'Limpieza de maquinaria y equipos',
+            'Limpieza de muelles de carga',
+            'Recolección y clasificación de residuos industriales no peligrosos',
+        ],
     },
     {
         id: 'aseo-construccion',
-        nombre: 'Aseo de construcción y postobra',
+        nombre: 'Limpieza de obra y posobra',
         icono: AseoConstruccion,
         imagen: '/images/servicios/aseo-construccion.jpg',
         descripcion: 'Labores de limpieza durante y después de obras civiles, remodelaciones y adecuaciones.',
         tituloLista: 'Incluye',
-        items: ['Retiro de polvo', 'Limpieza profunda', 'Limpieza de vidrios', 'Lavado de pisos', 'Limpieza de baños', 'Limpieza de enchapes', 'Limpieza final para entrega'],
+        items: [
+            'Retiro de polvo y residuos finos',
+            'Limpieza profunda de superficies',
+            'Limpieza de vidrios',
+            'Lavado de pisos',
+            'Limpieza de baños',
+            'Limpieza de enchapes',
+            'Limpieza final para entrega de obra',
+        ],
     },
     {
         id: 'zonas-verdes',
-        nombre: 'Mantenimiento de zonas verdes',
+        nombre: 'Mantenimiento de zonas verdes y jardines',
         icono: Sprout,
         imagen: '/images/servicios/zonas-verdes.jpg',
         descripcion: 'Conservación de jardines y espacios verdes mediante labores de mantenimiento preventivo y correctivo.',
         tituloLista: 'Servicios',
-        items: ['Corte de césped', 'Poda', 'Fertilización', 'Deshierbe', 'Riego', 'Siembra', 'Recolección de residuos vegetales'],
+        items: ['Corte de césped', 'Poda de plantas y arbustos', 'Fertilización', 'Deshierbe', 'Riego', 'Siembra y reposición de plantas', 'Recolección de residuos vegetales'],
     },
     {
         id: 'espacios-publicos',
@@ -164,16 +199,15 @@ export const SERVICIOS: LineaServicio[] = [
         imagen: '/images/servicios/espacios-publicos.jpg',
         descripcion: 'Conservación y mantenimiento de parques, vías peatonales y espacios urbanos.',
         tituloLista: 'Actividades',
-        items: ['Barrido manual', 'Recolección de residuos', 'Limpieza de parques', 'Limpieza de andenes', 'Limpieza de plazoletas', 'Limpieza de ciclorrutas', 'Lavado de mobiliario urbano'],
-    },
-    {
-        id: 'apoyo-plantas',
-        nombre: 'Apoyo operativo para plantas y centros logísticos',
-        icono: ApoyoPlantas,
-        imagen: '/images/operacion/organizacion-de-bodega.jpg',
-        descripcion: 'Personal de apoyo para fortalecer procesos productivos, logísticos y de almacenamiento.',
-        tituloLista: 'Actividades',
-        items: ['Abastecimiento de líneas', 'Clasificación', 'Empaque', 'Reempaque', 'Etiquetado', 'Inventarios', 'Organización de bodegas'],
+        items: [
+            'Barrido manual de espacios públicos',
+            'Limpieza de parques y áreas comunes',
+            'Recolección de residuos ordinarios',
+            'Limpieza de andenes',
+            'Limpieza de plazoletas',
+            'Limpieza de ciclorrutas',
+            'Lavado de mobiliario urbano',
+        ],
     },
 ];
 
@@ -208,7 +242,7 @@ export const SECTORES: { icono: TipoIcono; nombre: string }[] = [
 
 /** Datos clave de la portada (todos del portafolio, sin cifras inventadas). */
 export const DESTACADOS: { icono: TipoIcono; titulo: string; texto: string }[] = [
-    { icono: Layers, titulo: '8 líneas de servicio', texto: 'Logística, personal, aseo y mantenimiento' },
+    { icono: Layers, titulo: `${SERVICIOS.length} líneas de servicio`, texto: 'Logística, personal, aseo y mantenimiento' },
     { icono: Sectores, titulo: '13 sectores', texto: 'Industria, logística, retail, salud y más' },
     { icono: Map, titulo: 'Cobertura nacional', texto: 'Personal disponible en todo el país' },
     { icono: ShieldCheck, titulo: 'SG-SST', texto: 'Seguridad y salud en el trabajo' },

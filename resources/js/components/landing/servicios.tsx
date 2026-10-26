@@ -114,14 +114,22 @@ export function Servicios() {
                                     <h4 className="mt-6 text-xs font-bold tracking-[0.14em] uppercase">{s.tituloLista}</h4>
                                     <ul role="list" className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
                                         {s.items.map((item) => (
-                                            <li key={item} className="flex items-start gap-2 text-sm">
+                                            <li key={item} className={cn('flex items-start gap-2 text-sm', item === s.destacado && 'font-bold sm:col-span-2')}>
                                                 <span className="bg-good-soft text-good mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full">
                                                     <Check className="size-3" strokeWidth={3} aria-hidden="true" />
                                                 </span>
-                                                {item}
+                                                <span>
+                                                    {item}
+                                                    {item === s.destacado && (
+                                                        <span className="bg-brand-coral-soft text-brand-coral-ink ml-2 inline-block rounded-full px-2 py-0.5 text-[0.7rem] font-bold tracking-wide uppercase">
+                                                            Perfil principal
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>
+                                    {s.nota && <p className="text-muted-foreground mt-4 text-xs leading-relaxed">{s.nota}</p>}
 
                                     <a
                                         href="#contacto"
