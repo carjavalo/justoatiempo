@@ -2,7 +2,6 @@ import { AvisoFlash } from '@/components/aviso-flash';
 import { BarraSuperior } from '@/components/barra-superior';
 import { EnlaceVolver } from '@/components/enlace-volver';
 import { MenuLateral } from '@/components/menu-lateral';
-import { pantallaAnterior } from '@/lib/historial';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type GrupoMenu, type SharedData, type Volver } from '@/types';
@@ -23,19 +22,10 @@ function estaEnElMenu(menu: GrupoMenu[], href: string): boolean {
     return menu.some((g) => g.items.some((i) => i.href === ruta));
 }
 
-/** "Volver" a la pantalla por la que se venía, con el nombre que tiene en el menú si está en él. */
-function volverALaAnterior(menu: GrupoMenu[] | null, ruta: string): Volver | null {
-    const anterior = pantallaAnterior(ruta);
-    if (!anterior) return null;
-    const destino = anterior.split('?')[0];
-    const item = menu?.flatMap((g) => g.items).find((i) => i.href === destino);
-    return { texto: item ? `Volver a ${item.titulo}` : 'Volver a la pantalla anterior', href: anterior };
-}
-
 /**
  * Plantilla de la plataforma: el menú lateral (si quien navega tiene más de una opción), la barra superior y el
- * contenido. Una página interna vuelve a su sección (la revisión de una carga, a Cargas Drivin); las demás, a la pantalla
- * por la que se venía. Sin haber navegado todavía, quien no tiene menú vuelve a su inicio.
+ * contenido. Con menú, "Volver" solo aparece cuando lleva a un lugar que el menú no tiene (la sección de una página
+ * interna, como la revisión de una carga). Sin menú (quien trabaja en una sola línea), "Volver" lleva a su inicio.
  */
 export default function AppHeaderLayout({ children, volver }: { children: React.ReactNode; volver?: Volver | false }) {
     const pagina = usePage<SharedData>();
@@ -43,9 +33,8 @@ export default function AppHeaderLayout({ children, volver }: { children: React.
     const { inicio } = pagina.props.auth.user;
     const ruta = pagina.url.split('?')[0];
 
-    const anterior = volver === undefined ? volverALaAnterior(menu, ruta) : null;
-    const pedido = volver === false ? null : (volver ?? anterior ?? (menu || ruta === inicio.url ? null : { texto: inicio.volver, href: inicio.url }));
-    const destino = pedido && pedido !== anterior && menu && estaEnElMenu(menu, pedido.href) ? null : pedido;
+    const pedido = volver === false ? null : (volver ?? (menu || ruta === inicio.url ? null : { texto: inicio.volver, href: inicio.url }));
+    const destino = pedido && menu && estaEnElMenu(menu, pedido.href) ? null : pedido;
 
     const saltar = (
         // Primer elemento con Tab: evita recorrer el menú y la barra en cada página (WCAG 2.4.1)

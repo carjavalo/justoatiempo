@@ -144,6 +144,8 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     const [terminando, setTerminando] = useState<{ persona: Persona; asignacion: Asignacion } | null>(null);
     const form = useForm(VACIO);
     const borrador = useBorrador('asignaciones', form);
+    // Si se llegó desde la revisión de una carga de Drivin, se regresa a ella
+    const cargaOrigen = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('carga');
     const [eliminando, setEliminando] = useState<{ persona: Persona; asignacion: Asignacion } | null>(null);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
@@ -241,7 +243,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     ];
 
     return (
-        <AppLayout>
+        <AppLayout volver={cargaOrigen && /^\d+$/.test(cargaOrigen) ? { texto: 'Volver a la revisión de la carga', href: route('cargas.show', cargaOrigen) } : undefined}>
             <Head title="Asignaciones" />
 
             <div className={contenedorModulo}>

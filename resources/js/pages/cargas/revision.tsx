@@ -158,7 +158,7 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                         </div>
 
                         <VistaPrevia grupos={analisis.grupos} totales={analisis.totales} />
-                        <PersonalFuera personas={analisis.fueraDeOperacion} disabled={guardando || soloConsulta} onCambio={(incluir) => ajustar({ incluir })} />
+                        <PersonalFuera cargaId={carga.id} personas={analisis.fueraDeOperacion} disabled={guardando || soloConsulta} onCambio={(incluir) => ajustar({ incluir })} />
                         <TablaErrores errores={analisis.errores} total={analisis.totalErrores} />
                         <ListaAdvertencias advertencias={analisis.advertencias} />
                     </div>
@@ -418,7 +418,7 @@ function VistaPrevia({ grupos: todos, totales: delArchivo }: { grupos: Grupo[]; 
                                 <th scope="col" className="px-3 py-2.5 text-right font-semibold">
                                     Averías
                                 </th>
-                                <th scope="col" className="w-44 py-2.5 pr-5 pl-3 font-semibold">
+                                <th scope="col" className="w-32 py-2.5 pr-5 pl-3 font-semibold">
                                     Efectividad
                                 </th>
                             </tr>
@@ -432,14 +432,14 @@ function VistaPrevia({ grupos: todos, totales: delArchivo }: { grupos: Grupo[]; 
                                             {g.sucursal ?? 'Sin sucursal'} · {fmt.fechaCorta(g.fecha)}
                                         </p>
                                     </td>
-                                    <td className="max-w-48 truncate px-3 py-3 text-xs" title={g.ruta ?? undefined}>
+                                    <td className="max-w-40 truncate px-3 py-3 text-xs" title={g.ruta ?? undefined}>
                                         {g.ruta ?? '—'}
                                     </td>
                                     <td className="px-3 py-3 font-mono text-xs whitespace-nowrap">
                                         {g.placa ?? '—'}
                                         {g.placa && <Marca ok={g.vehiculoRegistrado} texto="vehículo no registrado" />}
                                     </td>
-                                    <td className="min-w-44 px-3 py-3 text-xs">
+                                    <td className="min-w-36 px-3 py-3 text-xs">
                                         {g.auxiliar ?? '—'}
                                         {g.auxiliar && <Marca ok={g.auxiliarReconocido} texto="auxiliar no reconocido" />}
                                     </td>
@@ -453,7 +453,7 @@ function VistaPrevia({ grupos: todos, totales: delArchivo }: { grupos: Grupo[]; 
                                     <td className="tabular px-3 py-3 text-right">{g.averias}</td>
                                     <td className="py-3 pr-5 pl-3">
                                         <div className="flex items-center gap-2">
-                                            <BarraProgreso valor={g.efectividad} etiqueta={`Efectividad de ${g.auxiliar ?? 'la ruta'}`} className="h-1.5 min-w-16 flex-1" />
+                                            <BarraProgreso valor={g.efectividad} etiqueta={`Efectividad de ${g.auxiliar ?? 'la ruta'}`} className="h-1.5 min-w-8 flex-1" />
                                             <span className="tabular w-12 text-right text-xs font-bold">{fmt.pctEntero(g.efectividad)}</span>
                                         </div>
                                     </td>
@@ -490,7 +490,7 @@ const MOTIVO_FUERA: Record<PersonaFuera['motivo'], string> = {
  * Quien aparece en el archivo y no tiene asignación en esa empresa o sede: no entra al informe. Si sí trabaja allí, se
  * asigna (queda para las próximas cargas) o se marca para incluirla solo en esta.
  */
-function PersonalFuera({ personas, disabled, onCambio }: { personas: PersonaFuera[]; disabled: boolean; onCambio: (incluir: string[]) => void }) {
+function PersonalFuera({ cargaId, personas, disabled, onCambio }: { cargaId: number; personas: PersonaFuera[]; disabled: boolean; onCambio: (incluir: string[]) => void }) {
     const puede = usePuede();
     if (personas.length === 0) return null;
 
@@ -549,7 +549,7 @@ function PersonalFuera({ personas, disabled, onCambio }: { personas: PersonaFuer
                                 <td className="tabular px-3 py-3 text-right">{fmt.numero(p.ordenes)}</td>
                                 <td className="py-3 pr-5 pl-3 text-right text-xs whitespace-nowrap">
                                     {p.usuarioId && puede('asignaciones.crear') && (
-                                        <Link href={route('asignaciones.index', { usuario: p.usuarioId, nueva: 1 })} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
+                                        <Link href={route('asignaciones.index', { usuario: p.usuarioId, nueva: 1, carga: cargaId })} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
                                             Asignar<span className="sr-only"> a {p.nombre}</span>
                                         </Link>
                                     )}

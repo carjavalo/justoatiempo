@@ -80,7 +80,7 @@ class Trazabilidad
 
         $entrega = $o->hora_entrega ? Carbon::parse($o->hora_entrega->format('Y-m-d H:i:s'), self::ZONA) : $dia->copy()->addSecond();
         $motivo = $o->motivoRechazo?->nombre ?? $o->motivo_texto;
-        $partes = array_filter(["{$o->productos_entregados} de {$o->productos} productos entregados", $motivo ? "Motivo: {$motivo}" : null, $o->comentario_pod ? "Comentario: {$o->comentario_pod}" : null]);
+        $partes = array_filter(["{$o->productos_entregados} de {$o->productos} ".($o->productos === 1 ? 'producto entregado' : 'productos entregados'), $motivo ? "Motivo: {$motivo}" : null, $o->comentario_pod ? "Comentario: {$o->comentario_pod}" : null]);
         [$titulo, $tono] = match ($o->estado) {
             EstadoOrden::Aprobada => [$o->faltante ? 'Entregada con faltante' : 'Entregada', $o->faltante ? 'alerta' : 'bien'],
             EstadoOrden::Rechazada => ['Rechazada: genera devolución', 'mal'],
