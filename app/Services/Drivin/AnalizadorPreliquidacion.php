@@ -4,7 +4,9 @@ namespace App\Services\Drivin;
 
 use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
+use App\Models\Asignacion;
 use App\Models\InformeDiario;
+use App\Models\LineaServicio;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
 use App\Models\Sede;
@@ -28,6 +30,8 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as FechaExcel;
  *   columna "Cliente corporativo" (la sede: TuGo, Sodimac…) o de la sede por defecto elegida en la revisión.
  * - El auxiliar es la persona con la cédula de "Entregado por" (su cuenta de Drivin) o, si no la trae, la que
  *   coincide con el nombre del asistente del conductor.
+ * - Solo entra el personal de la operación: una orden cuya persona no tiene asignación en esa empresa (y en esa sede,
+ *   si la asignación dice una) queda por fuera, salvo que en la revisión se marque para incluirla.
  */
 class AnalizadorPreliquidacion
 {
@@ -68,6 +72,9 @@ class AnalizadorPreliquidacion
     /** @var array<string, int> */
     private array $motivos = [];
 
+    /** @var Collection<int, Collection<int, Asignacion>> las asignaciones de cada persona */
+    private Collection $asignaciones;
+
     public function __construct()
     {
         foreach (self::ESTADOS as $estado => $alias) {
@@ -80,7 +87,7 @@ class AnalizadorPreliquidacion
     /**
      * @param  array{encabezados: array<int, string>, filas: list<array{fila: int, valores: array<int, mixed>}>}  $lectura
      * @param  array<string, int|null>  $mapeo
-     * @param  array{sede_id?: int|null, sucursal_id?: int|null}  $opciones
+     * @param  array{sede_id?: int|null, sucursal_id?: int|null, incluir?: list<string>}  $opciones
      */
     public function analizar(array $lectura, array $mapeo, array $opciones = []): array
     {
@@ -97,6 +104,8 @@ class AnalizadorPreliquidacion
             'totalAdvertencias' => 0,
             'fechas' => [],
             'grupos' => [],
+            'fueraDeOperacion' => [],
+            'ordenesFuera' => 0,
             'totales' => ['ordenes' => 0, 'asignadas' => 0, 'realizadas' => 0, 'devoluciones' => 0, 'faltantes' => 0, 'averias' => 0, 'efectividad' => 0.0],
         ];
 
@@ -215,6 +224,8 @@ class AnalizadorPreliquidacion
         $existentes = $this->ordenesExistentes($ordenes);
         $cerrados = $this->informesCerrados($ordenes);
 
+        $incluir = array_flip(array_map('strval', $opciones['incluir'] ?? []));
+        $fuera = [];
         $finales = [];
         foreach ($ordenes as $clave => $o) {
             if (isset($existentes[$clave])) {
@@ -226,6 +237,17 @@ class AnalizadorPreliquidacion
                 $error($o['fila'], 'fecha', 'El informe de esa jornada ya está cerrado y no admite nuevas órdenes.', $o['fecha_operacion']);
 
                 continue;
+            }
+
+            if ($ajena = $this->fueraDeOperacion($o)) {
+                $quien = $ajena['clave'];
+                $fuera[$quien] ??= [...$ajena, 'incluida' => isset($incluir[$quien]), 'ordenes' => 0, 'entregas' => 0, 'operaciones' => []];
+                $fuera[$quien]['ordenes']++;
+                $fuera[$quien]['entregas'] += max(1, count($o['productos']));
+                $fuera[$quien]['operaciones'][$this->operacion($o['sede_id'])] = true;
+                if (! isset($incluir[$quien])) {
+                    continue;
+                }
             }
 
             $finales[] = $this->cerrarOrden($o, $avisos);
@@ -242,6 +264,12 @@ class AnalizadorPreliquidacion
                 + ($avisos['sinAuxiliar'] ? 1 : 0) + ($avisos['sinPlaca'] ? 1 : 0) + ($avisos['sedePorDefecto'] ? 1 : 0),
             'fechas' => collect($finales)->countBy('fecha_operacion')->sortKeys()->all(),
             'grupos' => $this->grupos($finales),
+            'fueraDeOperacion' => collect($fuera)
+                ->map(fn ($p) => [...$p, 'operaciones' => array_keys($p['operaciones'])])
+                ->sortBy([['incluida', 'asc'], ['ordenes', 'desc'], ['nombre', 'asc']])
+                ->values()
+                ->all(),
+            'ordenesFuera' => collect($fuera)->where('incluida', false)->sum('ordenes'),
             'totales' => $this->totales($finales),
         ];
     }
@@ -273,10 +301,7 @@ class AnalizadorPreliquidacion
             $avisos['vehiculos'][$o['placa']] = ($avisos['vehiculos'][$o['placa']] ?? 0) + 1;
         }
 
-        // Con una cédula aún no registrada, el nombre solo puede ser de alguien sin cédula (si no, la orden quedaría con
-        // otra persona: "Fernando Plaza" para "JUAN FERNANDO PLAZA BENAVIDES"); queda con la cédula hasta registrarla
-        $auxiliarId = ($o['auxiliar_cedula'] ? ($this->porCedula[$o['auxiliar_cedula']] ?? null) : null)
-            ?? ($o['auxiliar_nombre'] ? $this->resolverPersona($o['auxiliar_nombre'], sinCedula: $o['auxiliar_cedula'] !== null) : null);
+        $auxiliarId = $this->auxiliarDe($o);
         if (! $o['auxiliar_nombre'] && ! $o['auxiliar_cedula']) {
             $avisos['sinAuxiliar']++;
         } elseif (! $auxiliarId) {
@@ -338,6 +363,66 @@ class AnalizadorPreliquidacion
         ];
     }
 
+    /**
+     * La persona de una orden. Con una cédula aún no registrada, el nombre solo puede ser de alguien sin cédula (si
+     * no, la orden quedaría con otra persona: "Fernando Plaza" para "JUAN FERNANDO PLAZA BENAVIDES"); queda con la
+     * cédula hasta registrarla.
+     */
+    private function auxiliarDe(array $o): ?int
+    {
+        return ($o['auxiliar_cedula'] ? ($this->porCedula[$o['auxiliar_cedula']] ?? null) : null)
+            ?? ($o['auxiliar_nombre'] ? $this->resolverPersona($o['auxiliar_nombre'], sinCedula: $o['auxiliar_cedula'] !== null) : null);
+    }
+
+    /**
+     * Si la persona de la orden no hace parte de su operación, quién es y por qué (null si sí, o si la orden no dice
+     * quién la hizo: de esa queda su propio aviso). Hace parte quien tiene una asignación en la empresa de la sede (si
+     * la asignación dice una sede, esa misma) o en toda la línea logística. Una asignación que ya había terminado en la
+     * fecha de la orden no cuenta; la de inicio no se revisa, porque la carga es a día vencido y el personal suele
+     * registrarse después de sus primeras jornadas.
+     *
+     * @return array{clave: string, nombre: string, cedula: string|null, usuarioId: int|null, motivo: string, asignadoA: list<string>}|null
+     */
+    private function fueraDeOperacion(array $o): ?array
+    {
+        if (! $o['auxiliar_nombre'] && ! $o['auxiliar_cedula']) {
+            return null;
+        }
+
+        $id = $this->auxiliarDe($o);
+        $empresa = $this->sedes->firstWhere('id', $o['sede_id'])?->empresa_id;
+        $vigentes = ($id ? ($this->asignaciones[$id] ?? collect()) : collect())
+            ->filter(fn (Asignacion $a) => $a->fecha_fin === null || $a->fecha_fin->toDateString() >= $o['fecha_operacion']);
+
+        $vinculada = $vigentes->contains(fn (Asignacion $a) => $a->empresa_id === null
+            ? $a->lineas->contains('modulo', LineaServicio::LOGISTICA)
+            : $a->empresa_id === $empresa && ($a->sede_id === null || $a->sede_id === $o['sede_id']));
+        if ($vinculada) {
+            return null;
+        }
+
+        return [
+            'clave' => $o['auxiliar_cedula'] ?? MapeoColumnas::normalizar($o['auxiliar_nombre']),
+            'nombre' => $o['auxiliar_nombre'] ?? 'Sin nombre',
+            'cedula' => $o['auxiliar_cedula'],
+            'usuarioId' => $id,
+            'motivo' => match (true) {
+                $id === null => 'sin_registrar',
+                $vigentes->isEmpty() => 'sin_asignacion',
+                default => 'otra_operacion',
+            },
+            'asignadoA' => $vigentes->map(fn (Asignacion $a) => $a->lugar())->unique()->values()->all(),
+        ];
+    }
+
+    /** "Ditransa · TuGo": la empresa y la sede de una orden. */
+    private function operacion(int $sedeId): string
+    {
+        $sede = $this->sedes->firstWhere('id', $sedeId);
+
+        return trim(($sede?->empresa?->nombre ?? '').' · '.($sede?->nombre ?? '—'), ' ·');
+    }
+
     private function cargarMaestros(): void
     {
         $this->sucursalesPorAlias = Sucursal::query()
@@ -354,7 +439,10 @@ class AnalizadorPreliquidacion
             ->get(['id', 'sede_id', 'nombre', 'alias_drivin'])
             ->map(fn (Sucursal $s) => ['id' => $s->id, 'sede_id' => $s->sede_id, 'nombre' => MapeoColumnas::normalizar($s->nombre), 'alias' => MapeoColumnas::normalizar($s->alias_drivin)]);
 
-        $this->sedes = Sede::with('sucursales:id,sede_id,nombre,ciudad,activo')->get();
+        $this->sedes = Sede::with('sucursales:id,sede_id,nombre,ciudad,activo', 'empresa:id,nombre')->get();
+        $this->asignaciones = Asignacion::with(['lineas:id,modulo', 'empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre'])
+            ->get(['id', 'user_id', 'empresa_id', 'sede_id', 'sucursal_id', 'fecha_inicio', 'fecha_fin'])
+            ->groupBy('user_id');
 
         foreach (Vehiculo::get(['id', 'placa', 'codigo_interno']) as $v) {
             $this->vehiculos[$v->placa] = $v->id;
@@ -597,6 +685,7 @@ class AnalizadorPreliquidacion
 
                 return [
                     'fecha' => $p['fecha_operacion'],
+                    'operacion' => $this->operacion($p['sede_id']),
                     'sede' => $nombresSedes[$p['sede_id']] ?? '—',
                     'sucursal' => $p['sucursal_id'] ? ($nombresSucursales[$p['sucursal_id']] ?? null) : null,
                     'ruta' => $p['ruta'],

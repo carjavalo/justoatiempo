@@ -6,6 +6,7 @@ import { CalendarRange, LayoutGrid, Plus } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -47,6 +48,7 @@ export default function Servicios({ lineas }: Props) {
     const [editando, setEditando] = useState<FilaLinea | null>(null);
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('servicios', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -54,12 +56,15 @@ export default function Servicios({ lineas }: Props) {
         setEditando(linea);
         setOrigen(boton);
         form.clearErrors();
-        form.setData(linea ? { nombre: linea.nombre, descripcion: linea.descripcion ?? '', icono: linea.icono ?? '' } : VACIO);
+        borrador.abrir(linea?.id ?? null, linea ? { nombre: linea.nombre, descripcion: linea.descripcion ?? '', icono: linea.icono ?? '' } : VACIO);
         setAbierto(true);
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('servicios.update', editando.id), opciones);
         else form.post(route('servicios.store'), opciones);
     };
@@ -177,6 +182,8 @@ export default function Servicios({ lineas }: Props) {
                                                 puede('servicios.estado') && !(l.drivin && l.activa) ? route('servicios.estado', l.id) : undefined
                                             }
                                             onEditar={puede('servicios.editar') ? (boton) => abrir(l, boton) : undefined}
+                                            // De la de Drivin dependen el tablero, las cargas y la auditoría
+                                            urlEliminar={!l.drivin && puede('servicios.eliminar') ? route('servicios.destroy', l.id) : undefined}
                                             consecuencia="Ya no se ofrecerá al marcar las líneas de una empresa ni al crear asignaciones. Las empresas que la reciben la conservan y su historial se mantiene. Si alguien tiene una asignación vigente o por empezar en ella, primero hay que terminarla."
                                             enlaces={[
                                                 ...(l.verLinea
@@ -213,6 +220,8 @@ export default function Servicios({ lineas }: Props) {
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear línea'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="nombre" etiqueta="Nombre" requerido error={form.errors.nombre}>

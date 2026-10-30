@@ -26,4 +26,9 @@ class Evidencia extends Model
     {
         return $this->belongsTo(Orden::class);
     }
+
+    public function subidoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'subido_por');
+    }
 }

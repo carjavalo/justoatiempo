@@ -12,6 +12,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
+import { useBorrador } from '@/hooks/use-borrador';
 import { Head, useForm } from '@inertiajs/react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 
@@ -250,6 +251,9 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const formMotivo = useForm<{ nombre: string; imputable: boolean }>({ nombre: '', imputable: false });
     const formNovedad = useForm<{ nombre: string; severidad: Severidad | '' }>({ nombre: '', severidad: '' });
+    const borradorMotivo = useBorrador('motivos', formMotivo);
+    const borradorNovedad = useBorrador('tipos-novedad', formNovedad);
+    const borrador = editor?.tipo === 'novedad' ? borradorNovedad : borradorMotivo;
 
     useFocoPrimerError(editor?.tipo === 'novedad' ? formNovedad.errors : formMotivo.errors, ['nombre', 'imputable', 'severidad']);
 
@@ -257,7 +261,7 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
         setEditor({ tipo: 'motivo', registro: motivo });
         setOrigen(boton);
         formMotivo.clearErrors();
-        formMotivo.setData(motivo ? { nombre: motivo.nombre, imputable: motivo.imputable } : { nombre: '', imputable: false });
+        borradorMotivo.abrir(motivo?.id ?? null, motivo ? { nombre: motivo.nombre, imputable: motivo.imputable } : { nombre: '', imputable: false });
         setAbierto(true);
     };
 
@@ -265,12 +269,15 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
         setEditor({ tipo: 'novedad', registro: novedad });
         setOrigen(boton);
         formNovedad.clearErrors();
-        formNovedad.setData(novedad ? { nombre: novedad.nombre, severidad: novedad.severidad } : { nombre: '', severidad: '' });
+        borradorNovedad.abrir(novedad?.id ?? null, novedad ? { nombre: novedad.nombre, severidad: novedad.severidad } : { nombre: '', severidad: '' });
         setAbierto(true);
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editor?.tipo === 'motivo') {
             if (editor.registro) formMotivo.put(route('parametros.motivos.update', editor.registro.id), opciones);
             else formMotivo.post(route('parametros.motivos.store'), opciones);
@@ -340,6 +347,7 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
                                         activo={m.activo}
                                         urlEstado={editable ? route('parametros.motivos.estado', m.id) : undefined}
                                         onEditar={editable ? (boton) => abrirMotivo(m, boton) : undefined}
+                                        urlEliminar={editable && !m.usos ? route('parametros.motivos.destroy', m.id) : undefined}
                                         consecuencia="Las próximas cargas de Drivin ya no lo reconocen: esas órdenes guardan solo el texto del motivo. Las órdenes ya cargadas lo conservan."
                                     />
                                 </td>
@@ -406,6 +414,7 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
                                             activo={n.activo}
                                             urlEstado={editable ? route('parametros.novedades.estado', n.id) : undefined}
                                             onEditar={editable ? (boton) => abrirNovedad(n, boton) : undefined}
+                                            urlEliminar={editable && !n.sistema ? route('parametros.novedades.destroy', n.id) : undefined}
                                             consecuencia="Ya no se ofrece al auditar las evidencias. Las órdenes que ya lo tienen lo conservan."
                                         />
                                     </td>
@@ -436,6 +445,8 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
                 onEnviar={guardar}
                 procesando={editor?.tipo === 'novedad' ? formNovedad.processing : formMotivo.processing}
                 textoEnviar={editor?.registro ? 'Guardar cambios' : 'Agregar'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 {editor?.tipo === 'novedad' ? (

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
+use App\Models\Bitacora;
 use App\Models\InformeDiario;
 use App\Models\Orden;
 use App\Models\User;
@@ -143,7 +144,7 @@ class SeguimientoController extends Controller
             // El día en que se revisa la operación (el informe es a día vencido)
             'fecha' => today(),
             'tipo' => $tipo,
-            'descripcion' => trim((string) ($datos['descripcion'] ?? '')) ?: null,
+            'descripcion' => trim((string) ($datos['descripcion'] ?? '')),
             'efectividad_referencia' => $linea?->efectividad,
             'notificado' => false,
             'registrado_por' => $yo->id,
@@ -152,18 +153,37 @@ class SeguimientoController extends Controller
         return back()->with('success', "{$tipo->label()} registrada para {$persona->name}.");
     }
 
+    /** Corrige el tipo o el detalle de una acción: lo mismo que se revisa para quitarla. */
+    public function actualizar(Request $request, AccionDesempeno $accion): RedirectResponse
+    {
+        $this->autorizarCambio($request, $accion);
+        $datos = $request->validate([
+            'tipo' => ['required', Rule::in(TipoAccion::values())],
+            'descripcion' => ['nullable', 'string', 'max:500'],
+        ], ['tipo.required' => 'Elige qué acción se toma.', 'tipo.in' => 'Elige una de las acciones de la lista.']);
+
+        $accion->update(['tipo' => TipoAccion::from($datos['tipo']), 'descripcion' => trim((string) ($datos['descripcion'] ?? ''))]);
+        Bitacora::registrar('editada', $accion, collect($accion->getChanges())->except('updated_at')->all());
+
+        return back()->with('success', 'Cambios guardados en la acción.');
+    }
+
     public function eliminar(Request $request, AccionDesempeno $accion): RedirectResponse
     {
-        $yo = $request->user();
-        $op = OperacionLogistica::para($yo);
-        abort_unless($accion->registrado_por === $yo->id || $yo->sinLimites(), 403, 'Solo quien registró la acción puede quitarla.');
-        if ($accion->informe_id) {
-            abort_unless($op->ubicacion(InformeDiario::whereKey($accion->informe_id))->exists(), 404);
-            abort_if($accion->informe?->estaCerrado(), 409, 'El informe está cerrado: reábrelo para quitar la acción.');
-        }
+        $this->autorizarCambio($request, $accion);
 
         $accion->delete();
 
         return back()->with('success', 'Acción quitada.');
+    }
+
+    private function autorizarCambio(Request $request, AccionDesempeno $accion): void
+    {
+        $yo = $request->user();
+        abort_unless($accion->registrado_por === $yo->id || $yo->sinLimites(), 403, 'Solo quien registró la acción puede cambiarla.');
+        if ($accion->informe_id) {
+            abort_unless(OperacionLogistica::para($yo)->ubicacion(InformeDiario::whereKey($accion->informe_id))->exists(), 404);
+            abort_if($accion->informe?->estaCerrado(), 409, 'El informe está cerrado: reábrelo para cambiar la acción.');
+        }
     }
 }

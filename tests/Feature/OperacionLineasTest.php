@@ -140,6 +140,33 @@ class OperacionLineasTest extends TestCase
         $this->get('/lineas/logisticos/informe')->assertRedirect('/informes');
     }
 
+    public function test_una_novedad_se_corrige_y_se_elimina(): void
+    {
+        $novedad = NovedadLinea::create([
+            'linea_servicio_id' => $this->aseo->id, 'fecha' => today(), 'empresa_id' => $this->bodegas->id, 'user_id' => $this->ana->id,
+            'tipo' => 'Llegada tarde', 'gravedad' => 'leve', 'descripcion' => 'Llegó tarde', 'estado' => 'abierta', 'registrada_por' => $this->coordinador->id,
+        ]);
+        $datos = ['fecha' => today()->toDateString(), 'lugar' => $this->clave(), 'user_id' => $this->ana->id, 'tipo' => 'Inasistencia', 'gravedad' => 'grave', 'descripcion' => 'No llegó'];
+
+        $this->actingAs($this->coordinador)->put("/novedades/{$novedad->id}", $datos)->assertSessionHas('success');
+        $this->assertSame(['Inasistencia', 'grave', 'No llegó'], [$novedad->fresh()->tipo, $novedad->fresh()->gravedad, $novedad->fresh()->descripcion]);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'editada', 'modelo_id' => $novedad->id]);
+
+        // Quien ya estaba se conserva aunque hoy no tenga asignación allí
+        $this->ana->asignaciones()->delete();
+        $this->put("/novedades/{$novedad->id}", [...$datos, 'descripcion' => 'Otra vez'])->assertSessionHasNoErrors();
+
+        // Cerrada ya no se corrige
+        $novedad->update(['estado' => 'cerrada']);
+        $this->put("/novedades/{$novedad->id}", $datos)->assertSessionHas('error');
+
+        // Eliminar pide su propio permiso: el coordinador base no lo tiene
+        $this->delete("/novedades/{$novedad->id}")->assertForbidden();
+        $this->actingAs(User::factory()->admin()->create())->delete("/novedades/{$novedad->id}")->assertSessionHas('success');
+        $this->assertModelMissing($novedad);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'eliminada', 'modelo_id' => $novedad->id]);
+    }
+
     public function test_las_novedades_se_registran_se_siguen_y_terminan_en_una_accion_de_desempeno(): void
     {
         $this->actingAs($this->coordinador)->post('/lineas/aseo-general/novedades', [

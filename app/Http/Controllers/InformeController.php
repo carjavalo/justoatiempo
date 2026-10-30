@@ -6,6 +6,7 @@ use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
+use App\Models\Bitacora;
 use App\Models\InformeDiario;
 use App\Models\InformeLinea;
 use App\Models\Parametro;
@@ -110,12 +111,14 @@ class InformeController extends Controller
         $nombre = $informe->sede?->nombre.($informe->sucursal ? " · {$informe->sucursal->nombre}" : '');
         if ($estado === EstadoInforme::Cerrado) {
             $informe->update(['estado' => $estado, 'cerrado_por' => $request->user()->id, 'cerrado_en' => now()]);
+            Bitacora::registrar('informe_estado', $informe, ['estado' => $estado->value]);
 
             return back()->with('success', "Informe de {$nombre} cerrado: ya no admite nuevas órdenes ni cambios.");
         }
 
         $reabierto = $informe->estaCerrado();
         $informe->update(['estado' => $estado, 'cerrado_por' => null, 'cerrado_en' => null]);
+        Bitacora::registrar('informe_estado', $informe, ['estado' => $estado->value, 'reabierto' => $reabierto]);
 
         return back()->with('success', $reabierto
             ? "Informe de {$nombre} reabierto: queda en seguimiento."

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -65,6 +66,7 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
     const [editando, setEditando] = useState<FilaEmpresa | null>(null);
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('empresas', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -72,7 +74,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
         setEditando(empresa);
         setOrigen(boton);
         form.clearErrors();
-        form.setData(
+        borrador.abrir(
+            empresa?.id ?? null,
             empresa
                 ? {
                       nombre: empresa.nombre,
@@ -93,7 +96,10 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
     const nombresLineas = (ids: number[]) => lineas.filter((l) => ids.includes(l.id)).map((l) => l.nombre);
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('empresas.update', editando.id), opciones);
         else form.post(route('empresas.store'), opciones);
     };
@@ -233,6 +239,7 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                                     activo={e.activo}
                                                     urlEstado={puede('empresas.estado') ? route('empresas.estado', e.id) : undefined}
                                                     onEditar={puede('empresas.editar') ? (boton) => abrir(e, boton) : undefined}
+                                                    urlEliminar={puede('empresas.eliminar') ? route('empresas.destroy', e.id) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevas sedes ni usuarios. ${mayuscula(seConserva(e.sedes, 'sede', 'sedes'))} y ${seConserva(e.usuarios, 'usuario', 'usuarios')}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>
@@ -255,6 +262,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear empresa'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="nombre" etiqueta="Razón social" requerido error={form.errors.nombre}>

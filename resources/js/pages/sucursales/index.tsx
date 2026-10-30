@@ -18,6 +18,7 @@ import { MapPin, MapPinned, Plus } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -94,6 +95,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
     const [editando, setEditando] = useState<FilaSucursal | null>(null);
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('sucursales', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -101,7 +103,8 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
         setEditando(sucursal);
         setOrigen(boton);
         form.clearErrors();
-        form.setData(
+        borrador.abrir(
+            sucursal?.id ?? null,
             sucursal
                 ? {
                       nombre: sucursal.nombre,
@@ -117,7 +120,10 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('sucursales.update', editando.id), opciones);
         else form.post(route('sucursales.store'), opciones);
     };
@@ -278,6 +284,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                                                     activo={s.activo}
                                                     urlEstado={puede('sucursales.estado') ? route('sucursales.estado', s.id) : undefined}
                                                     onEditar={puede('sucursales.editar') ? (boton) => abrir(s, boton) : undefined}
+                                                    urlEliminar={puede('sucursales.eliminar') ? route('sucursales.destroy', s.id) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevos usuarios; ${s.usuarios === 1 ? 'el usuario que tiene se conserva' : s.usuarios > 1 ? `los ${s.usuarios} usuarios que tiene se conservan` : 'no tiene usuarios asignados'}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>
@@ -300,6 +307,8 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear sucursal'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="nombre" etiqueta="Nombre de la sucursal" requerido error={form.errors.nombre}>

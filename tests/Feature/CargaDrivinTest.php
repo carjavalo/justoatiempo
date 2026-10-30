@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Enums\EstadoCarga;
 use App\Enums\EstadoInforme;
 use App\Models\Carga;
+use App\Models\Empresa;
 use App\Models\InformeDiario;
+use App\Models\LineaServicio;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
 use App\Models\Sede;
@@ -36,8 +38,8 @@ class CargaDrivinTest extends TestCase
         $sodimac->sucursales()->create(['nombre' => 'Cali', 'ciudad' => 'Cali']);
 
         Vehiculo::create(['placa' => 'SNX 708']);
-        // El auxiliar: parte del personal, sin acceso a la plataforma
-        User::factory()->sinAcceso()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null]);
+        // El auxiliar: parte del personal, sin acceso a la plataforma, asignado a la línea logística
+        User::factory()->sinAcceso()->create(['cedula' => '111', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza']);
         MotivoRechazo::firstOrCreate(['nombre' => 'Cliente ausente en domicilio']);
 
         $this->coordinador = User::factory()->coordinador()->create();
@@ -240,6 +242,90 @@ class CargaDrivinTest extends TestCase
         $revision = $this->subir($this->archivo([$this->fila('PDVT5', 'Aprobada')], 'b.xlsx'));
         $this->delete("/cargas/{$revision->id}")->assertRedirect('/cargas');
         $this->assertNull(Carga::find($revision->id));
+    }
+
+    public function test_solo_entra_el_personal_de_la_operacion()
+    {
+        $ditransa = $this->empresa();
+        $tugo = Sede::firstWhere('nombre', 'TuGo');
+        $sodimac = Sede::firstWhere('nombre', 'Sodimac');
+        $otraEmpresa = Empresa::create(['nombre' => 'Otra Empresa']);
+        $linea = LineaServicio::logistica()->id;
+
+        $otra = User::factory()->sinAcceso()->create(['cedula' => '222222222', 'nombres' => 'Otra', 'primer_apellido' => 'Empresa', 'linea_servicio_id' => null, 'empresa_id' => $otraEmpresa->id]);
+        $otraSede = User::factory()->sinAcceso()->create(['cedula' => '333333333', 'nombres' => 'Otra', 'primer_apellido' => 'Sede', 'linea_servicio_id' => $linea, 'empresa_id' => $ditransa->id, 'sede_id' => $sodimac->id]);
+        User::factory()->sinAcceso()->create(['cedula' => '444444444', 'nombres' => 'Sin', 'primer_apellido' => 'Asignar', 'linea_servicio_id' => null]);
+        // Trabaja en toda la empresa o en su sede: sí hace parte
+        User::factory()->sinAcceso()->create(['cedula' => '555555555', 'nombres' => 'Toda', 'primer_apellido' => 'Empresa', 'linea_servicio_id' => $linea, 'empresa_id' => $ditransa->id]);
+        User::factory()->sinAcceso()->create(['cedula' => '666666666', 'nombres' => 'Misma', 'primer_apellido' => 'Sede', 'linea_servicio_id' => $linea, 'empresa_id' => $ditransa->id, 'sede_id' => $tugo->id]);
+        // Una asignación que ya había terminado en la fecha de la orden no cuenta
+        $terminada = User::factory()->sinAcceso()->create(['cedula' => '777777777', 'nombres' => 'Ya', 'primer_apellido' => 'Termino', 'linea_servicio_id' => $linea, 'empresa_id' => $ditransa->id]);
+        $terminada->asignaciones()->update(['fecha_fin' => '2026-10-01', 'duracion' => 'fechas']);
+
+        $persona = fn (string $np, string $cedula) => $this->fila($np, 'Aprobada', ['Entregado por' => "[Mobile] {$cedula}@justoatiempo.com", 'Asistente' => "PERSONA {$cedula}"]);
+        $encabezados = ['Nombre Plan', 'Fecha Plan', 'Código del Vehículo', 'Código de Orden', 'Estado de la orden', 'Asistente', 'Entregado por'];
+        $carga = $this->subir($this->archivo([
+            $persona('A1', '222222222'), $persona('A2', '333333333'), $persona('A3', '444444444'), $persona('A4', '555555555'), $persona('A5', '666666666'), $persona('A6', '777777777'), $persona('A7', '999999999'),
+        ], 'operacion.xlsx', $encabezados));
+
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('analisis.totales.ordenes', 2)
+            ->where('analisis.ordenesFuera', 5)
+            ->where('analisis.fueraDeOperacion', fn ($fuera) => collect($fuera)->pluck('motivo', 'clave')->sortKeys()->all() === [
+                '222222222' => 'otra_operacion', '333333333' => 'otra_operacion', '444444444' => 'sin_asignacion', '777777777' => 'sin_asignacion', '999999999' => 'sin_registrar',
+            ])
+            ->where('analisis.grupos.0.operacion', 'Ditransa · TuGo')
+        );
+
+        // Se dice dónde está asignada y se puede incluir solo en esta carga
+        $this->patch("/cargas/{$carga->id}", ['incluir' => ['222222222', '999999999']])->assertRedirect();
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('analisis.totales.ordenes', 4)
+            ->where('analisis.ordenesFuera', 3)
+            ->where('carga.opciones.incluir', ['222222222', '999999999'])
+        );
+
+        // Ajustar otra cosa de la revisión no borra a quién se incluyó
+        $this->patch("/cargas/{$carga->id}", ['sede_id' => null, 'sucursal_id' => null])->assertRedirect();
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p->where('analisis.totales.ordenes', 4));
+
+        $this->post("/cargas/{$carga->id}/confirmar")->assertRedirect();
+        $this->assertEqualsCanonicalizing(['A1', 'A4', 'A5', 'A7'], Orden::pluck('codigo_orden')->all());
+        $this->assertSame($otra->id, Orden::firstWhere('codigo_orden', 'A1')->auxiliar_id);
+        $this->assertNull(Orden::where('auxiliar_id', $otraSede->id)->first());
+
+        // Lo que quedó por fuera se ve en el resultado de la carga
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p
+            ->component('cargas/resultado')
+            ->where('advertencias', fn ($a) => collect($a)->firstWhere('tipo', 'fuera_operacion')['items'] !== [])
+        );
+    }
+
+    public function test_quien_trabaja_en_toda_la_linea_hace_parte_de_cualquier_empresa()
+    {
+        User::factory()->sinAcceso()->create(['cedula' => '888888888', 'nombres' => 'Toda', 'primer_apellido' => 'Linea']);
+        $encabezados = ['Nombre Plan', 'Fecha Plan', 'Código del Vehículo', 'Código de Orden', 'Estado de la orden', 'Asistente', 'Entregado por'];
+        $carga = $this->subir($this->archivo([$this->fila('B1', 'Aprobada', ['Entregado por' => '[Mobile] 888888888@justoatiempo.com', 'Asistente' => 'TODA LINEA'])], 'linea.xlsx', $encabezados));
+
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p->where('analisis.totales.ordenes', 1)->where('analisis.ordenesFuera', 0));
+    }
+
+    public function test_una_carga_anulada_se_puede_volver_a_subir()
+    {
+        $archivo = $this->archivo([$this->fila('PDVT1', 'Aprobada')], 'repetido.xlsx');
+        $contenido = file_get_contents($archivo->getRealPath());
+        $carga = $this->subir($archivo);
+        $this->post("/cargas/{$carga->id}/confirmar");
+        $this->post("/cargas/{$carga->id}/anular");
+        $this->assertSame(0, Orden::count());
+
+        $copia = sys_get_temp_dir().'/'.uniqid('drivin_').'.xlsx';
+        file_put_contents($copia, $contenido);
+        $this->post('/cargas', ['archivo' => new UploadedFile($copia, 'repetido.xlsx', null, null, true)])->assertRedirect("/cargas/{$carga->id}");
+        $this->assertTrue($carga->fresh()->enRevision());
+
+        $this->post("/cargas/{$carga->id}/confirmar")->assertRedirect();
+        $this->assertSame(1, Orden::count());
     }
 
     public function test_solo_coordinador_y_administrador_cargan_archivos()

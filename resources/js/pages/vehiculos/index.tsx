@@ -17,6 +17,7 @@ import { Plus, Truck } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { fmt } from '@/lib/formato';
@@ -62,6 +63,7 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
     const [editando, setEditando] = useState<FilaVehiculo | null>(null);
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('vehiculos', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -69,7 +71,8 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
         setEditando(vehiculo);
         setOrigen(boton);
         form.clearErrors();
-        form.setData(
+        borrador.abrir(
+            vehiculo?.id ?? null,
             vehiculo
                 ? {
                       placa: vehiculo.placa,
@@ -84,7 +87,10 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('vehiculos.update', editando.id), opciones);
         else form.post(route('vehiculos.store'), opciones);
     };
@@ -244,6 +250,7 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
                                                         activo={v.activo}
                                                         urlEstado={puede('vehiculos.estado') ? route('vehiculos.estado', v.id) : undefined}
                                                         onEditar={puede('vehiculos.editar') ? (boton) => abrir(v, boton) : undefined}
+                                                        urlEliminar={puede('vehiculos.eliminar') ? route('vehiculos.destroy', v.id) : undefined}
                                                         consecuencia="Su historial de órdenes se conserva. Si vuelve a llegar en una preliquidación, sus órdenes se cargan igual. Puedes activarlo de nuevo cuando quieras."
                                                     />
                                                 </td>
@@ -271,6 +278,8 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Agregar vehículo'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo

@@ -19,8 +19,9 @@ use RuntimeException;
  * teléfono, correo, nacimiento e ingreso) a Usuarios: cada persona queda con su carnet (y, si se elige, entra con su
  * cédula) y, si la operación corresponde a una empresa, asignada a ella con sus líneas.
  *
- * Quien ya existe (por cédula) no se reemplaza: solo se le completan los datos que le falten, si quien importa
- * puede editarla. Nunca se muestra a alguien que quien importa no alcanza a ver.
+ * Quien ya existe (por cédula) no se reemplaza ni se duplica: solo se le completan los datos que le falten, si quien
+ * importa puede editarla, y si el archivo la pone en otra empresa, se le agrega esa asignación (una misma persona puede
+ * estar en varias). Nunca se muestra a alguien que quien importa no alcanza a ver.
  */
 class ImportadorPersonal
 {
@@ -109,7 +110,9 @@ class ImportadorPersonal
     public function analizar(array $lectura, User $quien, array $empresasElegidas = []): array
     {
         $existentes = User::whereIn('cedula', collect($lectura['filas'])->map(fn ($f) => $this->cedula($f['datos']['cedula'] ?? null))->filter())
+            ->with(['asignaciones' => fn ($q) => $q->actuales()])
             ->get()->keyBy('cedula');
+        $asignables = $this->empresasAsignables($quien);
         // Correo (en minúsculas) => cédula de su dueño (null si no tiene)
         $correosTomados = User::whereNotNull('email')->get(['email', 'cedula'])->mapWithKeys(fn (User $u) => [mb_strtolower($u->email) => $u->cedula]);
         $empresas = Empresa::where('activo', true)->get(['id', 'nombre']);
@@ -200,10 +203,16 @@ class ImportadorPersonal
                 $avisos[] = 'Tu rol no edita usuarios: sus datos no se completan.';
                 $completa = [];
             }
+            // Ya está en Usuarios y el archivo la pone en una empresa donde aún no trabaja: una asignación más, sin duplicarla
+            $asignar = $persona !== null && $errores === [] && $empresaId !== null && in_array($empresaId, $asignables, true)
+                && ! $persona->asignaciones->contains('empresa_id', $empresaId);
+            if ($asignar) {
+                $avisos[] = 'Ya está registrada: se le agrega la asignación en '.$empresas->firstWhere('id', $empresaId)?->nombre.'.';
+            }
             $accion = match (true) {
                 $errores !== [] => 'error',
                 $persona === null => 'nueva',
-                $completa !== [] => 'completa',
+                $completa !== [] || $asignar => 'completa',
                 default => 'igual',
             };
 
@@ -216,6 +225,7 @@ class ImportadorPersonal
                 'operacion' => $operacion,
                 'empresaId' => $empresaId,
                 'completa' => array_keys($completa),
+                'asignar' => $asignar,
                 'errores' => $errores,
                 'avisos' => $avisos,
             ];
@@ -255,7 +265,7 @@ class ImportadorPersonal
      * Registra las personas nuevas (sin acceso, con el rol elegido) y completa los datos de las que ya estaban. Quien
      * importa con permiso de asignar deja a cada persona nueva asignada a su empresa, con sus líneas, desde su ingreso.
      *
-     * @return array{nuevas: int, completadas: int, asignadas: int, sinAsignar: int}
+     * @return array{nuevas: int, completadas: int, asignadas: int, sinAsignar: int, otraEmpresa: int}
      */
     /** @param  bool  $acceso  si las personas nuevas entran a la plataforma (con su cédula como contraseña inicial) */
     public function importar(array $analisis, RolUsuario $rol, User $quien, bool $acceso = true): array
@@ -264,7 +274,7 @@ class ImportadorPersonal
         $empresas = Empresa::with('lineas:id')->whereIn('id', $asignables)->get()->keyBy('id');
 
         return DB::transaction(function () use ($analisis, $rol, $quien, $empresas, $acceso) {
-            $resultado = ['nuevas' => 0, 'completadas' => 0, 'asignadas' => 0, 'sinAsignar' => 0];
+            $resultado = ['nuevas' => 0, 'completadas' => 0, 'asignadas' => 0, 'sinAsignar' => 0, 'otraEmpresa' => 0];
 
             foreach ($analisis['filas'] as $f) {
                 $datos = collect($f)->only(['cedula', 'nombres', 'primer_apellido', 'segundo_apellido', 'cargo', 'ciudad', 'telefono', 'email', 'fecha_nacimiento', 'fecha_ingreso'])->all();
@@ -294,9 +304,22 @@ class ImportadorPersonal
                     } else {
                         $resultado['sinAsignar']++;
                     }
-                } elseif ($f['accion'] === 'completa' && $quien->puede('usuarios.editar') && ($persona = User::find($f['usuarioId'])) && $quien->cubreA($persona)) {
-                    $persona->update($this->completar($persona, $datos));
-                    $resultado['completadas']++;
+                } elseif ($f['accion'] === 'completa' && ($persona = User::find($f['usuarioId'])) && $quien->cubreA($persona)) {
+                    if ($f['completa'] !== [] && $quien->puede('usuarios.editar')) {
+                        $persona->update($this->completar($persona, $datos));
+                        $resultado['completadas']++;
+                    }
+                    $empresa = $f['asignar'] ? $empresas->get($f['empresaId']) : null;
+                    if ($empresa) {
+                        $asignacion = $persona->asignaciones()->create([
+                            'empresa_id' => $empresa->id,
+                            'fecha_inicio' => today()->toDateString(),
+                            'duracion' => 'indefinida',
+                            'creada_por' => $quien->id,
+                        ]);
+                        $asignacion->lineas()->sync($empresa->lineas->pluck('id')->all());
+                        $resultado['otraEmpresa']++;
+                    }
                 }
             }
 

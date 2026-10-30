@@ -1,4 +1,6 @@
 import { BotonEnviar } from '@/components/boton-enviar';
+import { ArrowLeft } from '@/components/iconos';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { type FormEventHandler, type ReactNode, useRef } from 'react';
 
@@ -12,14 +14,17 @@ interface Props {
     textoEnviar: string;
     /** Elemento que recibe el foco al cerrar (p. ej. el botón de acciones de la fila editada). */
     focoAlCerrar?: HTMLElement | null;
+    /** Si abrió con lo que se había escrito antes (useBorrador) y cómo empezar de nuevo. */
+    recuperado?: boolean;
+    onDescartar?: () => void;
     children: ReactNode;
 }
 
 /**
- * Formulario en panel lateral: crea o edita sin perder de vista la lista.
- * Se cierra con la X, con Escape o al guardar (no hay un "Cancelar" que repita lo que hace la X).
+ * Formulario en panel lateral: crea o edita sin perder de vista la lista. Se cierra con "Volver", con la X, con Escape
+ * o al guardar; lo que se escribió sigue ahí al abrirlo de nuevo (useBorrador).
  */
-export function FormularioLateral({ abierto, onCambio, titulo, descripcion, onEnviar, procesando, textoEnviar, focoAlCerrar, children }: Props) {
+export function FormularioLateral({ abierto, onCambio, titulo, descripcion, onEnviar, procesando, textoEnviar, focoAlCerrar, recuperado, onDescartar, children }: Props) {
     // Radix devuelve el foco a su "trigger"; aquí el panel se abre por código, así que se recuerda
     // quién tenía el foco al abrir (p. ej. "Nuevo usuario") para devolvérselo al cerrar
     const previo = useRef<HTMLElement | null>(null);
@@ -50,14 +55,28 @@ export function FormularioLateral({ abierto, onCambio, titulo, descripcion, onEn
                     <SheetDescription>{descripcion}</SheetDescription>
                 </SheetHeader>
                 <form onSubmit={enviar} noValidate className="flex min-h-0 flex-1 flex-col">
+                    {recuperado && (
+                        <div className="bg-secondary/60 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-6 py-2.5 text-xs">
+                            <p>Sigue lo que estabas escribiendo sin guardar.</p>
+                            <button type="button" onClick={onDescartar} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
+                                Empezar de nuevo
+                            </button>
+                        </div>
+                    )}
                     <div className="grid flex-1 content-start gap-5 overflow-y-auto px-6 py-6">{children}</div>
-                    <div className="bg-card flex items-center justify-between gap-3 border-t px-6 py-4">
-                        <p className="text-muted-foreground text-xs">
-                            <span aria-hidden="true">*</span> Obligatorio
-                        </p>
-                        <BotonEnviar procesando={procesando} textoProcesando="Guardando…" className="h-10 rounded-lg px-5 font-semibold">
-                            {textoEnviar}
-                        </BotonEnviar>
+                    <div className="bg-card flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
+                        <Button type="button" variant="ghost" onClick={() => onCambio(false)} className="h-10 rounded-lg px-3 font-semibold">
+                            <ArrowLeft className="size-4" aria-hidden="true" />
+                            Volver
+                        </Button>
+                        <div className="flex items-center gap-3">
+                            <p className="text-muted-foreground text-xs">
+                                <span aria-hidden="true">*</span> Obligatorio
+                            </p>
+                            <BotonEnviar procesando={procesando} textoProcesando="Guardando…" className="h-10 rounded-lg px-5 font-semibold">
+                                {textoEnviar}
+                            </BotonEnviar>
+                        </div>
                     </div>
                 </form>
             </SheetContent>

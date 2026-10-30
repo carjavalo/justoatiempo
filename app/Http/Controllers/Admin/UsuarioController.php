@@ -4,11 +4,23 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
+use App\Models\AccionDesempeno;
 use App\Models\Asignacion;
+use App\Models\AuditoriaPod;
+use App\Models\Bitacora;
+use App\Models\Carga;
 use App\Models\Empresa;
+use App\Models\Evidencia;
+use App\Models\InformeDiario;
+use App\Models\InformeLinea;
 use App\Models\LineaServicio;
+use App\Models\NovedadLinea;
+use App\Models\Orden;
+use App\Models\Programacion;
+use App\Models\ProgramacionAsignacion;
 use App\Models\RolUsuario;
 use App\Models\Sede;
+use App\Models\SolicitudContacto;
 use App\Models\Sucursal;
 use App\Models\User;
 use App\Services\Carnet;
@@ -251,11 +263,8 @@ class UsuarioController extends Controller
         if (! $request->user()->cubreA($usuario)) {
             return back()->with('error', "{$usuario->name} tiene más acceso que tu rol: no puedes cambiar su acceso.");
         }
-        // Siempre queda al menos una persona activa, con acceso, con el rol Administrador
-        $administrador = RolUsuario::administrador();
-        if (! $activo && $administrador && $usuario->rol_id === $administrador->id
-            && ! User::where('rol_id', $administrador->id)->where('activo', true)->where('acceso', true)->whereKeyNot($usuario->id)->exists()) {
-            return back()->with('error', "{$usuario->name} es la única persona con el rol {$administrador->nombre} que puede entrar a la plataforma: dáselo antes a otra persona.");
+        if (! $activo && ($error = $this->unicoAdministrador($usuario))) {
+            return back()->with('error', $error);
         }
 
         $usuario->update(['activo' => $activo]);
@@ -268,5 +277,60 @@ class UsuarioController extends Controller
         return back()->with('success', $activo
             ? "{$usuario->name} vuelve a tener acceso a la plataforma."
             : "{$usuario->name} ya no puede ingresar a la plataforma.");
+    }
+
+    /**
+     * Elimina a una persona registrada por error: solo si nunca ha operado. Con historial (entregas, programación o lo
+     * que hizo en la plataforma) se desactiva, porque esos registros dicen quién los hizo. Sus asignaciones se van con ella.
+     */
+    public function destroy(Request $request, User $usuario): RedirectResponse
+    {
+        if ($usuario->is($request->user())) {
+            return back()->with('error', 'No puedes eliminar tu propio usuario.');
+        }
+        if (! $request->user()->cubreA($usuario)) {
+            return back()->with('error', "{$usuario->name} tiene más acceso que tu rol: no puedes eliminarlo.");
+        }
+        if ($error = $this->unicoAdministrador($usuario)) {
+            return back()->with('error', $error);
+        }
+        $enUso = "{$usuario->name} tiene historial en la operación: no se puede eliminar. Desactívalo para conservarlo.";
+        if ($this->tieneHistorial($usuario)) {
+            return back()->with('error', $enUso);
+        }
+
+        $archivos = array_filter([$usuario->foto_path, $usuario->arl_path]);
+        $id = $usuario->id;
+
+        return $this->eliminarRegistro($usuario, $usuario->name, $enUso, function () use ($archivos, $id) {
+            Storage::disk('local')->delete($archivos);
+            DB::table(config('session.table', 'sessions'))->where('user_id', $id)->delete();
+        });
+    }
+
+    /** Siempre queda al menos una persona activa, con acceso, con el rol Administrador: el aviso si esta es la última. */
+    private function unicoAdministrador(User $usuario): ?string
+    {
+        $administrador = RolUsuario::administrador();
+        if (! $administrador || $usuario->rol_id !== $administrador->id
+            || User::where('rol_id', $administrador->id)->where('activo', true)->where('acceso', true)->whereKeyNot($usuario->id)->exists()) {
+            return null;
+        }
+
+        return "{$usuario->name} es la única persona con el rol {$administrador->nombre} que puede entrar a la plataforma: dáselo antes a otra persona.";
+    }
+
+    /** Sus entregas, su programación, lo que le pasó y lo que hizo en la plataforma. */
+    private function tieneHistorial(User $usuario): bool
+    {
+        $referencias = [
+            [Orden::class, 'auxiliar_id'], [InformeLinea::class, 'auxiliar_id'], [ProgramacionAsignacion::class, 'user_id'], [ProgramacionAsignacion::class, 'asistencia_por'],
+            [Programacion::class, 'creado_por'], [AccionDesempeno::class, 'user_id'], [AccionDesempeno::class, 'registrado_por'], [NovedadLinea::class, 'user_id'],
+            [NovedadLinea::class, 'registrada_por'], [NovedadLinea::class, 'cerrada_por'], [Carga::class, 'cargado_por'], [Carga::class, 'anulada_por'],
+            [AuditoriaPod::class, 'auditado_por'], [Evidencia::class, 'subido_por'], [InformeDiario::class, 'cerrado_por'], [SolicitudContacto::class, 'atendida_por_id'],
+            [Bitacora::class, 'user_id'],
+        ];
+
+        return collect($referencias)->contains(fn (array $r) => $r[0]::where($r[1], $usuario->id)->exists());
     }
 }

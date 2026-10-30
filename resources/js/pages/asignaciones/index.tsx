@@ -2,7 +2,7 @@ import { Campo } from '@/components/admin/campo';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import { contenedorModulo, EncabezadoModulo, EstadoVacio, Iniciales, Paginacion, SinResultados } from '@/components/admin/piezas';
-import { Building2, CalendarClock, CalendarRange, Layers, MapPinned, MoreHorizontal, Pencil, Plus, Undo2, UsersRound } from '@/components/iconos';
+import { Building2, CalendarClock, CalendarRange, Layers, MapPinned, MoreHorizontal, Pencil, Plus, Trash2, Undo2, UsersRound } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { ConfirmarEliminar } from '@/components/admin/acciones';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { aFecha, fmt } from '@/lib/formato';
@@ -141,6 +143,8 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const [terminando, setTerminando] = useState<{ persona: Persona; asignacion: Asignacion } | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('asignaciones', form);
+    const [eliminando, setEliminando] = useState<{ persona: Persona; asignacion: Asignacion } | null>(null);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -148,7 +152,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
         setEditando(null);
         setOrigen(boton);
         form.clearErrors();
-        form.setData({ ...VACIO, fecha_inicio: hoy(), usuario_id: personaId ? String(personaId) : '' });
+        borrador.abrir(personaId ? `nueva-${personaId}` : null, { ...VACIO, fecha_inicio: hoy(), usuario_id: personaId ? String(personaId) : '' });
         setAbierto(true);
     };
 
@@ -156,7 +160,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
         setEditando({ persona, asignacion: a });
         setOrigen(boton);
         form.clearErrors();
-        form.setData({
+        borrador.abrir(a.id, {
             usuario_id: String(persona.id),
             empresa_id: a.empresaId ? String(a.empresaId) : '',
             sede_id: a.sedeId ? String(a.sedeId) : '',
@@ -182,7 +186,10 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
     }, []);
 
     const guardar = () => {
-        const opcionesEnvio = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opcionesEnvio = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         form.transform(({ usuario_id, ...d }) => (editando ? d : { ...d, usuario_id }));
         if (editando) form.put(route('asignaciones.update', editando.asignacion.id), opcionesEnvio);
         else form.post(route('asignaciones.store'), opcionesEnvio);
@@ -337,6 +344,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                                 onAsignar={(boton) => abrirNueva(p.id, boton)}
                                 onEditar={(a, boton) => abrirEdicion(p, a, boton)}
                                 onTerminar={(a) => setTerminando({ persona: p, asignacion: a })}
+                                onEliminar={(a) => setEliminando({ persona: p, asignacion: a })}
                             />
                         ))}
                     </ul>
@@ -346,6 +354,15 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
             </div>
 
             <ConfirmarTerminar objetivo={terminando} onCerrar={() => setTerminando(null)} />
+            {eliminando && (
+                <ConfirmarEliminar
+                    abierto
+                    nombre={`la asignación de ${eliminando.persona.nombre}`}
+                    url={route('asignaciones.destroy', eliminando.asignacion.id)}
+                    consecuencia="No se puede deshacer y no queda en su historial. Si la persona solo dejó de trabajar allí, mejor termínala."
+                    onCerrar={() => setEliminando(null)}
+                />
+            )}
 
             <FormularioLateral
                 abierto={abierto}
@@ -361,6 +378,8 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Asignar'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="usuario_id" etiqueta="Persona" requerido error={form.errors.usuario_id}>
@@ -576,8 +595,10 @@ function TarjetaPersona({
     onAsignar,
     onEditar,
     onTerminar,
+    onEliminar,
 }: {
     persona: Persona;
+    onEliminar: (a: Asignacion) => void;
     onAsignar: (boton: HTMLElement | null) => void;
     onEditar: (a: Asignacion, boton: HTMLElement | null) => void;
     onTerminar: (a: Asignacion) => void;
@@ -620,7 +641,7 @@ function TarjetaPersona({
                 ) : (
                     <ul role="list" className="divide-y">
                         {p.asignaciones.map((a) => (
-                            <FilaAsignacion key={a.id} persona={p} asignacion={a} onEditar={onEditar} onTerminar={onTerminar} />
+                            <FilaAsignacion key={a.id} persona={p} asignacion={a} onEditar={onEditar} onTerminar={onTerminar} onEliminar={onEliminar} />
                         ))}
                     </ul>
                 )}
@@ -634,9 +655,11 @@ function FilaAsignacion({
     asignacion: a,
     onEditar,
     onTerminar,
+    onEliminar,
 }: {
     persona: Persona;
     asignacion: Asignacion;
+    onEliminar: (a: Asignacion) => void;
     onEditar: (a: Asignacion, boton: HTMLElement | null) => void;
     onTerminar: (a: Asignacion) => void;
 }) {
@@ -653,6 +676,7 @@ function FilaAsignacion({
     const empiezaEn = a.estado === 'programada' ? diasEntre(hoyIso, a.fechaInicio) : null;
     const puedeEditar = a.editable && a.estado !== 'terminada' && puede('asignaciones.editar');
     const puedeTerminar = a.editable && a.estado !== 'terminada' && puede('asignaciones.terminar');
+    const puedeEliminar = a.editable && puede('asignaciones.eliminar');
 
     return (
         <li className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] md:items-center">
@@ -718,7 +742,7 @@ function FilaAsignacion({
             </div>
 
             <div className="flex justify-end">
-                {(puedeEditar || puedeTerminar) && (
+                {(puedeEditar || puedeTerminar || puedeEliminar) && (
                     <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                             <Button ref={boton} variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground size-9 rounded-lg">
@@ -739,6 +763,12 @@ function FilaAsignacion({
                                 <DropdownMenuItem onSelect={() => onTerminar(a)} className="text-critical focus:text-critical gap-2">
                                     <Undo2 className="size-4" aria-hidden="true" />
                                     {a.estado === 'programada' ? 'Quitar' : 'Terminar'}
+                                </DropdownMenuItem>
+                            )}
+                            {puedeEliminar && (
+                                <DropdownMenuItem onSelect={() => onEliminar(a)} className="text-critical focus:text-critical gap-2">
+                                    <Trash2 className="size-4" aria-hidden="true" />
+                                    Eliminar
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

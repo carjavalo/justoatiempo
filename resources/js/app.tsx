@@ -5,6 +5,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { initializeTheme } from './hooks/use-appearance';
+import { iniciarHistorial } from './lib/historial';
 import { iniciarModalidad } from './lib/modalidad';
 import { iniciarSesion } from './lib/sesion';
 
@@ -20,6 +21,8 @@ createInertiaApp({
     setup({ el, App, props }) {
         // La sesión vigente: el código de seguridad de cada envío y qué hacer con «Atrás» (ver lib/sesion.ts)
         iniciarSesion(props.initialPage);
+        // Las pantallas recorridas, para "Volver" a la anterior (ver lib/historial.ts)
+        iniciarHistorial();
         // Teclado o mouse: el borde de foco de menús y listas es solo para teclado (ver lib/modalidad.ts)
         iniciarModalidad();
         const root = createRoot(el);

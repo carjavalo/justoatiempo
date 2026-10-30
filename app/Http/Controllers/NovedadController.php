@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\Asignacion;
+use App\Models\Bitacora;
 use App\Models\LineaServicio;
 use App\Models\NovedadLinea;
 use App\Support\OperacionLinea;
@@ -58,6 +59,7 @@ class NovedadController extends Controller
                 'id' => $n->id,
                 'fecha' => $n->fecha->toDateString(),
                 'lugar' => $n->lugar(),
+                'lugarClave' => OperacionLinea::clave($n->empresa_id, $n->sede_id, $n->sucursal_id),
                 'personaId' => $n->user_id,
                 'persona' => $n->persona?->name,
                 'cedula' => $n->persona?->cedula,
@@ -93,6 +95,47 @@ class NovedadController extends Controller
     public function store(Request $request, LineaServicio $linea): RedirectResponse
     {
         $op = OperacionLinea::para($request->user(), $linea, 'novedades.registrar');
+
+        NovedadLinea::create([
+            ...$this->validar($request, $op),
+            'linea_servicio_id' => $linea->id,
+            'estado' => 'abierta',
+            'registrada_por' => $request->user()->id,
+        ]);
+
+        return back()->with('success', 'Novedad registrada: queda abierta hasta que se le dé seguimiento.');
+    }
+
+    /** Corrige lo que se escribió: una novedad cerrada ya no cambia (primero se reabre). */
+    public function update(Request $request, NovedadLinea $novedad): RedirectResponse
+    {
+        $op = OperacionLinea::para($request->user(), $novedad->linea, 'novedades.registrar');
+        abort_unless($op->incluye($novedad->empresa_id, $novedad->sede_id, $novedad->sucursal_id), 404);
+        if ($novedad->estado === 'cerrada') {
+            return back()->with('error', 'Esta novedad está cerrada: reábrela para corregirla.');
+        }
+
+        $novedad->update($this->validar($request, $op, $novedad));
+        Bitacora::registrar('editada', $novedad, collect($novedad->getChanges())->except('updated_at')->all());
+
+        return back()->with('success', 'Cambios guardados en la novedad.');
+    }
+
+    public function destroy(Request $request, NovedadLinea $novedad): RedirectResponse
+    {
+        $op = OperacionLinea::para($request->user(), $novedad->linea, 'novedades.eliminar');
+        abort_unless($op->incluye($novedad->empresa_id, $novedad->sede_id, $novedad->sucursal_id), 404);
+
+        return $this->eliminarRegistro($novedad, "la novedad «{$novedad->tipo}» del {$novedad->fecha->format('d/m/Y')}", 'No se pudo eliminar la novedad.');
+    }
+
+    /**
+     * Lo que se guarda de una novedad. Al corregirla, quien ya estaba en ella se conserva aunque hoy no tenga asignación allí.
+     *
+     * @return array<string, mixed>
+     */
+    private function validar(Request $request, OperacionLinea $op, ?NovedadLinea $actual = null): array
+    {
         $datos = $request->validate([
             'fecha' => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
             'lugar' => ['required', 'string'],
@@ -110,12 +153,11 @@ class NovedadController extends Controller
         if (! $lugar) {
             throw ValidationException::withMessages(['lugar' => 'Elige uno de los lugares de la lista.']);
         }
-        if (! empty($datos['user_id']) && ! collect($this->personas($op))->contains(fn ($p) => $p['id'] === (int) $datos['user_id'] && in_array($lugar['clave'], $p['lugares'], true))) {
+        if (! empty($datos['user_id']) && (int) $datos['user_id'] !== $actual?->user_id && ! collect($this->personas($op))->contains(fn ($p) => $p['id'] === (int) $datos['user_id'] && in_array($lugar['clave'], $p['lugares'], true))) {
             throw ValidationException::withMessages(['user_id' => 'Esta persona no trabaja en ese lugar en la línea.']);
         }
 
-        NovedadLinea::create([
-            'linea_servicio_id' => $linea->id,
+        return [
             'fecha' => $datos['fecha'],
             'empresa_id' => $lugar['empresa_id'],
             'sede_id' => $lugar['sede_id'],
@@ -124,11 +166,7 @@ class NovedadController extends Controller
             'tipo' => trim($datos['tipo']),
             'gravedad' => $datos['gravedad'],
             'descripcion' => trim($datos['descripcion']),
-            'estado' => 'abierta',
-            'registrada_por' => $request->user()->id,
-        ]);
-
-        return back()->with('success', 'Novedad registrada: queda abierta hasta que se le dé seguimiento.');
+        ];
     }
 
     /** El seguimiento: en qué va, cómo se cerró y, si se toma, la acción de desempeño con la persona. */

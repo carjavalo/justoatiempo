@@ -24,6 +24,7 @@ use App\Http\Controllers\NovedadController;
 use App\Http\Controllers\PanelController;
 use App\Http\Controllers\ProgramacionController;
 use App\Http\Controllers\SeguimientoController;
+use App\Http\Controllers\TrazabilidadController;
 use App\Models\LineaServicio;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -63,6 +64,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('usuarios', [UsuarioController::class, 'store'])->middleware('permiso:usuarios.crear')->name('usuarios.store');
     Route::put('usuarios/{usuario}', [UsuarioController::class, 'update'])->middleware('permiso:usuarios.editar')->name('usuarios.update');
     Route::patch('usuarios/{usuario}/estado', [UsuarioController::class, 'estado'])->middleware('permiso:usuarios.estado')->name('usuarios.estado');
+    Route::delete('usuarios/{usuario}', [UsuarioController::class, 'destroy'])->middleware('permiso:usuarios.eliminar')->name('usuarios.destroy');
     Route::middleware('permiso:usuarios.ver')->group(function () {
         Route::get('usuarios/{usuario}/foto', [UsuarioController::class, 'foto'])->name('usuarios.foto');
         Route::get('usuarios/{usuario}/arl', [UsuarioController::class, 'arl'])->name('usuarios.arl');
@@ -74,37 +76,44 @@ Route::middleware(['auth'])->group(function () {
     Route::post('asignaciones', [AsignacionController::class, 'store'])->middleware('permiso:asignaciones.crear')->name('asignaciones.store');
     Route::put('asignaciones/{asignacion}', [AsignacionController::class, 'update'])->middleware('permiso:asignaciones.editar')->name('asignaciones.update');
     Route::patch('asignaciones/{asignacion}/terminar', [AsignacionController::class, 'terminar'])->middleware('permiso:asignaciones.terminar')->name('asignaciones.terminar');
+    Route::delete('asignaciones/{asignacion}', [AsignacionController::class, 'destroy'])->middleware('permiso:asignaciones.eliminar')->name('asignaciones.destroy');
 
     // Roles dentro de la empresa (auxiliar, conductor…), cada uno con sus permisos
     Route::get('roles', [RolController::class, 'index'])->middleware('permiso:roles.ver')->name('roles.index');
     Route::post('roles', [RolController::class, 'store'])->middleware('permiso:roles.crear')->name('roles.store');
     Route::put('roles/{rol}', [RolController::class, 'update'])->middleware('permiso:roles.editar')->name('roles.update');
     Route::patch('roles/{rol}/estado', [RolController::class, 'estado'])->middleware('permiso:roles.estado')->name('roles.estado');
+    Route::delete('roles/{rol}', [RolController::class, 'destroy'])->middleware('permiso:roles.eliminar')->name('roles.destroy');
 
     // Líneas de servicio: las del portafolio y las nuevas (por id: su slug es el de la URL de su tablero)
     Route::get('lineas-de-servicio', [LineaServicioController::class, 'index'])->middleware('permiso:servicios.ver')->name('servicios.index');
     Route::post('lineas-de-servicio', [LineaServicioController::class, 'store'])->middleware('permiso:servicios.crear')->name('servicios.store');
     Route::put('lineas-de-servicio/{servicio:id}', [LineaServicioController::class, 'update'])->middleware('permiso:servicios.editar')->name('servicios.update');
     Route::patch('lineas-de-servicio/{servicio:id}/estado', [LineaServicioController::class, 'estado'])->middleware('permiso:servicios.estado')->name('servicios.estado');
+    Route::delete('lineas-de-servicio/{servicio:id}', [LineaServicioController::class, 'destroy'])->middleware('permiso:servicios.eliminar')->name('servicios.destroy');
 
     Route::get('empresas', [EmpresaController::class, 'index'])->middleware('permiso:empresas.ver')->name('empresas.index');
     Route::post('empresas', [EmpresaController::class, 'store'])->middleware('permiso:empresas.crear')->name('empresas.store');
     Route::put('empresas/{empresa}', [EmpresaController::class, 'update'])->middleware('permiso:empresas.editar')->name('empresas.update');
     Route::patch('empresas/{empresa}/estado', [EmpresaController::class, 'estado'])->middleware('permiso:empresas.estado')->name('empresas.estado');
+    Route::delete('empresas/{empresa}', [EmpresaController::class, 'destroy'])->middleware('permiso:empresas.eliminar')->name('empresas.destroy');
 
     Route::get('sedes', [SedeController::class, 'index'])->middleware('permiso:sedes.ver')->name('sedes.index');
     Route::post('sedes', [SedeController::class, 'store'])->middleware('permiso:sedes.crear')->name('sedes.store');
     Route::put('sedes/{sede}', [SedeController::class, 'update'])->middleware('permiso:sedes.editar')->name('sedes.update');
     Route::patch('sedes/{sede}/estado', [SedeController::class, 'estado'])->middleware('permiso:sedes.estado')->name('sedes.estado');
+    Route::delete('sedes/{sede}', [SedeController::class, 'destroy'])->middleware('permiso:sedes.eliminar')->name('sedes.destroy');
 
     Route::get('sucursales', [SucursalController::class, 'index'])->middleware('permiso:sucursales.ver')->name('sucursales.index');
     Route::post('sucursales', [SucursalController::class, 'store'])->middleware('permiso:sucursales.crear')->name('sucursales.store');
     Route::put('sucursales/{sucursal}', [SucursalController::class, 'update'])->middleware('permiso:sucursales.editar')->name('sucursales.update');
     Route::patch('sucursales/{sucursal}/estado', [SucursalController::class, 'estado'])->middleware('permiso:sucursales.estado')->name('sucursales.estado');
+    Route::delete('sucursales/{sucursal}', [SucursalController::class, 'destroy'])->middleware('permiso:sucursales.eliminar')->name('sucursales.destroy');
 
     // Solicitudes de cotización del sitio web
     Route::get('solicitudes', [SolicitudController::class, 'index'])->middleware('permiso:solicitudes.ver')->name('solicitudes.index');
     Route::patch('solicitudes/{solicitud}/atencion', [SolicitudController::class, 'atencion'])->middleware('permiso:solicitudes.atender')->name('solicitudes.atencion');
+    Route::delete('solicitudes/{solicitud}', [SolicitudController::class, 'destroy'])->middleware('permiso:solicitudes.eliminar')->name('solicitudes.destroy');
 
     // Cada línea de servicio: su tablero (logística) o su resumen de empresas y personal
     Route::get('lineas/{linea}', [LineaController::class, 'show'])->name('lineas.show');
@@ -146,7 +155,11 @@ Route::middleware(['auth'])->group(function () {
     // Seguimiento y desempeño: cómo le va a cada auxiliar y las acciones que se toman con él
     Route::get('seguimiento', [SeguimientoController::class, 'index'])->middleware('permiso:seguimiento.ver')->name('seguimiento.index');
     Route::post('seguimiento/acciones', [SeguimientoController::class, 'registrar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.registrar');
+    Route::put('seguimiento/acciones/{accion}', [SeguimientoController::class, 'actualizar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.actualizar');
     Route::delete('seguimiento/acciones/{accion}', [SeguimientoController::class, 'eliminar'])->middleware('permiso:seguimiento.registrar')->name('seguimiento.eliminar');
+
+    // Trazabilidad: el recorrido de una orden, con quién hizo qué y cuándo (lo ve quien ve la auditoría)
+    Route::get('trazabilidad', TrazabilidadController::class)->middleware('permiso:auditoria.ver')->name('trazabilidad.index');
 
     // La operación diaria de cada línea de servicio: programación y asistencia, novedades y seguimiento, e informe
     // diario (el de logística es el de Drivin). Su permiso le aplica en las líneas donde trabaja: ver App\Support\OperacionLinea
@@ -167,6 +180,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('lineas/{linea}/novedades', [NovedadController::class, 'index'])->middleware('permiso:novedades.ver')->name('novedades.index');
     Route::post('lineas/{linea}/novedades', [NovedadController::class, 'store'])->middleware('permiso:novedades.registrar')->name('novedades.store');
     Route::patch('novedades/{novedad}', [NovedadController::class, 'seguimiento'])->middleware('permiso:novedades.cerrar')->name('novedades.seguimiento');
+    Route::put('novedades/{novedad}', [NovedadController::class, 'update'])->middleware('permiso:novedades.registrar')->name('novedades.update');
+    Route::delete('novedades/{novedad}', [NovedadController::class, 'destroy'])->middleware('permiso:novedades.eliminar')->name('novedades.destroy');
     Route::get('lineas/{linea}/informe', [InformeLineaController::class, 'index'])->middleware('permiso:informes.ver')->name('lineas.informe');
     Route::get('lineas/{linea}/informe/descargar', [InformeLineaController::class, 'descargar'])->middleware('permiso:informes.descargar')->name('lineas.informe.descargar');
 
@@ -175,6 +190,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('vehiculos', [VehiculoController::class, 'store'])->middleware('permiso:vehiculos.crear')->name('vehiculos.store');
     Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->middleware('permiso:vehiculos.editar')->name('vehiculos.update');
     Route::patch('vehiculos/{vehiculo}/estado', [VehiculoController::class, 'estado'])->middleware('permiso:vehiculos.estado')->name('vehiculos.estado');
+    Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->middleware('permiso:vehiculos.eliminar')->name('vehiculos.destroy');
 
     Route::get('parametros', [ParametroController::class, 'index'])->middleware('permiso:parametros.ver')->name('parametros.index');
     Route::middleware('permiso:parametros.editar')->group(function () {
@@ -182,9 +198,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('parametros/motivos', [ParametroController::class, 'guardarMotivo'])->name('parametros.motivos.store');
         Route::put('parametros/motivos/{motivo}', [ParametroController::class, 'guardarMotivo'])->name('parametros.motivos.update');
         Route::patch('parametros/motivos/{motivo}/estado', [ParametroController::class, 'estadoMotivo'])->name('parametros.motivos.estado');
+        Route::delete('parametros/motivos/{motivo}', [ParametroController::class, 'eliminarMotivo'])->name('parametros.motivos.destroy');
         Route::post('parametros/novedades', [ParametroController::class, 'guardarNovedad'])->name('parametros.novedades.store');
         Route::put('parametros/novedades/{novedad}', [ParametroController::class, 'guardarNovedad'])->name('parametros.novedades.update');
         Route::patch('parametros/novedades/{novedad}/estado', [ParametroController::class, 'estadoNovedad'])->name('parametros.novedades.estado');
+        Route::delete('parametros/novedades/{novedad}', [ParametroController::class, 'eliminarNovedad'])->name('parametros.novedades.destroy');
     });
 });
 

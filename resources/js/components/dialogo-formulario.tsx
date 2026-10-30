@@ -10,13 +10,15 @@ interface Props {
     onEnviar: (e: FormEvent) => void;
     procesando: boolean;
     textoEnviar: string;
+    /** "Volver" si lo escrito se conserva (useBorrador). */
+    textoCancelar?: string;
     /** Ancho máximo del diálogo (clase de Tailwind). */
     ancho?: string;
     children: ReactNode;
 }
 
 /** Diálogo con un formulario corto: título, descripción, sus campos y los botones Cancelar y enviar. */
-export function DialogoFormulario({ titulo, descripcion, onCerrar, onEnviar, procesando, textoEnviar, ancho = 'max-w-lg', children }: Props) {
+export function DialogoFormulario({ titulo, descripcion, onCerrar, onEnviar, procesando, textoEnviar, textoCancelar = 'Cancelar', ancho = 'max-w-lg', children }: Props) {
     return (
         <Dialog open onOpenChange={(v) => !v && onCerrar()}>
             <DialogContent className={cn('max-h-[92vh] overflow-y-auto rounded-2xl', ancho)}>
@@ -28,7 +30,7 @@ export function DialogoFormulario({ titulo, descripcion, onCerrar, onEnviar, pro
                     {children}
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button type="button" variant="outline" onClick={onCerrar} className="rounded-lg">
-                            Cancelar
+                            {textoCancelar}
                         </Button>
                         <Button type="submit" disabled={procesando} className="rounded-lg">
                             {procesando ? 'Guardando…' : textoEnviar}

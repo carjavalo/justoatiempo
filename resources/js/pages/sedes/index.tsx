@@ -18,6 +18,7 @@ import { Plus, Store } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -69,6 +70,7 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
     const [editando, setEditando] = useState<FilaSede | null>(null);
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const form = useForm(VACIO);
+    const borrador = useBorrador('sedes', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -76,7 +78,8 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
         setEditando(sede);
         setOrigen(boton);
         form.clearErrors();
-        form.setData(
+        borrador.abrir(
+            sede?.id ?? null,
             sede
                 ? {
                       nombre: sede.nombre,
@@ -91,7 +94,10 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('sedes.update', editando.id), opciones);
         else form.post(route('sedes.store'), opciones);
     };
@@ -249,6 +255,7 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
                                                     activo={s.activo}
                                                     urlEstado={puede('sedes.estado') ? route('sedes.estado', s.id) : undefined}
                                                     onEditar={puede('sedes.editar') ? (boton) => abrir(s, boton) : undefined}
+                                                    urlEliminar={puede('sedes.eliminar') ? route('sedes.destroy', s.id) : undefined}
                                                     consecuencia={`No se le podrán asignar nuevas sucursales ni usuarios; ${s.sucursales === 1 ? 'su sucursal se conserva' : s.sucursales > 1 ? `sus ${s.sucursales} sucursales se conservan` : 'no tiene sucursales'}. Puedes volver a activarla cuando quieras.`}
                                                 />
                                             </td>
@@ -271,6 +278,8 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear sede'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo

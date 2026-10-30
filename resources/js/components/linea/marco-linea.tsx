@@ -4,6 +4,7 @@ import {
     ClipboardCheck,
     FileSpreadsheet,
     LayoutGrid,
+    MapPinned,
     PackageCheck,
     Target,
     type TipoIcono,
@@ -18,7 +19,7 @@ import { type SharedData, type Volver } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { type ReactNode } from 'react';
 
-export type SeccionLinea = 'tablero' | 'programacion' | 'novedades' | 'informe' | 'cargas' | 'auditoria' | 'informes' | 'seguimiento' | 'entregas';
+export type SeccionLinea = 'tablero' | 'programacion' | 'novedades' | 'informe' | 'cargas' | 'auditoria' | 'trazabilidad' | 'informes' | 'seguimiento' | 'entregas';
 
 /** La línea de las herramientas de Drivin (sus páginas no reciben la línea desde el servidor). */
 export const LINEA_LOGISTICA = 'logisticos';
@@ -50,6 +51,14 @@ const PESTANAS: {
         texto: 'Auditoría POD',
         icono: ClipboardCheck,
         href: () => route('auditoria.index'),
+        permiso: 'auditoria.ver',
+        en: 'logistica',
+    },
+    {
+        id: 'trazabilidad',
+        texto: 'Trazabilidad',
+        icono: MapPinned,
+        href: () => route('trazabilidad.index'),
         permiso: 'auditoria.ver',
         en: 'logistica',
     },

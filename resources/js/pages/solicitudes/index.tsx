@@ -1,6 +1,7 @@
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { contenedorModulo, EncabezadoModulo, EstadoVacio, Iniciales, Paginacion, SinResultados } from '@/components/admin/piezas';
-import { Bandeja, Check, Mail, Phone, Undo2 } from '@/components/iconos';
+import { Bandeja, Check, Mail, Phone, Trash2, Undo2 } from '@/components/iconos';
+import { ConfirmarEliminar } from '@/components/admin/acciones';
 import { Button } from '@/components/ui/button';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
@@ -116,6 +117,7 @@ export default function Solicitudes({ solicitudes, total, pendientes, filtros }:
 function TarjetaSolicitud({ solicitud: s }: { solicitud: Solicitud }) {
     const puede = usePuede();
     const [procesando, setProcesando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
     const titulo = `solicitud-${s.id}`;
 
     const cambiarAtencion = () => {
@@ -213,6 +215,12 @@ function TarjetaSolicitud({ solicitud: s }: { solicitud: Solicitud }) {
                             Atendida por {s.atendidaPor ?? 'un usuario que ya no existe'} el {fechaHoraCompleta.format(new Date(s.atendidaEn))}
                         </p>
                     )}
+                    {puede('solicitudes.eliminar') && (
+                        <Button type="button" variant="ghost" onClick={() => setEliminando(true)} aria-describedby={titulo} className="text-critical hover:bg-critical-soft hover:text-critical h-9 rounded-lg px-3.5 font-semibold">
+                            <Trash2 className="size-4" aria-hidden="true" />
+                            Eliminar
+                        </Button>
+                    )}
                     {/* Marcarla pide su permiso; sin él, la tarjeta solo se consulta */}
                     {puede('solicitudes.atender') && (
                         <Button
@@ -229,6 +237,13 @@ function TarjetaSolicitud({ solicitud: s }: { solicitud: Solicitud }) {
                         </Button>
                     )}
                 </div>
+                <ConfirmarEliminar
+                    abierto={eliminando}
+                    nombre={`la solicitud de ${s.nombre}`}
+                    url={route('solicitudes.destroy', s.id)}
+                    consecuencia="Se borran sus datos de contacto y su mensaje. No se puede deshacer."
+                    onCerrar={() => setEliminando(false)}
+                />
             </article>
         </li>
     );

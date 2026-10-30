@@ -183,6 +183,18 @@ class AsignacionController extends Controller
         return back()->with('success', "La asignación de {$persona->name} en {$asignacion->lugar()} terminó: ya no aparece en su carnet.");
     }
 
+    /** Quita una asignación hecha por error (para que deje de contar desde ya, sin borrar su historial, se termina). */
+    public function destroy(Request $request, Asignacion $asignacion): RedirectResponse
+    {
+        $yo = $request->user();
+        $persona = $asignacion->usuario;
+        if (($persona->is($yo) && ! $yo->sinLimites()) || ! $yo->cubreA($persona) || ! $yo->veAsignacion($asignacion->load('lineas'))) {
+            return back()->with('error', 'No puedes eliminar esta asignación: está fuera de lo que tu rol te deja cambiar.');
+        }
+
+        return $this->eliminarRegistro($asignacion, "la asignación de {$persona->name} en {$asignacion->lugar()}", 'No se pudo eliminar la asignación.');
+    }
+
     /** Si la empresa aún no recibía alguna de las líneas asignadas, desde ahora la recibe (y aparece en su tablero). */
     private function empresaRecibe(Asignacion $asignacion, array $lineas): void
     {

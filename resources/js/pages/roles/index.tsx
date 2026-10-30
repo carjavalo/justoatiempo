@@ -9,6 +9,7 @@ import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
@@ -87,6 +88,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const [copiado, setCopiado] = useState('');
     const form = useForm(VACIO);
+    const borrador = useBorrador('roles', form);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -96,7 +98,8 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
         setCopiado('');
         form.clearErrors();
         // Un rol nuevo arranca con un alcance que quien lo crea sí puede dar
-        form.setData(
+        borrador.abrir(
+            rol?.id ?? null,
             rol
                 ? { nombre: rol.nombre, descripcion: rol.descripcion ?? '', permisos: rol.permisos, alcance: rol.alcance }
                 : { ...VACIO, alcance: alcancePermitido(VACIO.alcance) ? VACIO.alcance : miRol.alcance },
@@ -105,7 +108,10 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         if (editando) form.put(route('roles.update', editando.id), opciones);
         else form.post(route('roles.store'), opciones);
     };
@@ -298,6 +304,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                                                     // Los roles base siempre están disponibles; nadie toca un rol con más permisos que el suyo
                                                     urlEstado={!r.base && r.editable && puede('roles.estado') ? route('roles.estado', r.id) : undefined}
                                                     onEditar={r.editable && puede('roles.editar') ? (boton) => abrir(r, boton) : undefined}
+                                                    urlEliminar={!r.base && r.editable && puede('roles.eliminar') ? route('roles.destroy', r.id) : undefined}
                                                     consecuencia={`Ya no se ofrecerá al crear usuarios. ${
                                                         r.usuarios === 0
                                                             ? 'Nadie lo tiene asignado.'
@@ -332,6 +339,8 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear rol'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="nombre" etiqueta="Nombre" requerido error={form.errors.nombre}>

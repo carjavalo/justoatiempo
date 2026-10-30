@@ -250,7 +250,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
 
     const tarjetas: { accion: Accion; titulo: string; detalle: string }[] = [
         { accion: 'nueva', titulo: 'Nuevas', detalle: 'Se registran con su carnet' },
-        { accion: 'completa', titulo: 'Se completan', detalle: 'Ya estaban: reciben los datos que les faltan' },
+        { accion: 'completa', titulo: 'Se completan', detalle: 'Ya estaban: reciben los datos que les faltan o una empresa más' },
         { accion: 'igual', titulo: 'Sin cambios', detalle: 'Ya estaban con todos sus datos' },
         { accion: 'error', titulo: 'No se importan', detalle: 'Les falta algo obligatorio' },
     ];
@@ -432,7 +432,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                                 >
                                     {ACCIONES[f.accion].texto}
                                 </span>
-                                {f.accion === 'completa' && (
+                                {f.accion === 'completa' && f.completa.length > 0 && (
                                     <p className="text-muted-foreground mt-1">{f.completa.map((c) => CAMPOS[c] ?? c).join(', ')}</p>
                                 )}
                                 {f.errores.map((e) => (

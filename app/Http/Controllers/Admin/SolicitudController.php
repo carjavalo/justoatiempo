@@ -73,4 +73,9 @@ class SolicitudController extends Controller
             ? "La solicitud de {$solicitud->nombre} quedó como atendida."
             : "La solicitud de {$solicitud->nombre} volvió a pendientes.");
     }
+
+    public function destroy(SolicitudContacto $solicitud): RedirectResponse
+    {
+        return $this->eliminarRegistro($solicitud, "la solicitud de {$solicitud->nombre}", 'No se pudo eliminar la solicitud.');
+    }
 }

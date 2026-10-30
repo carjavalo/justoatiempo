@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\InformeLinea;
+use App\Models\ProgramacionAsignacion;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\Builder;
@@ -89,6 +91,17 @@ class VehiculoController extends Controller
         $vehiculo->update(['activo' => $activo]);
 
         return back()->with('success', $activo ? "{$vehiculo->placa} está activo de nuevo." : "{$vehiculo->placa} quedó inactivo: su historial se conserva.");
+    }
+
+    /** Solo un vehículo que nunca ha operado (p. ej. una placa mal escrita): el que tiene historial se desactiva. */
+    public function destroy(Vehiculo $vehiculo): RedirectResponse
+    {
+        $enUso = "{$vehiculo->placa} tiene órdenes o programación registradas: no se puede eliminar. Desactívalo para conservar su historial.";
+        if ($vehiculo->ordenes()->exists() || InformeLinea::where('vehiculo_id', $vehiculo->id)->exists() || ProgramacionAsignacion::where('vehiculo_id', $vehiculo->id)->exists()) {
+            return back()->with('error', $enUso);
+        }
+
+        return $this->eliminarRegistro($vehiculo, "el vehículo {$vehiculo->placa}", $enUso);
     }
 
     /** @return array<string, mixed> */

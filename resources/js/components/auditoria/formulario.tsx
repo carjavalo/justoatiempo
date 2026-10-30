@@ -1,4 +1,5 @@
 import { BotonEnviar } from '@/components/boton-enviar';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -99,7 +100,7 @@ export function FormularioAuditoria({
     const a = orden.auditoria;
     const idNovedad = (nombre: string) => tiposNovedad.find((t) => t.nombre === nombre)?.id ?? null;
 
-    const { data, setData, transform, post, processing, errors } = useForm({
+    const inicial = {
         foto_fachada: a.foto_fachada,
         fotos_sellado: a.fotos_sellado,
         fotos_destapado: a.fotos_destapado,
@@ -110,10 +111,18 @@ export function FormularioAuditoria({
         sin_evidencia: a.sin_evidencia,
         tipo_novedad_id: a.tipo_novedad_id ?? idNovedad(orden.sugerencia.novedad),
         concepto: a.concepto ?? orden.sugerencia.concepto,
-    });
+    };
+    const form = useForm(inicial);
+    const { data, setData, transform, post, processing, errors } = form;
+    const borrador = useBorrador('auditoria', form);
 
     // Mientras la persona no los edite, novedad y concepto siguen a la lista de chequeo
     const [editado, setEditado] = useState({ novedad: a.auditada, concepto: a.auditada });
+    // Lo que se marcó sin guardar sigue ahí al volver a esta orden
+    useEffect(() => {
+        if (borrador.abrir(orden.id, inicial)) setEditado({ novedad: true, concepto: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const evaluacion = useMemo(() => evaluar(data as Checklist), [data]);
 
     useEffect(() => {
@@ -135,7 +144,7 @@ export function FormularioAuditoria({
         e.preventDefault();
         if (processing || bloqueado) return;
         const query = new URLSearchParams(consultaFiltros(filtros)).toString();
-        post(`/auditoria/${orden.id}?${query}`, { preserveScroll: false });
+        post(`/auditoria/${orden.id}?${query}`, { preserveScroll: false, onSuccess: () => borrador.limpiar() });
     };
 
     const textoGuardar = siguiente ? `Guardar y seguir con ${siguiente.codigo}` : 'Guardar auditoría';

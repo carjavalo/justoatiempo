@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EmpresaRequest;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
+use App\Models\NovedadLinea;
+use App\Models\Programacion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,5 +91,17 @@ class EmpresaController extends Controller
         return back()->with('success', $activo
             ? "{$empresa->nombre} está activa de nuevo."
             : "{$empresa->nombre} quedó inactiva: no recibirá nuevas sedes ni usuarios.");
+    }
+
+    /** Solo una empresa sin sedes, sin personal y sin operación: lo demás se desactiva, para conservar su historial. */
+    public function destroy(Empresa $empresa): RedirectResponse
+    {
+        $enUso = "{$empresa->nombre} tiene sedes, personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
+        if ($empresa->sedes()->withTrashed()->exists() || $empresa->asignaciones()->exists()
+            || Programacion::where('empresa_id', $empresa->id)->exists() || NovedadLinea::where('empresa_id', $empresa->id)->exists()) {
+            return back()->with('error', $enUso);
+        }
+
+        return $this->eliminarRegistro($empresa, $empresa->nombre, $enUso);
     }
 }

@@ -1,4 +1,7 @@
+import { ConfirmarEliminar } from '@/components/admin/acciones';
+import { Campo } from '@/components/admin/campo';
 import { claseTd, claseTh, Tabla } from '@/components/admin/piezas';
+import { DialogoFormulario } from '@/components/dialogo-formulario';
 import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import {
     CalendarDays,
@@ -20,11 +23,13 @@ import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { NavegadorFecha } from '@/components/linea/navegador-fecha';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { usePuede } from '@/hooks/use-puede';
 import { fmt, semaforo } from '@/lib/formato';
+import { propsCampo } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { type FormEvent, useState } from 'react';
 
 interface Accion {
@@ -533,6 +538,8 @@ const COLOR_ACCION: Record<string, string> = {
 
 function AccionRegistrada({ accion, editable }: { accion: Accion; editable: boolean }) {
     const puede = usePuede();
+    const [modificando, setModificando] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
     return (
         <li className="flex items-start gap-1.5">
             <span className="min-w-0 flex-1">
@@ -542,16 +549,56 @@ function AccionRegistrada({ accion, editable }: { accion: Accion; editable: bool
                 {accion.descripcion && <span className="mt-0.5 block break-words">{accion.descripcion}</span>}
             </span>
             {editable && puede('seguimiento.registrar') && (
-                <button
-                    type="button"
-                    onClick={() => router.delete(route('seguimiento.eliminar', accion.id), { preserveScroll: true })}
-                    className="text-muted-foreground hover:text-critical focus-visible:ring-ring rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-hidden"
-                >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                    <span className="sr-only">Quitar {accion.tipoLabel}</span>
-                </button>
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setModificando(true)}
+                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        <Pencil className="size-3.5" aria-hidden="true" />
+                        <span className="sr-only">Modificar {accion.tipoLabel}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setEliminando(true)}
+                        className="text-muted-foreground hover:text-critical focus-visible:ring-ring rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                        <span className="sr-only">Eliminar {accion.tipoLabel}</span>
+                    </button>
+                    <ConfirmarEliminar
+                        abierto={eliminando}
+                        nombre={`esta acción (${accion.tipoLabel})`}
+                        url={route('seguimiento.eliminar', accion.id)}
+                        consecuencia="Deja de contar en el seguimiento de la persona. No se puede deshacer."
+                        onCerrar={() => setEliminando(false)}
+                    />
+                    {modificando && <DialogoModificarAccion accion={accion} onCerrar={() => setModificando(false)} />}
+                </>
             )}
         </li>
+    );
+}
+
+function DialogoModificarAccion({ accion, onCerrar }: { accion: Accion; onCerrar: () => void }) {
+    const { tiposAccion } = usePage<{ tiposAccion: Props['tiposAccion'] }>().props;
+    const form = useForm({ tipo: accion.tipo, descripcion: accion.descripcion ?? '' });
+
+    const enviar = (e: FormEvent) => {
+        e.preventDefault();
+        if (form.processing) return;
+        form.put(route('seguimiento.actualizar', accion.id), { preserveScroll: true, onSuccess: onCerrar });
+    };
+
+    return (
+        <DialogoFormulario titulo="Modificar la acción" descripcion="Corrige el tipo o el detalle de lo que se registró." onCerrar={onCerrar} onEnviar={enviar} procesando={form.processing} textoEnviar="Guardar cambios">
+            <Campo id="tipo-accion" etiqueta="Acción" requerido error={form.errors.tipo}>
+                <Selector {...propsCampo('tipo-accion', form.errors.tipo)} valor={form.data.tipo} onCambio={(v) => form.setData('tipo', v)} opciones={tiposAccion} />
+            </Campo>
+            <Campo id="detalle-accion" etiqueta="Detalle" error={form.errors.descripcion}>
+                <Textarea {...propsCampo('detalle-accion', form.errors.descripcion)} rows={3} maxLength={500} value={form.data.descripcion} onChange={(e) => form.setData('descripcion', e.target.value)} />
+            </Campo>
+        </DialogoFormulario>
     );
 }
 

@@ -127,7 +127,7 @@ class PersonalTest extends TestCase
     {
         $tugo = $this->sede('TuGo', ['codigo' => 'TUGO']);
         $tugo->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
-        $juan = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null]);
+        $juan = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza']);
         $coordinador = User::factory()->coordinador()->create();
 
         // Como la exportación real: "Entregado por" lleva la cédula; el esquema es la sucursal; una fila por producto
@@ -152,6 +152,8 @@ class PersonalTest extends TestCase
 
         $this->actingAs($coordinador)->post('/cargas', ['archivo' => new UploadedFile($ruta, 'Preliquidacion.xlsx', null, null, true)])->assertRedirect();
         $carga = Carga::latest('id')->firstOrFail();
+        // Quien aún no está en Usuarios queda por fuera, salvo que se marque
+        $this->patch("/cargas/{$carga->id}", ['incluir' => ['1061428366']])->assertRedirect();
         $this->post("/cargas/{$carga->id}/confirmar")->assertRedirect();
 
         $pdvt1 = Orden::firstWhere('codigo_orden', 'PDVT1');
@@ -228,6 +230,29 @@ class PersonalTest extends TestCase
         $juan->refresh();
         $this->assertSame(['Juan Plaza Benavides', 'Auxiliar', '3022501982', 'plaza@gmail.com', 'Benavides'], [$juan->name, $juan->cargo, $juan->telefono, $juan->email, $juan->segundo_apellido]);
         $this->assertFalse($juan->acceso);
+    }
+
+    public function test_quien_ya_existe_y_trabaja_en_otra_empresa_no_se_duplica_y_queda_tambien_alli(): void
+    {
+        $primera = $this->empresa('Primera');
+        $segunda = $this->empresa('Segunda');
+        $persona = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan', 'primer_apellido' => 'Plaza', 'linea_servicio_id' => null, 'empresa_id' => $primera->id]);
+        $total = User::count();
+
+        $archivo = fn () => $this->excelPersonal([[1, 1144203579, 'JUAN', '', 'PLAZA', '', 'AUXILIAR LOGISTICO', 'SEGUNDA', 'CALI', null, null, null, null]]);
+        $this->actingAs($this->admin)->post('/usuarios/importar', ['archivo' => $archivo()])->assertRedirect('/usuarios/importar');
+        $this->get('/usuarios/importar')->assertInertia(fn (Assert $p) => $p->where('revision.filas.0.accion', 'completa')->where('revision.filas.0.asignar', true));
+
+        $token = pathinfo(Storage::files('importaciones')[0], PATHINFO_FILENAME);
+        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertRedirect('/usuarios');
+
+        $this->assertSame($total, User::count());
+        $this->assertEqualsCanonicalizing([$primera->id, $segunda->id], $persona->asignaciones()->pluck('empresa_id')->all());
+        $this->assertTrue($persona->asignaciones()->where('empresa_id', $segunda->id)->sole()->lineas()->exists());
+
+        // Importar lo mismo otra vez no le agrega otra asignación
+        $this->post('/usuarios/importar', ['archivo' => $archivo()]);
+        $this->get('/usuarios/importar')->assertInertia(fn (Assert $p) => $p->where('revision.filas.0.accion', 'igual')->where('revision.filas.0.asignar', false));
     }
 
     public function test_importar_pide_permiso_para_crear_y_no_da_roles_de_mas(): void
@@ -316,6 +341,7 @@ class PersonalTest extends TestCase
             'Entregado por' => '[Mobile] 1144203579@justoatiempo.com', 'Nombre del Esquema' => 'CALI SUR',
         ]], ['Nombre Plan', 'Fecha Plan', 'Código del Vehículo', 'Código de Orden', 'Nombre Cliente', 'Estado de la Órden', 'Asistente conductor', 'Entregado por', 'Nombre del Esquema']);
         $this->actingAs($coordinador)->post('/cargas', ['archivo' => new UploadedFile($ruta, 'p.xlsx', null, null, true)]);
+        $this->patch('/cargas/'.Carga::latest('id')->value('id'), ['incluir' => ['1144203579']]);
         $this->post('/cargas/'.Carga::latest('id')->value('id').'/confirmar');
 
         $orden = Orden::firstWhere('codigo_orden', 'PDVT1');

@@ -1,12 +1,13 @@
 import { Cifra, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila } from '@/components/cargas/piezas';
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { usePuede } from '@/hooks/use-puede';
 import { fmt } from '@/lib/formato';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { AlertTriangle, ChevronDown, FileSpreadsheet, LoaderCircle, Trash2, XCircle } from '@/components/iconos';
 import { useEffect, useId, useState } from 'react';
 import { Selector } from '@/components/selector';
@@ -26,6 +27,8 @@ interface Campo {
 
 interface Grupo {
     fecha: string;
+    /** "Ditransa · TuGo": la empresa y la sede. */
+    operacion: string;
     sede: string;
     sucursal: string | null;
     ruta: string | null;
@@ -43,6 +46,20 @@ interface Grupo {
     efectividad: number;
 }
 
+/** Quien no tiene asignación en la empresa o la sede de sus órdenes. */
+interface PersonaFuera {
+    clave: string;
+    nombre: string;
+    cedula: string | null;
+    usuarioId: number | null;
+    motivo: 'sin_registrar' | 'sin_asignacion' | 'otra_operacion';
+    asignadoA: string[];
+    incluida: boolean;
+    ordenes: number;
+    entregas: number;
+    operaciones: string[];
+}
+
 interface Analisis {
     columnasFaltantes: string[];
     filasLeidas: number;
@@ -53,11 +70,14 @@ interface Analisis {
     totalAdvertencias: number;
     fechas: Record<string, number>;
     grupos: Grupo[];
+    fueraDeOperacion: PersonaFuera[];
+    /** Las órdenes que quedan por fuera: las de quien no se marcó para incluir. */
+    ordenesFuera: number;
     totales: { ordenes: number; asignadas: number; realizadas: number; devoluciones: number; faltantes: number; averias: number; efectividad: number };
 }
 
 interface Props {
-    carga: { id: number; archivo: string; usuario: string | null; creada: string; opciones?: { sede_id: number | null; sucursal_id: number | null } };
+    carga: { id: number; archivo: string; usuario: string | null; creada: string; opciones?: { sede_id: number | null; sucursal_id: number | null; incluir?: string[] } };
     errorLectura?: string;
     lectura?: { hojas: { nombre: string; puntaje: number; filas: number }[]; hoja: string; filaEncabezados: number; columnas: Columna[] };
     campos?: Campo[];
@@ -138,6 +158,7 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                         </div>
 
                         <VistaPrevia grupos={analisis.grupos} totales={analisis.totales} />
+                        <PersonalFuera personas={analisis.fueraDeOperacion} disabled={guardando || soloConsulta} onCambio={(incluir) => ajustar({ incluir })} />
                         <TablaErrores errores={analisis.errores} total={analisis.totalErrores} />
                         <ListaAdvertencias advertencias={analisis.advertencias} />
                     </div>
@@ -327,9 +348,41 @@ function Marca({ ok, texto }: { ok: boolean; texto: string }) {
 }
 
 /** Así quedará el informe diario: fecha > sede > sucursal > ruta > placa > auxiliar (RF-05). */
-function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['totales'] }) {
+function VistaPrevia({ grupos: todos, totales: delArchivo }: { grupos: Grupo[]; totales: Analisis['totales'] }) {
+    const [operacion, setOperacion] = useState('');
+    const operaciones = [...new Set(todos.map((g) => g.operacion))].sort();
+    // Si la operación elegida ya no está en el archivo (cambió el mapeo), se ven todas
+    const elegida = operaciones.includes(operacion) ? operacion : '';
+    const grupos = elegida ? todos.filter((g) => g.operacion === elegida) : todos;
+    const suma = (campo: 'asignadas' | 'realizadas' | 'devoluciones' | 'faltantes' | 'averias') => grupos.reduce((n, g) => n + g[campo], 0);
+    const totales = elegida
+        ? {
+              ...delArchivo,
+              asignadas: suma('asignadas'),
+              realizadas: suma('realizadas'),
+              devoluciones: suma('devoluciones'),
+              faltantes: suma('faltantes'),
+              averias: suma('averias'),
+              efectividad: suma('asignadas') ? (suma('realizadas') / suma('asignadas')) * 100 : 0,
+          }
+        : delArchivo;
+
     return (
-        <Panel titulo="Vista previa del informe" descripcion="Así quedará el informe diario con las órdenes válidas del archivo." cuerpoClassName="px-0 pb-2">
+        <Panel titulo="Vista previa del informe" descripcion="Así quedará el informe diario, solo con el personal de cada operación." cuerpoClassName="px-0 pb-2">
+            {operaciones.length > 1 && (
+                <div className="grid gap-1.5 px-5 pb-4 sm:max-w-sm">
+                    <label htmlFor="filtro-operacion" className="text-sm font-semibold">
+                        Operación
+                    </label>
+                    <Selector
+                        id="filtro-operacion"
+                        valor={elegida}
+                        onCambio={setOperacion}
+                        className="h-9"
+                        opciones={[{ valor: '', texto: 'Todas las del archivo' }, ...operaciones.map((o) => ({ valor: o, texto: o }))]}
+                    />
+                </div>
+            )}
             {grupos.length === 0 ? (
                 <p className="text-muted-foreground px-5 pb-4 text-sm">No hay órdenes válidas para mostrar.</p>
             ) : (
@@ -427,12 +480,101 @@ function VistaPrevia({ grupos, totales }: { grupos: Grupo[]; totales: Analisis['
     );
 }
 
+const MOTIVO_FUERA: Record<PersonaFuera['motivo'], string> = {
+    sin_registrar: 'No está en Usuarios',
+    sin_asignacion: 'Sin asignación',
+    otra_operacion: 'Asignada a otra operación',
+};
+
+/**
+ * Quien aparece en el archivo y no tiene asignación en esa empresa o sede: no entra al informe. Si sí trabaja allí, se
+ * asigna (queda para las próximas cargas) o se marca para incluirla solo en esta.
+ */
+function PersonalFuera({ personas, disabled, onCambio }: { personas: PersonaFuera[]; disabled: boolean; onCambio: (incluir: string[]) => void }) {
+    const puede = usePuede();
+    if (personas.length === 0) return null;
+
+    const incluidas = personas.filter((p) => p.incluida).map((p) => p.clave);
+    const alternar = (clave: string, marcada: boolean) => onCambio(marcada ? [...incluidas, clave] : incluidas.filter((c) => c !== clave));
+
+    return (
+        <Panel
+            titulo="Personal fuera de esta operación"
+            descripcion="No tienen una asignación en la empresa o la sede de sus órdenes: sus órdenes no entran al informe. Si alguien sí trabaja allí, asígnalo (queda para las próximas cargas) o márcalo para incluirlo solo en esta."
+            cuerpoClassName="px-0 pb-2"
+        >
+            <div className="focus-visible:ring-ring relative overflow-x-auto focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset" tabIndex={0} role="region" aria-label="Personal fuera de esta operación, desplazable">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                    <caption className="sr-only">Personas del archivo sin asignación en la operación de sus órdenes</caption>
+                    <thead className="text-muted-foreground border-y text-[0.72rem] tracking-wide uppercase">
+                        <tr>
+                            <th scope="col" className="w-20 py-2.5 pl-5 font-semibold">
+                                Incluir
+                            </th>
+                            <th scope="col" className="px-3 py-2.5 font-semibold">
+                                Persona
+                            </th>
+                            <th scope="col" className="px-3 py-2.5 font-semibold">
+                                En el archivo
+                            </th>
+                            <th scope="col" className="px-3 py-2.5 font-semibold">
+                                Su asignación
+                            </th>
+                            <th scope="col" className="px-3 py-2.5 text-right font-semibold">
+                                Órdenes
+                            </th>
+                            <th scope="col" className="py-2.5 pr-5 pl-3">
+                                <span className="sr-only">Acción</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {personas.map((p, i) => (
+                            <tr key={p.clave}>
+                                <td className="py-3 pl-5">
+                                    <Checkbox id={`incluir-${i}`} checked={p.incluida} disabled={disabled} onCheckedChange={(v) => alternar(p.clave, v === true)} />
+                                    <label htmlFor={`incluir-${i}`} className="sr-only">
+                                        Incluir a {p.nombre} solo en esta carga
+                                    </label>
+                                </td>
+                                <td className="px-3 py-3">
+                                    <p className="font-semibold">{p.nombre}</p>
+                                    {p.cedula && <p className="text-muted-foreground text-xs">C.C. {p.cedula}</p>}
+                                </td>
+                                <td className="px-3 py-3 text-xs">{p.operaciones.join(', ')}</td>
+                                <td className="px-3 py-3 text-xs">
+                                    <p className="font-semibold">{MOTIVO_FUERA[p.motivo]}</p>
+                                    {p.asignadoA.length > 0 && <p className="text-muted-foreground">{p.asignadoA.join(', ')}</p>}
+                                </td>
+                                <td className="tabular px-3 py-3 text-right">{fmt.numero(p.ordenes)}</td>
+                                <td className="py-3 pr-5 pl-3 text-right text-xs whitespace-nowrap">
+                                    {p.usuarioId && puede('asignaciones.crear') && (
+                                        <Link href={route('asignaciones.index', { usuario: p.usuarioId, nueva: 1 })} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
+                                            Asignar<span className="sr-only"> a {p.nombre}</span>
+                                        </Link>
+                                    )}
+                                    {!p.usuarioId && puede('usuarios.crear') && (
+                                        <Link href={route('usuarios.index')} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
+                                            Ir a Usuarios<span className="sr-only"> para registrar a {p.nombre}</span>
+                                        </Link>
+                                    )}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </Panel>
+    );
+}
+
 /** Acciones fijas al pie: el resumen de lo que va a pasar junto al botón que lo hace. */
 function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; analisis?: Analisis; guardando: boolean }) {
     const puede = usePuede();
     const [importando, setImportando] = useState(false);
     const ordenes = analisis?.totales.ordenes ?? 0;
     const omitidas = analisis?.filasConError ?? 0;
+    const fuera = analisis?.ordenesFuera ?? 0;
     const bloqueado = !analisis || ordenes === 0 || analisis.columnasFaltantes.length > 0;
 
     const importar = () => router.post(`/cargas/${cargaId}/confirmar`, {}, { onStart: () => setImportando(true), onFinish: () => setImportando(false) });
@@ -451,6 +593,12 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
                                 <>
                                     {' '}
                                     y se omitirán <strong className="text-critical">{fmt.numero(omitidas)}</strong> {omitidas === 1 ? 'fila' : 'filas'}
+                                </>
+                            )}
+                            {fuera > 0 && (
+                                <>
+                                    {' '}
+                                    · <strong className="text-warning">{fmt.numero(fuera)}</strong> {fuera === 1 ? 'orden queda' : 'órdenes quedan'} por fuera: personal de otra operación
                                 </>
                             )}
                             .
@@ -485,7 +633,7 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
                         </Dialog>
                     )}
 
-                    {!puede('cargas.confirmar') ? null : omitidas > 0 && !bloqueado ? (
+                    {!puede('cargas.confirmar') ? null : (omitidas > 0 || fuera > 0) && !bloqueado ? (
                         <Dialog>
                             <DialogTrigger asChild>
                                 <Button className="h-10 rounded-lg px-5 font-semibold" disabled={guardando || importando}>
@@ -494,10 +642,20 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
                                 </Button>
                             </DialogTrigger>
                             <DialogContent>
-                                <DialogTitle>¿Importar sin las filas con error?</DialogTitle>
+                                <DialogTitle>{omitidas > 0 ? '¿Importar sin las filas con error?' : '¿Importar sin el personal de otra operación?'}</DialogTitle>
                                 <DialogDescription>
-                                    {fmt.numero(omitidas)} {omitidas === 1 ? 'fila no se importará' : 'filas no se importarán'}. Si son órdenes reales, corrígelas en Drivin y súbelas en un archivo
-                                    aparte: el sistema no duplica las órdenes que ya existan.
+                                    {omitidas > 0 && (
+                                        <>
+                                            {fmt.numero(omitidas)} {omitidas === 1 ? 'fila no se importará' : 'filas no se importarán'}. Si son órdenes reales, corrígelas en Drivin y súbelas en un archivo
+                                            aparte: el sistema no duplica las órdenes que ya existan.{' '}
+                                        </>
+                                    )}
+                                    {fuera > 0 && (
+                                        <>
+                                            {fmt.numero(fuera)} {fuera === 1 ? 'orden queda' : 'órdenes quedan'} por fuera porque su personal no tiene asignación en esa operación. Si alguna sí es de aquí,
+                                            márcala antes de importar.
+                                        </>
+                                    )}
                                 </DialogDescription>
                                 <DialogFooter className="gap-2">
                                     <DialogClose asChild>

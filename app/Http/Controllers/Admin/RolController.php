@@ -112,4 +112,21 @@ class RolController extends Controller
             ? "El rol {$rol->nombre} está activo de nuevo."
             : "El rol {$rol->nombre} quedó inactivo: ya no se ofrece al crear usuarios (quienes lo tienen lo conservan).");
     }
+
+    /** Solo un rol que no es de la plataforma y que nadie tiene. */
+    public function destroy(Request $request, RolUsuario $rol): RedirectResponse
+    {
+        if ($rol->base) {
+            return back()->with('error', 'Es un rol base de la plataforma: no se elimina.');
+        }
+        if (! $request->user()->rolUsuario?->cubre($rol)) {
+            return back()->with('error', 'Este rol tiene permisos que el tuyo no tiene: no puedes eliminarlo.');
+        }
+        $enUso = "El rol {$rol->nombre} lo tienen personas de la plataforma: dales otro rol antes de eliminarlo, o desactívalo.";
+        if ($rol->usuarios()->exists()) {
+            return back()->with('error', $enUso);
+        }
+
+        return $this->eliminarRegistro($rol, "el rol {$rol->nombre}", $enUso);
+    }
 }

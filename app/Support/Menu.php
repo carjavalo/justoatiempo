@@ -34,7 +34,7 @@ final class Menu
     ];
 
     /** Las páginas de logística que no cuelgan de /lineas/logisticos (sus herramientas de Drivin). */
-    private const RUTAS_LOGISTICA = ['/cargas', '/auditoria', '/evidencias', '/informes', '/seguimiento', '/mis-entregas'];
+    private const RUTAS_LOGISTICA = ['/cargas', '/auditoria', '/trazabilidad', '/evidencias', '/informes', '/seguimiento', '/mis-entregas'];
 
     /**
      * @param  Collection<int, LineaServicio>  $lineas  las que ve (User::lineasVisibles)

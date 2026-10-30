@@ -49,7 +49,7 @@ class AdministracionTest extends TestCase
                 ->where('menu.0.items.0.href', '/panel')
                 // Las líneas activas: «Apoyo operativo para plantas» quedó integrada en logística y personal
                 ->has('menu.1.items', 7)
-                ->where('menu.1.items.0.rutas', ['/lineas/logisticos', '/cargas', '/auditoria', '/evidencias', '/informes', '/seguimiento', '/mis-entregas'])
+                ->where('menu.1.items.0.rutas', ['/lineas/logisticos', '/cargas', '/auditoria', '/trazabilidad', '/evidencias', '/informes', '/seguimiento', '/mis-entregas'])
                 ->where('menu.2.items', fn ($items) => $titulos($items) === ['Usuarios', 'Asignaciones', 'Roles'])
                 ->where('menu.3.items', fn ($items) => $titulos($items) === ['Empresas', 'Sedes', 'Sucursales', 'Solicitudes'])
                 ->where('menu.4.items', fn ($items) => $titulos($items) === ['Líneas de servicio', 'Flota', 'Parámetros'])

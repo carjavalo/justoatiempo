@@ -5,7 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SedeRequest;
 use App\Models\Empresa;
+use App\Models\InformeDiario;
+use App\Models\NovedadLinea;
+use App\Models\Orden;
 use App\Models\Parametro;
+use App\Models\Programacion;
 use App\Models\Sede;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -92,5 +96,17 @@ class SedeController extends Controller
         return back()->with('success', $activo
             ? "La sede {$sede->nombre} está activa de nuevo."
             : "La sede {$sede->nombre} quedó inactiva: no recibirá nuevas sucursales ni usuarios.");
+    }
+
+    /** Solo una sede sin sucursales, sin personal y sin operación: lo demás se desactiva, para conservar su historial. */
+    public function destroy(Sede $sede): RedirectResponse
+    {
+        $enUso = "La sede {$sede->nombre} tiene sucursales, personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
+        if ($sede->sucursales()->withTrashed()->exists() || $sede->asignaciones()->exists() || Orden::where('sede_id', $sede->id)->exists()
+            || InformeDiario::where('sede_id', $sede->id)->exists() || Programacion::where('sede_id', $sede->id)->exists() || NovedadLinea::where('sede_id', $sede->id)->exists()) {
+            return back()->with('error', $enUso);
+        }
+
+        return $this->eliminarRegistro($sede, "la sede {$sede->nombre}", $enUso);
     }
 }

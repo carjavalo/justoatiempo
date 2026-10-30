@@ -192,6 +192,7 @@ class AuditoriaController extends Controller
 
         $datos = $request->validate(['tipo' => ['required', Rule::enum(TipoEvidencia::class)]]);
         $evidencia->update($datos);
+        Bitacora::registrar('evidencia_clasificada', $evidencia->orden, ['archivo' => $evidencia->nombre_original, 'tipo' => $evidencia->tipo->label()]);
 
         return back();
     }

@@ -95,6 +95,7 @@ class ImportadorPreliquidacion
                 ->all();
 
             $fechaPrincipal = collect($a['fechas'])->sortDesc()->keys()->first();
+            $fuera = collect($a['fueraDeOperacion'])->where('incluida', false);
 
             $carga->update([
                 'estado' => $a['totalErrores'] > 0 ? EstadoCarga::ConErrores : EstadoCarga::Procesada,
@@ -106,12 +107,20 @@ class ImportadorPreliquidacion
                 'filas_validas' => $a['filasLeidas'] - $a['filasConError'],
                 'filas_error' => $a['filasConError'],
                 'ordenes_importadas' => count($a['ordenes']),
-                'advertencias' => $a['totalAdvertencias'],
+                'advertencias' => $a['totalAdvertencias'] + ($fuera->isEmpty() ? 0 : 1),
                 'errores' => $a['errores'],
                 'resumen' => [
                     'totales' => $a['totales'],
                     'fechas' => $a['fechas'],
-                    'advertencias' => $a['advertencias'],
+                    'advertencias' => [
+                        ...$a['advertencias'],
+                        ...($fuera->isEmpty() ? [] : [[
+                            'tipo' => 'fuera_operacion',
+                            'titulo' => 'Personal que no hace parte de la operación',
+                            'detalle' => 'Sus órdenes no se importaron. Si alguna sí era de esta operación, anula la carga, asigna a la persona y vuelve a subir el archivo.',
+                            'items' => $fuera->map(fn ($p) => ['valor' => trim($p['nombre'].($p['cedula'] ? " · C.C. {$p['cedula']}" : '')), 'ordenes' => $p['ordenes']])->values()->all(),
+                        ]]),
+                    ],
                     'informes' => $informes,
                 ],
                 'procesado_en' => now(),
@@ -124,7 +133,7 @@ class ImportadorPreliquidacion
                 ['valor' => json_encode(['version' => MapeoColumnas::VERSION, 'encabezados' => $lectura['encabezados'], 'mapeo' => $mapeo], JSON_UNESCAPED_UNICODE), 'descripcion' => 'Último mapeo de columnas confirmado para la preliquidación de Drivin'],
             );
 
-            Bitacora::registrar('importada', $carga, ['ordenes' => count($a['ordenes']), 'filas_omitidas' => $a['filasConError']]);
+            Bitacora::registrar('importada', $carga, ['ordenes' => count($a['ordenes']), 'filas_omitidas' => $a['filasConError'], 'ordenes_fuera' => $a['ordenesFuera']]);
 
             return ['ordenes' => count($a['ordenes']), 'informes' => $informes];
         });
@@ -151,6 +160,8 @@ class ImportadorPreliquidacion
         }
 
         DB::transaction(function () use ($carga, $claves) {
+            // Sus órdenes se borran: la bitácora guarda sus códigos para la trazabilidad
+            $codigos = $carga->ordenes()->pluck('codigo_orden')->unique()->values()->all();
             $carga->ordenes()->delete();
 
             foreach ($claves as $k) {
@@ -161,7 +172,7 @@ class ImportadorPreliquidacion
             }
 
             $carga->update(['estado' => EstadoCarga::Anulada, 'anulada_por' => auth()->id(), 'anulada_en' => now()]);
-            Bitacora::registrar('anulada', $carga);
+            Bitacora::registrar('anulada', $carga, ['ordenes' => $codigos]);
         });
     }
 

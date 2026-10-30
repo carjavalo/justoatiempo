@@ -69,6 +69,17 @@ class CargaController extends Controller
             if ($existente->enRevision()) {
                 return to_route('cargas.show', $existente)->with('success', 'Este archivo ya estaba en revisión: puedes continuar donde quedaste.');
             }
+            // Una carga anulada no dejó órdenes: el mismo archivo vuelve a su revisión
+            if ($existente->estado === EstadoCarga::Anulada) {
+                $existente->update([
+                    'estado' => EstadoCarga::EnRevision, 'fecha_operacion' => null, 'total_filas' => 0, 'filas_validas' => 0, 'filas_error' => 0,
+                    'ordenes_importadas' => 0, 'advertencias' => 0, 'errores' => null, 'resumen' => null, 'procesado_en' => null, 'duracion_ms' => null,
+                    'anulada_por' => null, 'anulada_en' => null,
+                ]);
+                Bitacora::registrar('reabierta', $existente);
+
+                return to_route('cargas.show', $existente)->with('success', 'Este archivo se había anulado: vuelve a su revisión para importarlo de nuevo.');
+            }
 
             return back()->withErrors(['archivo' => "Este archivo ya se importó el {$existente->procesado_en?->format('d/m/Y H:i')} (carga #{$existente->id})."]);
         }
@@ -157,7 +168,7 @@ class CargaController extends Controller
         ]);
     }
 
-    /** Ajustes de la revisión: hoja, mapeo de columnas y sede/sucursal por defecto. */
+    /** Ajustes de la revisión: hoja, mapeo de columnas, sede/sucursal por defecto y a quién se incluye de otra operación. */
     public function update(Request $request, Carga $carga): RedirectResponse
     {
         abort_unless($carga->enRevision(), 409, 'La carga ya fue procesada.');
@@ -168,6 +179,8 @@ class CargaController extends Controller
             'mapeo.*' => ['nullable', 'integer', 'min:0', 'max:500'],
             'sede_id' => ['nullable', 'integer', Rule::in($this->sedesPorDefecto()->modelKeys())],
             'sucursal_id' => ['nullable', 'integer', Rule::exists('sucursales', 'id')->where('sede_id', $request->integer('sede_id'))->where('activo', true)->whereNull('deleted_at')],
+            'incluir' => ['nullable', 'array', 'max:500'],
+            'incluir.*' => ['string', 'max:150'],
         ], [
             'sede_id.in' => 'Elige una sede activa de una empresa que reciba servicios logísticos.',
             'sucursal_id.exists' => 'Elige una sucursal activa de la sede elegida.',
@@ -177,7 +190,11 @@ class CargaController extends Controller
         $cambios = [];
 
         if ($request->has('sede_id')) {
-            $cambios['opciones'] = ['sede_id' => $datos['sede_id'] ?? null, 'sucursal_id' => $datos['sucursal_id'] ?? null];
+            $cambios['opciones'] = [...($carga->opciones ?? []), 'sede_id' => $datos['sede_id'] ?? null, 'sucursal_id' => $datos['sucursal_id'] ?? null];
+        }
+
+        if ($request->has('incluir')) {
+            $cambios['opciones'] = [...($cambios['opciones'] ?? $carga->opciones ?? []), 'incluir' => array_values(array_unique($datos['incluir'] ?? []))];
         }
 
         if ($request->filled('hoja') && $datos['hoja'] !== $carga->hoja) {
@@ -257,7 +274,7 @@ class CargaController extends Controller
         unset($analisis['ordenes']);
 
         return Inertia::render('cargas/revision', [
-            'carga' => [...$base, 'opciones' => $carga->opciones ?? ['sede_id' => null, 'sucursal_id' => null]],
+            'carga' => [...$base, 'opciones' => ($carga->opciones ?? []) + ['sede_id' => null, 'sucursal_id' => null, 'incluir' => []]],
             'lectura' => [
                 'hojas' => $lectura['hojas'],
                 'hoja' => $lectura['hoja'],

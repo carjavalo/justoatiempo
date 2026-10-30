@@ -146,6 +146,7 @@ class ImportacionPersonalController extends Controller
         $partes = array_filter([
             $r['nuevas'] ? ($r['nuevas'] === 1 ? '1 persona nueva' : "{$r['nuevas']} personas nuevas") : null,
             $r['completadas'] ? ($r['completadas'] === 1 ? 'se completaron los datos de 1 persona' : "se completaron los datos de {$r['completadas']} personas") : null,
+            $r['otraEmpresa'] ? ($r['otraEmpresa'] === 1 ? '1 persona ya registrada quedó también en otra empresa' : "{$r['otraEmpresa']} personas ya registradas quedaron también en otra empresa") : null,
         ]);
         $asignadas = $r['asignadas'] ? ' '.($r['asignadas'] === 1 ? 'Una quedó asignada a su empresa.' : "{$r['asignadas']} quedaron asignadas a su empresa.") : '';
         $asignadas .= $r['sinAsignar'] ? ' '.($r['sinAsignar'] === 1 ? 'Una quedó sin asignar: asígnala en Asignaciones.' : "{$r['sinAsignar']} quedaron sin asignar: asígnalas en Asignaciones.") : '';

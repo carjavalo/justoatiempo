@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/input-error';
+import { useBorrador } from '@/hooks/use-borrador';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
 import { fechaHoraCompleta, haceCuanto } from '@/lib/formato';
@@ -139,6 +140,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
     const [verContrasena, setVerContrasena] = useState(false);
     const [generada, setGenerada] = useState(false);
     const form = useForm(VACIO);
+    const borrador = useBorrador('usuarios', form, ['password', 'restablecer', 'foto', 'quitar_foto', 'arl', 'quitar_arl']);
 
     useFocoPrimerError(form.errors, ORDEN_CAMPOS);
 
@@ -148,7 +150,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
         setVerContrasena(false);
         setGenerada(false);
         form.clearErrors();
-        form.setData(
+        borrador.abrir(
+            usuario?.id ?? null,
             usuario
                 ? {
                       nombres: usuario.nombres ?? '',
@@ -176,7 +179,10 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
     };
 
     const guardar = () => {
-        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => setAbierto(false) };
+        const opciones = { preserveScroll: true, preserveState: true, onSuccess: () => {
+                borrador.limpiar();
+                setAbierto(false);
+            } };
         // Con una imagen al editar, el envío va como formulario con archivos, que PHP solo lee en POST: se marca como edición
         const conArchivoAlEditar = Boolean(editando && (form.data.foto || form.data.arl));
         form.transform((d) => (conArchivoAlEditar ? { ...d, _method: 'put' } : d));
@@ -462,6 +468,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                     // Nadie se desactiva a sí mismo, ni toca a quien tiene más permisos que él
                                                     urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
                                                     onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
+                                                    urlEliminar={!u.esUsted && u.editable && puede('usuarios.eliminar') ? route('usuarios.destroy', u.id) : undefined}
                                                     consecuencia={
                                                         u.acceso
                                                             ? 'Perderá el acceso de inmediato, incluso si tiene la sesión abierta, y su carnet dejará de estar vigente. Podrás activarla de nuevo cuando quieras.'
@@ -496,6 +503,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear usuario'}
+                recuperado={borrador.recuperado}
+                onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
             >
                 <Campo id="nombres" etiqueta="Nombres" requerido error={form.errors.nombres}>

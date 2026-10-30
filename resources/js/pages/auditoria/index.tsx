@@ -9,7 +9,7 @@ import { usePuede } from '@/hooks/use-puede';
 import { Selector } from '@/components/selector';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 interface Props {
@@ -239,7 +239,15 @@ function Detalle({
                     </h2>
                     {orden.ruta && <p className="text-muted-foreground mt-0.5 text-xs">{orden.ruta}</p>}
                 </div>
-                <EstadoAuditoriaBadge estado={estado} className="mt-1" />
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                    <Link
+                        href={route('trazabilidad.index', { q: orden.codigo, codigo: orden.codigo })}
+                        className="text-primary focus-visible:ring-ring rounded-sm text-xs font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                    >
+                        Ver su recorrido
+                    </Link>
+                    <EstadoAuditoriaBadge estado={estado} />
+                </div>
             </header>
 
             <div className="grid gap-6 p-5 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
