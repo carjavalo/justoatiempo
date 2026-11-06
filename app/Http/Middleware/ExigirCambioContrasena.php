@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Quien entra con la contraseña inicial (su cédula) la cambia antes de usar la plataforma: cualquier página lo lleva a
+ * Quien entra con su código inicial crea su contraseña antes de usar la plataforma: cualquier página lo lleva a
  * "Cambiar contraseña" hasta que lo haga. Puede salir sin cambiarla.
  */
 class ExigirCambioContrasena

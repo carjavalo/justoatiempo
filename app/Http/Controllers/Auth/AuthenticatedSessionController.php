@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -29,7 +30,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): SymfonyResponse
     {
         $request->authenticate();
 
@@ -37,7 +38,9 @@ class AuthenticatedSessionController extends Controller
 
         $request->user()->forceFill(['ultimo_acceso_en' => now()])->save();
 
-        return redirect()->intended(route('panel', absolute: false));
+        // Carga completa (no dentro de la página de ingreso): el sitio público solo trae sus propias rutas
+        // (config/ziggy.php) y la plataforma necesita todas las suyas
+        return Inertia::location(redirect()->intended(route('panel', absolute: false)));
     }
 
     /**

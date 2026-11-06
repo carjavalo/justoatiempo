@@ -4,13 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
- * Los auxiliares operativos entran con su cédula (sin correo), la primera vez con su cédula como contraseña, la cambian
- * antes de seguir y solo ven su carnet.
+ * Los auxiliares operativos entran con su cédula (sin correo), la primera vez con un código inicial que les entregan,
+ * crean su contraseña antes de seguir y solo ven su carnet.
  */
 class AccesoAuxiliaresTest extends TestCase
 {
@@ -20,7 +21,7 @@ class AccesoAuxiliaresTest extends TestCase
     {
         return User::factory()->create([
             'email' => null, 'cedula' => '1144203579', 'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza',
-            'password' => '1144203579', 'debe_cambiar_contrasena' => true,
+            'password' => '48312290', 'codigo_inicial' => '48312290', 'debe_cambiar_contrasena' => true,
         ]);
     }
 
@@ -28,8 +29,12 @@ class AccesoAuxiliaresTest extends TestCase
     {
         $auxiliar = $this->auxiliar();
 
-        // Con puntos o espacios, como la escriba
-        $this->post('/login', ['email' => '1.144.203.579', 'password' => '1144203579'])->assertRedirect('/panel');
+        // La cédula no es su contraseña: cualquiera que la conozca no entra
+        $this->post('/login', ['email' => '1144203579', 'password' => '1144203579'])->assertSessionHasErrors('ingreso');
+        $this->assertGuest();
+
+        // Cédula con puntos o espacios, como la escriba, y el código tal como se le entregó ("4831 2290")
+        $this->post('/login', ['email' => '1.144.203.579', 'password' => '4831 2290'])->assertRedirect('/panel');
         $this->assertAuthenticatedAs($auxiliar);
 
         // Cualquier página lo lleva a cambiar la contraseña
@@ -37,14 +42,18 @@ class AccesoAuxiliaresTest extends TestCase
         $this->get('/mi-carnet')->assertRedirect('/settings/password');
         $this->get('/settings/password')->assertInertia(fn (Assert $p) => $p->component('settings/password')->where('obligatorio', true));
 
-        // No sirve dejar la misma ni usar la cédula
-        $this->put('/settings/password', ['current_password' => '1144203579', 'password' => '1144203579', 'password_confirmation' => '1144203579'])
+        // No sirve dejar el mismo código ni usar la cédula
+        $this->put('/settings/password', ['current_password' => '48312290', 'password' => '48312290', 'password_confirmation' => '48312290'])
             ->assertSessionHasErrors('password');
-        $this->put('/settings/password', ['current_password' => '1144203579', 'password' => 'Camion-Azul-27', 'password_confirmation' => 'Camion-Azul-27'])
+        $this->put('/settings/password', ['current_password' => '48312290', 'password' => '1144203579', 'password_confirmation' => '1144203579'])
+            ->assertSessionHasErrors('password');
+        $this->put('/settings/password', ['current_password' => '48312290', 'password' => 'Camion-Azul-27', 'password_confirmation' => 'Camion-Azul-27'])
             ->assertRedirect('/mi-carnet');
 
+        // Con su contraseña creada, el código deja de existir
         $auxiliar->refresh();
         $this->assertFalse($auxiliar->debe_cambiar_contrasena);
+        $this->assertNull($auxiliar->codigo_inicial);
         $this->assertTrue(Hash::check('Camion-Azul-27', $auxiliar->password));
         $this->get('/mi-carnet')->assertOk();
     }
@@ -76,24 +85,97 @@ class AccesoAuxiliaresTest extends TestCase
         $this->post('/logout');
 
         User::factory()->sinAcceso()->create(['cedula' => '99887766']);
-        $this->post('/login', ['email' => '99887766', 'password' => '99887766'])->assertSessionHasErrors('email');
+        $this->post('/login', ['email' => '99887766', 'password' => '99887766'])->assertSessionHasErrors('ingreso');
         $this->assertGuest();
         $this->post('/login', ['email' => 'sin numeros', 'password' => 'x'])->assertSessionHasErrors('email');
     }
 
-    public function test_el_administrador_le_devuelve_la_contrasena_inicial(): void
+    public function test_el_administrador_le_da_un_codigo_inicial_nuevo_y_lo_consulta_en_la_lista(): void
     {
         $admin = User::factory()->admin()->create();
         $auxiliar = $this->auxiliar();
         $auxiliar->update(['password' => 'Su-Clave-2026', 'debe_cambiar_contrasena' => false]);
+        $this->assertNull($auxiliar->fresh()->codigo_inicial);
 
-        $this->actingAs($admin)->put("/usuarios/{$auxiliar->id}", [
+        $respuesta = $this->actingAs($admin)->put("/usuarios/{$auxiliar->id}", [
             'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'cedula' => '1144203579', 'cargo' => 'Auxiliar logístico',
             'rol_id' => $auxiliar->rol_id, 'acceso' => true, 'restablecer' => true,
         ])->assertSessionHasNoErrors();
 
+        // Un código de 8 cifras al azar (no su cédula), que se le dice a quien lo generó
         $auxiliar->refresh();
+        $codigo = $auxiliar->codigo_inicial;
+        $this->assertMatchesRegularExpression('/^\d{8}$/', $codigo);
         $this->assertTrue($auxiliar->debe_cambiar_contrasena);
-        $this->assertTrue(Hash::check('1144203579', $auxiliar->password));
+        $this->assertTrue(Hash::check($codigo, $auxiliar->password));
+        $this->assertFalse(Hash::check('Su-Clave-2026', $auxiliar->password));
+        $respuesta->assertSessionHas('success', fn (string $m) => str_contains($m, User::formatoCodigo($codigo)));
+
+        // Va cifrado en la base de datos y nunca en las respuestas del modelo
+        $this->assertNotSame($codigo, DB::table('users')->where('id', $auxiliar->id)->value('codigo_inicial'));
+        $this->assertArrayNotHasKey('codigo_inicial', $auxiliar->toArray());
+
+        // En Usuarios lo ve quien puede editar a la persona, y el filtro reúne a quienes aún lo tienen por entregar
+        $this->get('/usuarios?acceso=codigo')->assertInertia(fn (Assert $p) => $p
+            ->has('usuarios.data', 1)
+            ->where('usuarios.data.0.contrasenaInicial', true)
+            ->where('usuarios.data.0.codigoInicial', User::formatoCodigo($codigo)));
+    }
+
+    public function test_el_error_habla_de_lo_que_se_escribio_y_avisa_antes_del_bloqueo(): void
+    {
+        $this->auxiliar();
+
+        // Sin @ ni números no es ni correo ni cédula: es un error del campo, no un intento
+        $this->post('/login', ['email' => 'juan plaza', 'password' => 'x'])
+            ->assertSessionHasErrors(['email' => 'Escribe tu correo completo (con @) o tu número de cédula.']);
+        $this->post('/login', ['email' => '1144203579', 'password' => ''])->assertSessionHasErrors(['password' => 'Escribe tu contraseña.']);
+
+        // Con cédula, el error dice "cédula"; con correo, "correo"
+        $this->post('/login', ['email' => '1144203579', 'password' => 'otra'])
+            ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas.']);
+        $this->post('/login', ['email' => 'nadie@example.com', 'password' => 'otra'])
+            ->assertSessionHasErrors(['ingreso' => 'El correo o la contraseña no son correctos.']);
+
+        // "1.144.203.579" es la misma cédula: suma al mismo contador (2.º, 3.º y, en el 4.º, el aviso)
+        $this->post('/login', ['email' => '1.144.203.579', 'password' => 'otra']);
+        $this->post('/login', ['email' => '1144 203 579', 'password' => 'otra'])
+            ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas.']);
+        $this->post('/login', ['email' => '1144203579', 'password' => 'otra'])
+            ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas. Te queda un intento: si fallas otra vez, tendrás que esperar un minuto.']);
+        $this->post('/login', ['email' => '1144203579', 'password' => 'otra']);
+
+        // Bloqueado: aun con la contraseña correcta, toca esperar (el mensaje lo dice en minutos y la pantalla cuenta los segundos)
+        $this->post('/login', ['email' => '1.144.203.579', 'password' => '48312290'])
+            ->assertSessionHasErrors(['ingreso' => 'Hiciste demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.'])
+            ->assertSessionHasErrors('bloqueo');
+        $segundos = (int) session('errors')->first('bloqueo');
+        $this->assertTrue($segundos > 0 && $segundos <= 60);
+        $this->assertGuest();
+    }
+
+    public function test_quien_escribio_su_cedula_llega_a_la_recuperacion_por_su_camino(): void
+    {
+        $this->get('/forgot-password?con=cedula')->assertInertia(fn (Assert $p) => $p->where('con', 'cedula'));
+        $this->get('/forgot-password')->assertInertia(fn (Assert $p) => $p->where('con', 'correo'));
+
+        // De vuelta de pedir un enlace (con correo), abre en el correo aunque la dirección diga otra cosa
+        $this->withSession(['status' => 'Enviado'])->get('/forgot-password?con=cedula')->assertInertia(fn (Assert $p) => $p->where('con', 'correo'));
+    }
+
+    public function test_al_ingresar_la_plataforma_se_carga_completa_y_el_sitio_publico_no_trae_sus_rutas(): void
+    {
+        $auxiliar = $this->auxiliar();
+        $auxiliar->update(['password' => 'Camion-Azul-27', 'debe_cambiar_contrasena' => false]);
+
+        // Sin sesión, solo las rutas del sitio público: ni el mapa de la plataforma ni su peso
+        $this->get('/login')->assertOk()->assertSee('"password.request"', false)->assertDontSee('"usuarios.index"', false);
+
+        // Desde la pantalla de ingreso (Inertia), la plataforma se abre con una carga completa, que trae todas sus rutas
+        $this->post('/login', ['email' => '1144203579', 'password' => 'Camion-Azul-27'], ['X-Inertia' => 'true'])
+            ->assertStatus(409)
+            ->assertHeader('X-Inertia-Location');
+        $this->assertAuthenticatedAs($auxiliar);
+        $this->get('/mi-carnet')->assertOk()->assertSee('"usuarios.index"', false);
     }
 }

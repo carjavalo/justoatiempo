@@ -22,7 +22,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, Props>(
 
         return (
             <div className="relative">
-                <Input ref={ref} type={visible ? 'text' : 'password'} className={cn('pr-11', className)} spellCheck={false} autoCapitalize="none" {...props} />
+                <Input ref={ref} type={visible ? 'text' : 'password'} className={cn('pr-12', className)} spellCheck={false} autoCapitalize="none" {...props} />
                 <button
                     type="button"
                     onClick={() => setVisible(!visible)}
@@ -30,7 +30,8 @@ const PasswordInput = React.forwardRef<HTMLInputElement, Props>(
                     aria-label="Mostrar contraseña"
                     aria-pressed={visible}
                     aria-controls={props.id}
-                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
+                    // Toda la altura del campo y 44 px de ancho: fácil de tocar sin rozar lo que haya cerca
+                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                 >
                     <Icono className="size-4" aria-hidden="true" />
                 </button>

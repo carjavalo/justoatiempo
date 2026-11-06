@@ -45,8 +45,10 @@ interface FilaUsuario {
     /** Si entra a la plataforma (con su correo o su cédula); sin acceso, sigue teniendo su carnet. */
     acceso: boolean;
     tieneContrasena: boolean;
-    /** Aún entra con la contraseña inicial (su cédula): la cambia en su primer ingreso. */
+    /** Aún no crea su contraseña: entra con su código inicial. */
     contrasenaInicial: boolean;
+    /** Ese código ("4831 2290"), solo para quien puede editar a la persona y entregárselo. */
+    codigoInicial: string | null;
     telefono: string | null;
     ciudad: string | null;
     fechaNacimiento: string | null;
@@ -117,6 +119,36 @@ const ORDEN_CAMPOS = [
     'email',
     'password',
 ];
+
+/**
+ * Código inicial de quien aún no crea su contraseña, oculto hasta que se pide verlo (la lista puede estar a la vista de
+ * otros). Sin código (quien no puede editar a la persona), solo el estado.
+ */
+function CodigoInicial({ nombre, codigo }: { nombre: string; codigo: string | null }) {
+    const [visible, setVisible] = useState(false);
+    if (!codigo) return <span className="text-muted-foreground">Aún no crea su contraseña</span>;
+
+    return (
+        <span className="grid gap-0.5">
+            <span className="text-muted-foreground">Código inicial</span>
+            <span className="flex items-center gap-2">
+                <span aria-live="polite" className="text-foreground font-mono text-[0.8rem] font-semibold tabular-nums">
+                    {visible ? codigo : '•••• ••••'}
+                </span>
+                {/* Nombre fijo + aria-pressed (como el botón para mostrar contraseñas) */}
+                <button
+                    type="button"
+                    onClick={() => setVisible(!visible)}
+                    aria-pressed={visible}
+                    aria-label={`Ver el código inicial de ${nombre}`}
+                    className="text-primary focus-visible:ring-ring inline-flex min-h-6 items-center rounded-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                >
+                    Ver
+                </button>
+            </span>
+        </span>
+    );
+}
 
 /** Contraseña aleatoria legible (sin 0/O ni 1/l/I) con mayúsculas, minúsculas, números y un símbolo. */
 function generarContrasena(): string {
@@ -309,6 +341,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                     { valor: '', texto: 'Con y sin acceso' },
                                     { valor: 'con', texto: 'Entran a la plataforma' },
                                     { valor: 'sin', texto: 'Solo carnet (sin acceso)' },
+                                    { valor: 'codigo', texto: 'Con código inicial por entregar' },
                                 ]}
                             />
                             {chips.map((c) => (
@@ -448,7 +481,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                                         Sin acceso
                                                     </span>
                                                 ) : u.contrasenaInicial ? (
-                                                    <span className="text-muted-foreground">Aún con la contraseña inicial</span>
+                                                    <CodigoInicial nombre={u.nombre} codigo={u.codigoInicial} />
                                                 ) : u.ultimoAcceso ? (
                                                     <time
                                                         dateTime={u.ultimoAcceso}
@@ -727,19 +760,15 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                         <Campo
                             id="password"
                             etiqueta={pideContrasena ? 'Contraseña' : 'Nueva contraseña'}
-                            requerido={pideContrasena && !conCedula}
                             ayuda={
                                 pideContrasena
-                                    ? conCedula
-                                        ? 'En blanco, su contraseña inicial es su cédula y la cambia en su primer ingreso. O escribe una y compártela por un medio seguro.'
-                                        : 'Compártela con la persona por un medio seguro.'
+                                    ? 'En blanco, recibe un código inicial (lo ves en la lista) para entrar y crear su contraseña. O escribe una y compártela por un medio seguro.'
                                     : 'Déjala en blanco para conservar la actual.'
                             }
                             error={form.errors.password}
                         >
                             <PasswordInput
                                 {...propsCampo('password', form.errors.password, 'password-ayuda')}
-                                required={pideContrasena && !conCedula}
                                 autoComplete="new-password"
                                 placeholder="Mínimo 8 caracteres"
                                 value={form.data.password}
@@ -768,8 +797,8 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                         </Campo>
                     )}
 
-                    {/* Si olvidó la contraseña y no tiene correo para restablecerla: vuelve a ser su cédula */}
-                    {form.data.acceso && !pideContrasena && conCedula && !form.data.password && (
+                    {/* Si olvidó la contraseña y no tiene correo para restablecerla: un código inicial nuevo */}
+                    {form.data.acceso && !pideContrasena && !form.data.password && (
                         <div className="flex items-start gap-3">
                             <Checkbox
                                 id="restablecer"
@@ -780,10 +809,10 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                             />
                             <div className="grid gap-1">
                                 <label htmlFor="restablecer" className="cursor-pointer text-sm leading-none font-medium">
-                                    Volver a la contraseña inicial
+                                    Darle un código inicial nuevo
                                 </label>
                                 <p id="restablecer-ayuda" className="text-muted-foreground text-xs">
-                                    Su contraseña vuelve a ser su cédula y la cambia al ingresar. Útil si la olvidó y no tiene correo.
+                                    Su contraseña deja de servir; con el código entra y crea una nueva. Útil si la olvidó y no tiene correo.
                                 </p>
                             </div>
                         </div>

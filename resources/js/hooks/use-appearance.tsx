@@ -8,6 +8,8 @@ const applyTheme = (appearance: Appearance) => {
     const isDark = appearance === 'dark' || (appearance === 'system' && prefersDark());
 
     document.documentElement.classList.toggle('dark', isDark);
+    // La barra del navegador del teléfono acompaña al tema (azul de la marca en claro, grafito en oscuro)
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark ? '#121417' : '#12244a');
 };
 
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

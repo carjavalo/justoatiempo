@@ -26,8 +26,8 @@ export function Pie() {
                             {empresa.datosDePrueba && <MarcaPrueba className="bg-white/10 text-[#f6c47a]" />}
                         </h2>
                         <ul role="list" className="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-                            {canales.map(({ icono: Icono, etiqueta, valor, href, externo }) => (
-                                <li key={etiqueta} className="flex min-w-0 items-center gap-2.5">
+                            {canales.map(({ icono: Icono, etiqueta, valor, href, externo, alterno }) => (
+                                <li key={etiqueta} className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
                                     <Icono className="text-brand-coral-on-dark size-4" aria-hidden="true" />
                                     {href ? (
                                         <a
@@ -44,6 +44,15 @@ export function Pie() {
                                             <span className="sr-only">{etiqueta}: </span>
                                             {valor}
                                         </span>
+                                    )}
+                                    {alterno && (
+                                        <a
+                                            href={alterno.href}
+                                            aria-label={alterno.nombre}
+                                            className="inline-flex min-h-6 items-center font-semibold text-white/85 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                        >
+                                            {alterno.texto}
+                                        </a>
                                     )}
                                 </li>
                             ))}

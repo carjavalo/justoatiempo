@@ -17,7 +17,7 @@ use RuntimeException;
 
 /**
  * Importar el Excel del personal (auxiliares, conductores, operarios) en dos pasos: se sube y se revisa qué pasará
- * con cada fila; al confirmar, se registran las personas nuevas (si se elige, entran con su cédula) y se completan
+ * con cada fila; al confirmar, se registran las personas nuevas (si se elige, entran con su cédula y un código inicial) y se completan
  * los datos de las que ya estaban.
  */
 class ImportacionPersonalController extends Controller
@@ -151,9 +151,10 @@ class ImportacionPersonalController extends Controller
         $asignadas = $r['asignadas'] ? ' '.($r['asignadas'] === 1 ? 'Una quedó asignada a su empresa.' : "{$r['asignadas']} quedaron asignadas a su empresa.") : '';
         $asignadas .= $r['sinAsignar'] ? ' '.($r['sinAsignar'] === 1 ? 'Una quedó sin asignar: asígnala en Asignaciones.' : "{$r['sinAsignar']} quedaron sin asignar: asígnalas en Asignaciones.") : '';
 
-        return to_route('usuarios.index', $acceso ? [] : ['acceso' => 'sin'])
+        // Con acceso, la lista abre en quienes tienen un código inicial por entregar
+        return to_route('usuarios.index', $acceso ? ($r['nuevas'] ? ['acceso' => 'codigo'] : []) : ['acceso' => 'sin'])
             ->with('success', 'Personal importado: '.implode(' y ', $partes).'.'.$asignadas.($acceso
-                ? ' Las personas nuevas entran con su cédula, y su contraseña inicial es su cédula: la cambian al entrar.'
+                ? ($r['nuevas'] ? ' Las personas nuevas entran con su cédula y el código inicial que ves en esta lista: entrégale a cada una el suyo.' : '')
                 : ' Las personas nuevas tienen su carnet y no entran a la plataforma.'));
     }
 

@@ -99,7 +99,7 @@ class NavegacionTest extends TestCase
     {
         $this->from('/login')->post('/login', ['email' => 'nadie@example.com', 'password' => 'cualquiera'])
             ->assertRedirect('/login')
-            ->assertSessionHasErrors(['email' => 'El correo o la contraseña no son correctos.']);
+            ->assertSessionHasErrors(['ingreso' => 'El correo o la contraseña no son correctos.']);
         $this->assertGuest();
     }
 

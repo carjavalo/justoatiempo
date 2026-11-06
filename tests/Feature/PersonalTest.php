@@ -67,13 +67,15 @@ class PersonalTest extends TestCase
         // Sin acceso, la cédula es obligatoria: es la que lo identifica
         $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '']))
             ->assertSessionHasErrors(['cedula' => 'Escribe la cédula: sin acceso a la plataforma, es la que identifica a la persona.']);
-        // Con acceso, sin cédula: correo y contraseña
+        // Con acceso, sin cédula: el correo (la contraseña puede quedar en blanco: recibe un código inicial)
         $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '', 'acceso' => true]))
-            ->assertSessionHasErrors(['email' => 'Escribe el correo o la cédula: con uno de los dos entra a la plataforma.', 'password']);
-        // Con acceso y cédula, sin correo ni contraseña: entra con su cédula y esa es su contraseña inicial
+            ->assertSessionHasErrors(['email' => 'Escribe el correo o la cédula: con uno de los dos entra a la plataforma.'])
+            ->assertSessionDoesntHaveErrors('password');
+        // Con acceso y cédula, sin correo ni contraseña: entra con su cédula y un código inicial (no su cédula)
         $this->actingAs($this->admin)->post('/usuarios', $this->datos(['cedula' => '222333', 'acceso' => true]))->assertSessionHasNoErrors();
         $nuevo = User::where('cedula', '222333')->sole();
-        $this->assertTrue($nuevo->acceso && $nuevo->debe_cambiar_contrasena && Hash::check('222333', $nuevo->password));
+        $this->assertTrue($nuevo->acceso && $nuevo->debe_cambiar_contrasena && Hash::check($nuevo->codigo_inicial, $nuevo->password));
+        $this->assertFalse(Hash::check('222333', $nuevo->password));
     }
 
     public function test_sin_acceso_no_ingresa_ni_recibe_una_contrasena(): void
@@ -82,7 +84,7 @@ class PersonalTest extends TestCase
         $sinAcceso = User::factory()->create(['email' => 'cristian@example.com', 'acceso' => false]);
 
         $this->post('/login', ['email' => 'cristian@example.com', 'password' => 'password'])
-            ->assertSessionHasErrors(['email' => 'Tu usuario no tiene acceso a la plataforma. Si lo necesitas, habla con el administrador.']);
+            ->assertSessionHasErrors(['ingreso' => 'Tu usuario no tiene acceso a la plataforma. Si lo necesitas, habla con el administrador.']);
         $this->assertGuest();
 
         $this->post('/forgot-password', ['email' => 'cristian@example.com']);
@@ -105,12 +107,12 @@ class PersonalTest extends TestCase
         $this->actingAs($persona)->get('/panel')->assertRedirect('/login')
             ->assertSessionHas('status', 'Tu usuario ya no tiene acceso a la plataforma. Si crees que es un error, habla con el administrador.');
 
-        // Al devolvérselo sin escribir una contraseña, vuelve a la inicial: su cédula
+        // Al devolvérselo sin escribir una contraseña, recibe un código inicial nuevo
         $this->actingAs($this->admin)->put("/usuarios/{$persona->id}", $this->datos([
             'nombres' => 'Juan Fernando', 'primer_apellido' => 'Plaza', 'cedula' => '1144203579', 'email' => $persona->email, 'acceso' => true,
         ]))->assertSessionHasNoErrors();
         $persona->refresh();
-        $this->assertTrue($persona->acceso && $persona->debe_cambiar_contrasena && Hash::check('1144203579', $persona->password));
+        $this->assertTrue($persona->acceso && $persona->debe_cambiar_contrasena && Hash::check($persona->codigo_inicial, $persona->password));
     }
 
     public function test_nadie_se_quita_su_propio_acceso(): void
@@ -215,12 +217,14 @@ class PersonalTest extends TestCase
         $this->assertFalse(User::where('cedula', '1061428366')->exists(), 'La revisión no registra a nadie');
 
         $token = pathinfo(Storage::files('importaciones')[0], PATHINFO_FILENAME);
-        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertRedirect('/usuarios');
+        // La lista abre en quienes tienen un código inicial por entregar
+        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertRedirect('/usuarios?acceso=codigo');
 
-        // Entran con su cédula, y su contraseña inicial es su cédula
+        // Entran con su cédula y un código inicial (cada uno el suyo; ninguno es su cédula)
         $cristian = User::where('cedula', '1061428366')->sole();
         $this->assertSame(['Cristian Alejandro', 'Aponza', 'Mina', 'Auxiliar logístico', true, true, null], [$cristian->nombres, $cristian->primer_apellido, $cristian->segundo_apellido, $cristian->cargo, $cristian->acceso, $cristian->debe_cambiar_contrasena, $cristian->email]);
-        $this->assertTrue(Hash::check('1061428366', $cristian->password));
+        $this->assertTrue(Hash::check($cristian->codigo_inicial, $cristian->password));
+        $this->assertFalse(Hash::check('1061428366', $cristian->password));
         // Asignada a Ditransa, con sus líneas, desde su ingreso
         $asignacion = $cristian->asignaciones()->with('lineas')->sole();
         $this->assertSame([$ditransa->id, '2026-03-10', [LineaServicio::logistica()->id]], [$asignacion->empresa_id, $asignacion->fecha_inicio->toDateString(), $asignacion->lineas->pluck('id')->all()]);

@@ -53,6 +53,7 @@ class User extends Authenticatable
         'activo',
         'acceso',
         'debe_cambiar_contrasena',
+        'codigo_inicial',
         'ultimo_acceso_en',
     ];
 
@@ -69,6 +70,8 @@ class User extends Authenticatable
         'arl_path',
         // Código del QR del carnet: va en el carnet, no en las respuestas de la plataforma
         'carnet_codigo',
+        // Solo lo ve quien administra usuarios, en la lista (UsuarioController)
+        'codigo_inicial',
     ];
 
     /**
@@ -85,6 +88,7 @@ class User extends Authenticatable
             'activo' => 'boolean',
             'acceso' => 'boolean',
             'debe_cambiar_contrasena' => 'boolean',
+            'codigo_inicial' => 'encrypted',
             'fecha_nacimiento' => 'date',
             'fecha_ingreso' => 'date',
             'ultimo_acceso_en' => 'datetime',
@@ -112,6 +116,11 @@ class User extends Authenticatable
         });
 
         static::saving(function (User $user) {
+            // El código inicial solo existe mientras la persona no haya creado su contraseña
+            if (! $user->acceso || ! $user->debe_cambiar_contrasena) {
+                $user->codigo_inicial = null;
+            }
+
             if (filled($user->nombres)) {
                 $user->name = self::nombreCompleto($user->nombres, $user->primer_apellido, $user->segundo_apellido);
             }
@@ -234,10 +243,21 @@ class User extends Authenticatable
         return ! $this->administraAlgo() && ! $this->puede('tablero.ver') && ($lineas ?? $this->lineasVisibles())->isEmpty();
     }
 
-    /** La contraseña inicial es su cédula: entra con ella y debe cambiarla en su primer ingreso. */
-    public function contrasenaInicial(): array
+    /**
+     * Contraseña inicial: un código de 8 cifras al azar que el administrador le entrega (no su cédula, que conoce
+     * cualquiera que tenga su carnet o una planilla). Entra con él y crea su propia contraseña en su primer ingreso.
+     */
+    public static function contrasenaInicial(): array
     {
-        return ['password' => $this->cedula, 'debe_cambiar_contrasena' => true];
+        $codigo = str_pad((string) random_int(0, 99_999_999), 8, '0', STR_PAD_LEFT);
+
+        return ['password' => $codigo, 'codigo_inicial' => $codigo, 'debe_cambiar_contrasena' => true];
+    }
+
+    /** "48312290" → "4831 2290": en dos grupos, para dictarlo y copiarlo sin perderse. */
+    public static function formatoCodigo(string $codigo): string
+    {
+        return substr($codigo, 0, 4).' '.substr($codigo, 4);
     }
 
     /** Su rol dentro de la empresa (auxiliar, conductor, supervisor…), con sus permisos en la plataforma. */

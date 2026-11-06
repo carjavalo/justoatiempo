@@ -9,7 +9,7 @@ import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { Head, useForm } from '@inertiajs/react';
 import { FormEventHandler } from 'react';
 
-/** obligatorio: entró con la contraseña inicial (su cédula) y debe cambiarla para seguir. */
+/** obligatorio: entró con su código inicial y debe crear su contraseña para seguir. */
 export default function Password({ obligatorio = false }: { obligatorio?: boolean }) {
     const { data, setData, errors, put, reset, processing, recentlySuccessful } = useForm({
         current_password: '',
@@ -43,8 +43,8 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
                     <p role="status" className="bg-secondary text-secondary-foreground mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm">
                         <KeyRound className="text-brand-coral-ink mt-0.5 size-5 shrink-0" aria-hidden="true" />
                         <span>
-                            <strong className="font-semibold">Crea tu propia contraseña para seguir.</strong> Entraste con la contraseña inicial (tu
-                            cédula): escríbela como contraseña actual y elige una nueva que solo tú conozcas.
+                            <strong className="font-semibold">Crea tu propia contraseña para seguir.</strong> Entraste con tu código inicial:
+                            escríbelo como contraseña actual y elige una nueva que solo tú conozcas.
                         </span>
                     </p>
                 )}
@@ -58,7 +58,7 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
                             required
                             className="h-11 rounded-lg"
                             autoComplete="current-password"
-                            placeholder={obligatorio ? 'Tu número de cédula' : 'La que usas para ingresar'}
+                            placeholder={obligatorio ? 'Tu código inicial' : 'La que usas para ingresar'}
                         />
                         <InputError id="current_password-error" message={errors.current_password} />
                     </div>

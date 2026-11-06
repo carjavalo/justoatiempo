@@ -43,7 +43,8 @@ class UsuarioController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'rol' => ['nullable', 'integer'],
             'estado' => ['nullable', Rule::in(['activos', 'inactivos'])],
-            'acceso' => ['nullable', Rule::in(['con', 'sin'])],
+            // "codigo": con acceso, pero aún sin crear su contraseña (para entregarles su código inicial)
+            'acceso' => ['nullable', Rule::in(['con', 'sin', 'codigo'])],
             'empresa' => ['nullable', 'integer'],
             'sede' => ['nullable', 'integer'],
             'sucursal' => ['nullable', 'integer'],
@@ -65,7 +66,9 @@ class UsuarioController extends Controller
             })
             ->when($filtros['rol'] ?? null, fn (Builder $q, int|string $rol) => $q->where('rol_id', (int) $rol))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activos'))
-            ->when($filtros['acceso'] ?? null, fn (Builder $q, string $acceso) => $q->where('acceso', $acceso === 'con'))
+            ->when($filtros['acceso'] ?? null, fn (Builder $q, string $acceso) => $acceso === 'codigo'
+                ? $q->where('acceso', true)->where('debe_cambiar_contrasena', true)
+                : $q->where('acceso', $acceso === 'con'))
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('empresa_id', $id)))
             ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sede_id', $id)))
             ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sucursal_id', $id)))
@@ -87,8 +90,11 @@ class UsuarioController extends Controller
                 'email' => $u->email,
                 'acceso' => $u->acceso,
                 'tieneContrasena' => filled($u->password),
-                // Aún con la contraseña inicial (su cédula)
+                // Aún no crea su contraseña: entra con su código inicial, que solo ve quien puede editarlo para entregárselo
                 'contrasenaInicial' => $u->acceso && $u->debe_cambiar_contrasena,
+                'codigoInicial' => $u->acceso && $u->debe_cambiar_contrasena && $u->codigo_inicial && $yo->puede('usuarios.editar') && $yo->cubreA($u)
+                    ? User::formatoCodigo($u->codigo_inicial)
+                    : null,
                 'telefono' => $u->telefono,
                 'ciudad' => $u->ciudad,
                 'fechaNacimiento' => $u->fecha_nacimiento?->toDateString(),
@@ -153,15 +159,16 @@ class UsuarioController extends Controller
             $usuario->markEmailAsVerified();
         }
         $this->guardarArchivos($request, $usuario);
+        $codigo = $this->avisoCodigo($usuario);
 
         // Lo siguiente es decir dónde presta el servicio: se abre Asignaciones con la persona elegida
         if ($request->user()->puede('asignaciones.crear') && $request->user()->cubreA($usuario)) {
             return to_route('asignaciones.index', ['usuario' => $usuario->id, 'nueva' => 1])
-                ->with('success', "Persona registrada: {$usuario->name}. Ahora elige dónde presta el servicio y qué líneas hace.");
+                ->with('success', "Persona registrada: {$usuario->name}.{$codigo} Ahora elige dónde presta el servicio y qué líneas hace.");
         }
 
         return back()->with('success', $usuario->acceso
-            ? "Usuario creado: {$usuario->name} ya puede ingresar con su correo."
+            ? "Usuario creado: {$usuario->name} ya puede ingresar.{$codigo}"
             : "Persona registrada: {$usuario->name}, con su carnet y sin acceso a la plataforma.");
     }
 
@@ -179,7 +186,18 @@ class UsuarioController extends Controller
                 ->delete();
         }
 
-        return back()->with('success', "Cambios guardados en {$usuario->name}.");
+        // Con un código inicial nuevo (o el primero, si antes no tenía acceso), se dice cuál es
+        $codigo = array_key_exists('codigo_inicial', $datos) ? $this->avisoCodigo($usuario) : '';
+
+        return back()->with('success', "Cambios guardados en {$usuario->name}.{$codigo}");
+    }
+
+    /** " Su código inicial es 4831 2290: …" para el mensaje de guardado (vacío si no tiene código pendiente). */
+    private function avisoCodigo(User $usuario): string
+    {
+        return $usuario->codigo_inicial
+            ? ' Su código inicial es '.User::formatoCodigo($usuario->codigo_inicial).': entrégaselo para que entre y cree su contraseña.'
+            : '';
     }
 
     /** Foto de una persona que quien mira alcanza a ver (cada quien ve la suya en Mi carnet). */

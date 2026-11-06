@@ -6,7 +6,8 @@ import { useEffect } from 'react';
  * `ayuda` agrega el id de un texto de ayuda permanente (p. ej. requisitos de la contraseña).
  */
 export function propsCampo(id: string, error?: string, ayuda?: string) {
-    const descripciones = [ayuda, error ? `${id}-error` : null].filter(Boolean).join(' ');
+    // Primero el error (lo urgente), después la ayuda
+    const descripciones = [error ? `${id}-error` : null, ayuda].filter(Boolean).join(' ');
 
     return {
         id,

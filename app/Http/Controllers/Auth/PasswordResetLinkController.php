@@ -29,6 +29,8 @@ class PasswordResetLinkController extends Controller
             // Contador para volver a pedir el enlace; sigue corriendo aunque se recargue la página
             'espera' => $this->espera($request),
             'enviadoEn' => $request->session()->get(self::ULTIMO_ENVIO),
+            // Abre en el camino de la cédula si eso se escribió al iniciar sesión; de vuelta de pedir un enlace, en el del correo
+            'con' => $request->query('con') === 'cedula' && ! $request->session()->hasAny(['status', 'errors']) ? 'cedula' : 'correo',
         ]);
     }
 

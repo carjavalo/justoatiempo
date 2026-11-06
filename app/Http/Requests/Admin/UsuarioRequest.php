@@ -67,10 +67,10 @@ class UsuarioRequest extends FormRequest
             // Ingresa con su correo o con su cédula: con acceso, al menos uno de los dos
             'email' => ['nullable', Rule::requiredIf(fn () => $this->boolean('acceso') && blank($this->input('cedula'))), 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
-            // Con acceso y sin contraseña aún: la que se escriba o, en blanco, su cédula (la inicial, que cambia al entrar).
-            // Al editar, en blanco conserva la actual. Sin acceso no se usa.
-            'password' => [Rule::requiredIf(fn () => $this->boolean('acceso') && blank($usuario?->password) && blank($this->input('cedula'))), 'nullable', 'string', 'max:255', Password::defaults()],
-            // Volver a la contraseña inicial (su cédula), p. ej. si la olvidó y no tiene correo para restablecerla
+            // Con acceso y sin contraseña aún: la que se escriba o, en blanco, un código inicial (con él entra y crea la
+            // suya). Al editar, en blanco conserva la actual. Sin acceso no se usa.
+            'password' => ['nullable', 'string', 'max:255', Password::defaults()],
+            // Darle un código inicial nuevo, p. ej. si olvidó su contraseña y no tiene correo para restablecerla
             'restablecer' => ['boolean'],
             'telefono' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\s-]{7,30}$/'],
             'ciudad' => ['nullable', 'string', 'max:80'],
@@ -195,10 +195,9 @@ class UsuarioRequest extends FormRequest
         } elseif (filled($datos['password'] ?? null)) {
             $guardar['password'] = $datos['password'];
             $guardar['debe_cambiar_contrasena'] = false;
-        } elseif (filled($datos['cedula'] ?? null) && (($datos['restablecer'] ?? false) || blank($usuario?->password))) {
-            // Contraseña inicial: su cédula, que cambia en su primer ingreso
-            $guardar['password'] = $datos['cedula'];
-            $guardar['debe_cambiar_contrasena'] = true;
+        } elseif (($datos['restablecer'] ?? false) || blank($usuario?->password)) {
+            // Contraseña inicial: un código al azar que se le entrega; con él entra y crea la suya
+            $guardar = [...$guardar, ...User::contrasenaInicial()];
         }
 
         return $guardar;

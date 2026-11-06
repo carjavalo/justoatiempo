@@ -4,6 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
+import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2 } from '@/components/iconos';
@@ -103,7 +104,7 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                                 {empresa.datosDePrueba && <MarcaPrueba />}
                             </h3>
                             <ul role="list" className="mt-4 grid gap-1">
-                                {canales.map(({ icono: Icono, etiqueta, valor, href, externo }) => {
+                                {canales.map(({ icono: Icono, etiqueta, valor, href, externo, alterno }) => {
                                     const contenido = (
                                         <>
                                             <Icono className="text-primary size-5" aria-hidden="true" />
@@ -114,18 +115,31 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                                         </>
                                     );
                                     return (
-                                        <li key={etiqueta}>
+                                        <li key={etiqueta} className="flex items-center gap-2">
                                             {href ? (
                                                 <a
                                                     href={href}
                                                     {...(externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                                                    className="hover:bg-card focus-visible:ring-ring -mx-3 flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
+                                                    className={cn(
+                                                        'hover:bg-card focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
+                                                        alterno ? '-ml-3' : '-mx-3',
+                                                    )}
                                                 >
                                                     {contenido}
                                                     {externo && <span className="sr-only">(se abre en WhatsApp)</span>}
                                                 </a>
                                             ) : (
                                                 <div className="-mx-3 flex items-center gap-3 px-3 py-2.5">{contenido}</div>
+                                            )}
+                                            {alterno && (
+                                                <a
+                                                    href={alterno.href}
+                                                    aria-label={alterno.nombre}
+                                                    className="hover:bg-card focus-visible:ring-ring inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
+                                                >
+                                                    <alterno.icono className="text-primary size-4" aria-hidden="true" />
+                                                    {alterno.texto}
+                                                </a>
                                             )}
                                         </li>
                                     );

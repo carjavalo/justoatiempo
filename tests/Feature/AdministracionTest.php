@@ -339,8 +339,11 @@ class AdministracionTest extends TestCase
         $this->actingAs($this->admin)->post('/usuarios', ['email' => 'z@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar), 'password' => 'Clave-segura-1'])
             ->assertSessionHasErrors(['nombres', 'primer_apellido'])
             ->assertSessionDoesntHaveErrors('segundo_apellido');
-        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => 'x@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar)])
-            ->assertSessionHasErrors('password');
+        // Sin contraseña no hay error: recibe un código inicial para entrar y crear la suya
+        $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'cargo' => 'Auxiliar', 'email' => 'x@example.com', 'rol_id' => $this->rolBase(Rol::Auxiliar)])
+            ->assertSessionHasNoErrors();
+        $nuevo = User::where('email', 'x@example.com')->sole();
+        $this->assertTrue($nuevo->debe_cambiar_contrasena && Hash::check($nuevo->codigo_inicial, $nuevo->password));
     }
 
     public function test_al_editar_sin_contrasena_se_conserva_la_actual(): void
@@ -380,7 +383,7 @@ class AdministracionTest extends TestCase
 
         auth()->logout();
         $this->post('/login', ['email' => $usuario->email, 'password' => 'password'])
-            ->assertSessionHasErrors(['email' => 'Tu usuario está desactivado. Habla con el administrador para recuperar el acceso.']);
+            ->assertSessionHasErrors(['ingreso' => 'Tu usuario está desactivado. Habla con el administrador para recuperar el acceso.']);
         $this->assertGuest();
     }
 

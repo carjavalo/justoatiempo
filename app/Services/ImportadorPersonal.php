@@ -267,7 +267,7 @@ class ImportadorPersonal
      *
      * @return array{nuevas: int, completadas: int, asignadas: int, sinAsignar: int, otraEmpresa: int}
      */
-    /** @param  bool  $acceso  si las personas nuevas entran a la plataforma (con su cédula como contraseña inicial) */
+    /** @param  bool  $acceso  si las personas nuevas entran a la plataforma (con su cédula y un código inicial) */
     public function importar(array $analisis, RolUsuario $rol, User $quien, bool $acceso = true): array
     {
         $asignables = $this->empresasAsignables($quien);
@@ -286,8 +286,8 @@ class ImportadorPersonal
                         'rol_id' => $rol->id,
                         'activo' => true,
                         'acceso' => $acceso,
-                        // Entra con su cédula y su cédula como contraseña inicial, que cambia al ingresar
-                        ...($acceso ? ['password' => $datos['cedula'], 'debe_cambiar_contrasena' => true] : []),
+                        // Entra con su cédula y un código inicial que le entregan; crea su contraseña al ingresar
+                        ...($acceso ? User::contrasenaInicial() : []),
                     ]);
                     $resultado['nuevas']++;
 

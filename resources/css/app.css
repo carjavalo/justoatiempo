@@ -1,3 +1,5 @@
+/* La fuente de la marca, servida por la propia plataforma: un archivo variable para todos los grosores */
+@import '@fontsource-variable/plus-jakarta-sans';
 @import 'tailwindcss';
 
 @plugin 'tailwindcss-animate';
@@ -10,7 +12,7 @@
 
 @theme {
     --font-sans:
-        'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+        'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -45,6 +47,7 @@
     --color-border: var(--border);
     --color-input: var(--input);
     --color-ring: var(--ring);
+    --color-anillo-accion: var(--anillo-accion);
 
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
@@ -134,6 +137,8 @@
     --border: #e3e8f0;
     --input: #7d879c; /* bordes de campos: ≥3:1 sobre fondo, tarjeta y muted (WCAG 1.4.11) */
     --ring: #2f5ba8;
+    /* Foco de los botones rellenos: ≥3:1 contra el botón (#1f3a68) y contra el fondo (el aro va pegado, sin separación) */
+    --anillo-accion: #5b8ad6;
     --radius: 0.75rem;
 
     /* Gráficas: paleta validada (CVD y contraste) sobre superficie blanca */
@@ -208,6 +213,7 @@
     --border: #2b3038;
     --input: #6b7482;
     --ring: #8fadde;
+    --anillo-accion: #b4cbf0; /* ≥3:1 contra el botón (#3f6bbd) y contra el fondo */
 
     --series-1: #6f93da;
     --series-2: #e0604d;

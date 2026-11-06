@@ -225,7 +225,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [rol, setRol] = useState(rolPorDefecto && roles.some((r) => r.id === rolPorDefecto) ? String(rolPorDefecto) : '');
     const [procesando, setProcesando] = useState(false);
-    // Las personas nuevas entran a la plataforma con su cédula (y su cédula como contraseña inicial)
+    // Las personas nuevas entran a la plataforma con su cédula y un código inicial que se les entrega
     const [acceso, setAcceso] = useState(true);
     const { resumen } = revision;
     const porImportar = resumen.nueva + resumen.completa;
@@ -364,7 +364,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                             </label>
                             <p id="acceso-ayuda" className="text-muted-foreground text-xs">
                                 {acceso
-                                    ? 'Entran con su cédula, y su contraseña inicial es su cédula: la cambian en su primer ingreso.'
+                                    ? 'Entran con su cédula y un código inicial que les entregas (lo ves en Usuarios); con él crean su contraseña.'
                                     : 'Solo tendrán su carnet: no entran a la plataforma.'}
                             </p>
                         </div>

@@ -21,7 +21,7 @@ class PasswordController extends Controller
         return Inertia::render('settings/password', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
-            // Entró con la contraseña inicial (su cédula): debe cambiarla para seguir
+            // Entró con su código inicial: debe crear su contraseña para seguir
             'obligatorio' => $request->user()->debe_cambiar_contrasena,
         ]);
     }

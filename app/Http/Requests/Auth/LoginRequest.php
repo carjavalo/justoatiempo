@@ -12,6 +12,9 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
+    /** Intentos fallidos seguidos antes de tener que esperar (el contador se reinicia al minuto del primero). */
+    private const INTENTOS = 5;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -29,23 +32,29 @@ class LoginRequest extends FormRequest
     {
         return [
             // El correo o la cédula (la mayoría de auxiliares no tiene correo)
-            'email' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'max:255', function (string $atributo, mixed $valor, \Closure $fallar) {
+                if (is_string($valor) && ! str_contains($valor, '@') && preg_replace('/\D/', '', $valor) === '') {
+                    $fallar('Escribe tu correo completo (con @) o tu número de cédula.');
+                }
+            }],
             'password' => ['required', 'string'],
         ];
     }
 
     public function messages(): array
     {
-        return ['email.required' => 'Escribe tu correo o tu cédula.'];
+        return [
+            'email.required' => 'Escribe tu correo o tu cédula.',
+            'password.required' => 'Escribe tu contraseña.',
+        ];
     }
 
-    /** Con qué se identifica: el correo (si trae @) o la cédula (solo sus números). */
-    private function credenciales(): array
+    /** Con qué se identifica: el correo (si trae @) en minúsculas o la cédula con solo sus números. */
+    private function identificacion(): array
     {
         $usuario = trim((string) $this->input('email'));
-        $campo = str_contains($usuario, '@') ? ['email' => mb_strtolower($usuario)] : ['cedula' => preg_replace('/\D/', '', $usuario)];
 
-        return [...$campo, 'password' => (string) $this->input('password')];
+        return str_contains($usuario, '@') ? ['email' => mb_strtolower($usuario)] : ['cedula' => preg_replace('/\D/', '', $usuario)];
     }
 
     /**
@@ -57,20 +66,32 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $credenciales = $this->credenciales();
-        if (in_array('', [$credenciales['email'] ?? null, $credenciales['cedula'] ?? null], true) || ! Auth::attempt($credenciales, $this->boolean('remember'))) {
+        // Los fallos del ingreso (datos que no coinciden, bloqueo, cuenta) son del formulario, no de un campo: van en
+        // "ingreso" y la pantalla los muestra arriba, con el foco en la contraseña
+        $identificacion = $this->identificacion();
+        $clave = (string) $this->input('password');
+        $recordar = $this->boolean('remember');
+        $entro = Auth::attempt([...$identificacion, 'password' => $clave], $recordar)
+            // El código inicial se entrega en dos grupos ("4831 2290"): vale escrito con o sin el espacio
+            || (preg_match('/^\d{4}[\s.-]\d{4}$/', trim($clave)) && Auth::attempt([...$identificacion, 'password' => preg_replace('/\D/', '', $clave)], $recordar));
+
+        if (! $entro) {
             RateLimiter::hit($this->throttleKey());
 
-            throw ValidationException::withMessages([
-                'email' => __('auth.failed'),
-            ]);
+            $mensaje = __(isset($identificacion['cedula']) ? 'auth.failed_cedula' : 'auth.failed');
+            // Antes del bloqueo, un aviso: el siguiente fallo obliga a esperar
+            if (RateLimiter::remaining($this->throttleKey(), self::INTENTOS) === 1) {
+                $mensaje .= ' '.__('auth.ultimo_intento');
+            }
+
+            throw ValidationException::withMessages(['ingreso' => $mensaje]);
         }
 
         if (! Auth::user()->activo) {
             Auth::guard('web')->logout();
 
             throw ValidationException::withMessages([
-                'email' => 'Tu usuario está desactivado. Habla con el administrador para recuperar el acceso.',
+                'ingreso' => 'Tu usuario está desactivado. Habla con el administrador para recuperar el acceso.',
             ]);
         }
 
@@ -79,7 +100,7 @@ class LoginRequest extends FormRequest
             Auth::guard('web')->logout();
 
             throw ValidationException::withMessages([
-                'email' => 'Tu usuario no tiene acceso a la plataforma. Si lo necesitas, habla con el administrador.',
+                'ingreso' => 'Tu usuario no tiene acceso a la plataforma. Si lo necesitas, habla con el administrador.',
             ]);
         }
 
@@ -93,27 +114,28 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        if (! RateLimiter::tooManyAttempts($this->throttleKey(), self::INTENTOS)) {
             return;
         }
 
         event(new Lockout($this));
 
-        $seconds = RateLimiter::availableIn($this->throttleKey());
+        $segundos = RateLimiter::availableIn($this->throttleKey());
+        $minutos = max(1, (int) ceil($segundos / 60));
 
         throw ValidationException::withMessages([
-            'email' => __('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
+            'ingreso' => trans_choice('auth.throttle', $minutos, ['minutes' => $minutos]),
+            // Para la cuenta regresiva de la pantalla
+            'bloqueo' => (string) $segundos,
         ]);
     }
 
     /**
-     * Get the rate limiting throttle key for the request.
+     * Los intentos se cuentan por persona y equipo, con lo que se escribió ya normalizado: "1.234.567" y "1234567"
+     * son la misma cédula, como "Ana@Correo.com" y "ana@correo.com" el mismo correo.
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(implode('|', [...$this->identificacion(), $this->ip()]));
     }
 }

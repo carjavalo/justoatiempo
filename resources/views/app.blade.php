@@ -6,8 +6,6 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <meta name="theme-color" content="#12244a">
@@ -18,12 +16,19 @@
                 var a = localStorage.getItem('appearance') || 'system';
                 if (a === 'dark' || (a === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)) {
                     document.documentElement.classList.add('dark');
+                    // La barra del navegador del teléfono, del mismo grafito que la página
+                    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#121417');
                 }
             } catch (e) {}
         </script>
         <style>html { background: #f5f7fb; } html.dark { background: #121417; }</style>
 
-        @routes
+        {{-- Sin sesión, solo las rutas del sitio público (config/ziggy.php) --}}
+        @auth
+            @routes
+        @else
+            @routes('publico')
+        @endauth
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         @inertiaHead
