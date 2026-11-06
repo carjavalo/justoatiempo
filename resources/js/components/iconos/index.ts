@@ -125,6 +125,7 @@ export { LogIn } from './log-in';
 export { LogOut } from './log-out';
 export { Menu } from './menu';
 export { Minus } from './minus';
+export { Numpad } from './numpad';
 export { MoreHorizontal } from './more-horizontal';
 export { PanelLeft } from './panel-left';
 export { Paperclip } from './paperclip';

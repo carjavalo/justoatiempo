@@ -12,8 +12,16 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
-    /** Intentos fallidos seguidos antes de tener que esperar (el contador se reinicia al minuto del primero). */
+    /** Intentos fallidos con una misma cuenta (desde un mismo equipo) antes de un bloqueo, contados en 15 minutos. */
     private const INTENTOS = 5;
+
+    private const VENTANA = 900;
+
+    /** Esperas de los bloqueos seguidos: 1, 5 y 15 minutos (de ahí en adelante, 15). Se olvidan al entrar bien o al día. */
+    private const ESPERAS = [60, 300, 900];
+
+    /** Fallos por equipo (con cualquier cuenta) en un minuto: frena a quien prueba muchas cédulas desde un mismo lugar. */
+    private const POR_EQUIPO = 20;
 
     /**
      * Determine if the user is authorized to make this request.
@@ -32,8 +40,9 @@ class LoginRequest extends FormRequest
     {
         return [
             // El correo o la cédula (la mayoría de auxiliares no tiene correo)
+            // Sin @ tiene que ser una cédula (solo números): "ana.ruiz2" es un correo a medias, no la cédula "2"
             'email' => ['required', 'string', 'max:255', function (string $atributo, mixed $valor, \Closure $fallar) {
-                if (is_string($valor) && ! str_contains($valor, '@') && preg_replace('/\D/', '', $valor) === '') {
+                if (is_string($valor) && ! str_contains($valor, '@') && ! self::esCedula($valor)) {
                     $fallar('Escribe tu correo completo (con @) o tu número de cédula.');
                 }
             }],
@@ -47,6 +56,12 @@ class LoginRequest extends FormRequest
             'email.required' => 'Escribe tu correo o tu cédula.',
             'password.required' => 'Escribe tu contraseña.',
         ];
+    }
+
+    /** Una cédula como se la escriba: solo números, con puntos, espacios o guiones. */
+    private static function esCedula(string $valor): bool
+    {
+        return preg_match('/^[\d\s.\-]+$/', trim($valor)) === 1 && preg_match('/\d/', $valor) === 1;
     }
 
     /** Con qué se identifica: el correo (si trae @) en minúsculas o la cédula con solo sus números. */
@@ -77,8 +92,12 @@ class LoginRequest extends FormRequest
             || (preg_match('/^\d{4}[\s.-]\d{4}$/', trim($clave)) && Auth::attempt([...$identificacion, 'password' => preg_replace('/\D/', '', $clave)], $recordar));
 
         if (! $entro) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), self::VENTANA);
+            RateLimiter::hit($this->claveEquipo());
             // El fallo que agota los intentos ya trae el bloqueo (no el intento siguiente): lo que el aviso anterior prometió
+            if (RateLimiter::tooManyAttempts($this->throttleKey(), self::INTENTOS)) {
+                $this->bloquear();
+            }
             $this->ensureIsNotRateLimited();
 
             $mensaje = __(isset($identificacion['cedula']) ? 'auth.failed_cedula' : 'auth.failed');
@@ -107,6 +126,19 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Entró: se olvidan sus fallos y sus bloqueos
+        RateLimiter::clear($this->throttleKey());
+        RateLimiter::clear($this->claveBloqueos());
+    }
+
+    /** Un bloqueo más largo cada vez que se repite (1, 5, 15 minutos); al terminar, los intentos vuelven a empezar. */
+    private function bloquear(): void
+    {
+        $seguidos = RateLimiter::hit($this->claveBloqueos(), 86400);
+        $espera = self::ESPERAS[min($seguidos, count(self::ESPERAS)) - 1];
+
+        RateLimiter::clear($this->claveBloqueo());
+        RateLimiter::hit($this->claveBloqueo(), $espera);
         RateLimiter::clear($this->throttleKey());
     }
 
@@ -117,17 +149,21 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), self::INTENTOS)) {
+        // Lo que falta de verdad: el bloqueo de esta cuenta o el del equipo, el que termine después
+        $segundos = max(
+            RateLimiter::tooManyAttempts($this->claveBloqueo(), 1) ? RateLimiter::availableIn($this->claveBloqueo()) : 0,
+            RateLimiter::tooManyAttempts($this->claveEquipo(), self::POR_EQUIPO) ? RateLimiter::availableIn($this->claveEquipo()) : 0,
+        );
+        if ($segundos <= 0) {
             return;
         }
 
         event(new Lockout($this));
 
-        // Lo que falta de verdad (el plazo corre desde el primer fallo), no un minuto redondo
-        $segundos = max(1, RateLimiter::availableIn($this->throttleKey()));
-
         throw ValidationException::withMessages([
-            'ingreso' => trans_choice('auth.throttle', $segundos, ['seconds' => $segundos]),
+            'ingreso' => __('auth.throttle', ['espera' => $segundos < 60
+                ? trans_choice('auth.segundos', $segundos, ['n' => $segundos])
+                : trans_choice('auth.minutos', $minutos = (int) ceil($segundos / 60), ['n' => $minutos])]),
             // Para la cuenta regresiva de la pantalla
             'bloqueo' => (string) $segundos,
         ]);
@@ -140,5 +176,21 @@ class LoginRequest extends FormRequest
     public function throttleKey(): string
     {
         return Str::transliterate(implode('|', [...$this->identificacion(), $this->ip()]));
+    }
+
+    private function claveBloqueo(): string
+    {
+        return 'ingreso-bloqueado|'.$this->throttleKey();
+    }
+
+    /** Cuántos bloqueos seguidos lleva la cuenta en este equipo (para alargar el siguiente). */
+    private function claveBloqueos(): string
+    {
+        return 'ingreso-bloqueos|'.$this->throttleKey();
+    }
+
+    private function claveEquipo(): string
+    {
+        return 'ingreso-equipo|'.$this->ip();
     }
 }

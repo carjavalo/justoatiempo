@@ -190,6 +190,59 @@ class AccesoAuxiliaresTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_el_bloqueo_se_alarga_si_se_repite_y_se_olvida_al_entrar_bien(): void
+    {
+        $auxiliar = $this->auxiliar();
+        $auxiliar->update(['password' => 'Camion-Azul-27', 'debe_cambiar_contrasena' => false]);
+        $bloquear = function (): int {
+            foreach (range(1, 5) as $i) {
+                $respuesta = $this->post('/login', ['email' => '1144203579', 'password' => "mala-{$i}"]);
+            }
+            $respuesta->assertSessionHasErrors('bloqueo');
+
+            return (int) session('errors')->first('bloqueo');
+        };
+
+        // 1.º bloqueo: un minuto; 2.º: cinco; 3.º: quince
+        $this->assertEqualsWithDelta(60, $bloquear(), 2);
+        $this->travel(61)->seconds();
+        $this->assertEqualsWithDelta(300, $bloquear(), 2);
+        $this->assertStringContainsString('Espera 5 minutos', session('errors')->first('ingreso'));
+        $this->travel(301)->seconds();
+        $this->assertEqualsWithDelta(900, $bloquear(), 2);
+
+        // Al entrar bien, la cuenta de bloqueos vuelve a empezar
+        $this->travel(901)->seconds();
+        $this->post('/login', ['email' => '1144203579', 'password' => 'Camion-Azul-27'])->assertRedirect();
+        $this->post('/logout');
+        $this->assertEqualsWithDelta(60, $bloquear(), 2);
+    }
+
+    public function test_un_mismo_equipo_no_puede_probar_muchas_cedulas(): void
+    {
+        // 20 fallos con cédulas distintas desde el mismo equipo: el siguiente intento espera, con cualquier cuenta
+        foreach (range(1, 20) as $i) {
+            $this->post('/login', ['email' => (string) (5550000000 + $i), 'password' => 'mala']);
+        }
+        $this->post('/login', ['email' => '5559999999', 'password' => 'mala'])->assertSessionHasErrors('bloqueo');
+        $this->assertGuest();
+    }
+
+    public function test_sin_arroba_solo_vale_una_cedula(): void
+    {
+        $auxiliar = $this->auxiliar();
+        $auxiliar->update(['password' => 'Camion-Azul-27', 'debe_cambiar_contrasena' => false]);
+
+        // Un correo a medias no es la cédula "2": es un error del campo y no cuenta como intento
+        $this->post('/login', ['email' => 'ana.ruiz2gmail.com', 'password' => 'x'])
+            ->assertSessionHasErrors(['email' => 'Escribe tu correo completo (con @) o tu número de cédula.'])
+            ->assertSessionDoesntHaveErrors('ingreso');
+
+        // La cédula con puntos, espacios o guiones sí vale
+        $this->post('/login', ['email' => '1.144-203 579', 'password' => 'Camion-Azul-27'])->assertRedirect();
+        $this->assertAuthenticatedAs($auxiliar);
+    }
+
     public function test_quien_escribio_su_cedula_llega_a_la_recuperacion_por_su_camino(): void
     {
         $this->get('/forgot-password?con=cedula')->assertInertia(fn (Assert $p) => $p->where('con', 'cedula'));

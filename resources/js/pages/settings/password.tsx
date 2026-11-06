@@ -65,7 +65,6 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
                                 required
                                 className="h-11 rounded-lg"
                                 autoComplete="current-password"
-                                placeholder="La que usas para ingresar"
                             />
                             <InputError id="current_password-error" message={errors.current_password} />
                         </div>
@@ -81,9 +80,8 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
                                 required
                                 className="h-11 rounded-lg"
                                 autoComplete="new-password"
-                                placeholder="Escribe la nueva contraseña"
                             />
-                            <p id="password-ayuda" className="text-muted-foreground text-xs">
+                            <p id="password-ayuda" className="text-muted-foreground text-sm">
                                 Mínimo 8 caracteres.
                             </p>
                             <InputError id="password-error" message={errors.password} />
@@ -98,7 +96,6 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
                                 required
                                 className="h-11 rounded-lg"
                                 autoComplete="new-password"
-                                placeholder="Repítela para confirmar"
                             />
                             <InputError id="password_confirmation-error" message={errors.password_confirmation} />
                         </div>
@@ -106,7 +103,7 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-6">
                         <BotonEnviar procesando={processing} textoProcesando="Actualizando…" className="h-10 rounded-lg px-5 font-semibold">
-                            Actualizar contraseña
+                            {obligatorio ? 'Crear mi contraseña' : 'Actualizar contraseña'}
                         </BotonEnviar>
 
                         {/* Región siempre presente: el aviso se anuncia al aparecer (WCAG 4.1.3) */}

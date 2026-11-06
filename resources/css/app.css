@@ -383,6 +383,16 @@ body::-webkit-scrollbar-track {
     }
 }
 
+/* Un aviso nuevo (o el mismo, repetido) destella un instante: se nota que la pantalla respondió */
+@keyframes aviso-nuevo {
+    from {
+        box-shadow: 0 0 0 4px color-mix(in oklab, var(--status-critical) 35%, transparent);
+    }
+    to {
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
 /* Recharts hace la gráfica enfocable (flechas recorren los puntos): foco visible solo con teclado */
 .recharts-surface:focus {
     outline: none;

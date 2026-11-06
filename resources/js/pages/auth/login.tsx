@@ -3,7 +3,7 @@ import { FormEventHandler, KeyboardEvent, useEffect, useRef, useState } from 're
 import { flushSync } from 'react-dom';
 
 import { BotonEnviar } from '@/components/boton-enviar';
-import { AlertTriangle, At, LockKeyhole, UserRound, XCircle } from '@/components/iconos';
+import { AlertTriangle, At, LockKeyhole, Numpad, UserRound, XCircle } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { MensajeEstado } from '@/components/mensaje-estado';
 import { PasswordInput } from '@/components/password-input';
@@ -42,19 +42,32 @@ function modoRecordado(): Modo | null {
     }
 }
 
-function recordarModo(modo: Modo) {
+function recordarModo(modo: Modo | null) {
     try {
-        localStorage.setItem(CLAVE_MODO, modo);
+        if (modo) localStorage.setItem(CLAVE_MODO, modo);
+        else localStorage.removeItem(CLAVE_MODO);
     } catch {
         // Sin almacenamiento (navegación privada): el teclado queda el de siempre
     }
 }
 
-/** Lo escrito es una cédula (sin @ y con números). */
-const esCedula = (texto: string) => !texto.includes('@') && /\d/.test(texto);
+/** Un correo: lleva @. */
+const esCorreo = (texto: string) => texto.includes('@');
+
+/** Una cédula como se la escriba: solo números, con puntos, espacios o guiones ("ana.ruiz2" no lo es). */
+const esCedula = (texto: string) => /^[\d\s.-]+$/.test(texto.trim()) && /\d/.test(texto);
 
 /** Pantalla táctil: ahí el teclado lo pone el teléfono (en un computador no hay teclado que cambiar). */
 const esTactil = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
+/** "4:47" desde un minuto; "42 s" por debajo. */
+const reloj = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s} s`);
+
+/** "5 minutos", "42 segundos": para el lector de pantalla. */
+const enPalabras = (s: number) => {
+    const minutos = Math.ceil(s / 60);
+    return s >= 60 ? `${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}` : `${s} ${s === 1 ? 'segundo' : 'segundos'}`;
+};
 
 export default function Login({ status, canResetPassword, correo }: LoginProps) {
     const { data, setData, post, processing, errors, reset, clearErrors, setError } = useForm<LoginForm>({
@@ -71,26 +84,32 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
     const relojesAnuncio = useRef<number[]>([]);
     const [tactil] = useState(esTactil);
     // El teclado de números para quien entra con cédula: si la última vez fue con cédula o, en un teléfono, si no hay
-    // memoria (la primera vez casi siempre es un auxiliar). Quien entra con correo tiene el botón «@» dentro del campo
+    // memoria (la primera vez casi siempre es un auxiliar). En el teléfono, un botón dentro del campo cambia entre ambos
     const [teclado, setTeclado] = useState<'numeric' | 'email' | 'text'>(() => {
         const modo = correo ? 'correo' : modoRecordado();
         if (modo === 'correo') return 'email';
         return modo === 'cedula' || esTactil() ? 'numeric' : 'text';
     });
 
+    const conCorreo = esCorreo(data.email);
+    const conCedula = esCedula(data.email);
+
     const restante = useCuentaRegresiva(Number(bloqueo ?? 0), bloqueo ? intentos : undefined);
     const bloqueado = restante > 0;
-    // Durante el bloqueo, los segundos van solo en el botón; al terminar, el aviso desaparece y el botón vuelve a servir
-    const aviso = bloqueo ? (bloqueado ? 'Hiciste demasiados intentos seguidos.' : null) : ingreso;
-    const conTiempo = (texto: string) => `${texto} Podrás intentarlo de nuevo en ${restante} segundos.`;
+    // Durante el bloqueo, el tiempo va solo en el botón; el aviso dice a quién acudir. Al terminar, el aviso desaparece
+    const ayudaBloqueo = conCorreo
+        ? 'Si no recuerdas tu contraseña, usa «¿Olvidaste tu contraseña?».'
+        : 'Si no recuerdas tu contraseña, pide un código nuevo a tu coordinador o al administrador.';
+    const aviso = bloqueo ? (bloqueado ? `Hiciste demasiados intentos seguidos. ${ayudaBloqueo}` : null) : ingreso;
+    const tiempo = () => `Podrás intentarlo de nuevo en ${enPalabras(restante)}.`;
 
     /**
-     * Lo que el lector de pantalla debe oír ya (el fallo, el último intento, el bloqueo). Se vacía y se vuelve a llenar,
-     * para que se anuncie aunque el texto sea el mismo; unos segundos después se vacía otra vez: el aviso visible queda
-     * para leerlo, sin repetirse ni quedar desactualizado (p. ej. con los segundos del bloqueo).
+     * Lo que el lector de pantalla debe oír ya. Se vacía y se vuelve a llenar, para que se anuncie aunque el texto sea el
+     * mismo; unos segundos después se vacía otra vez: lo que sigue a la vista se lee con la contraseña, sin repetirse ni
+     * quedar desactualizado (p. ej. con el tiempo del bloqueo).
      */
     const anunciar = (texto?: string | null) => {
-        relojesAnuncio.current.forEach((reloj) => window.clearTimeout(reloj));
+        relojesAnuncio.current.forEach((r) => window.clearTimeout(r));
         setAnuncio('');
         if (!texto) return;
         relojesAnuncio.current = [window.setTimeout(() => setAnuncio(texto), 100), window.setTimeout(() => setAnuncio(''), 4000)];
@@ -102,7 +121,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [bloqueado]);
 
-    useEffect(() => () => relojesAnuncio.current.forEach((reloj) => window.clearTimeout(reloj)), []);
+    useEffect(() => () => relojesAnuncio.current.forEach((r) => window.clearTimeout(r)), []);
 
     // Tras cada intento fallido (no al corregir), el foco va al campo que falta o, si no, a la contraseña: es lo que
     // se vació y casi siempre lo que hay que volver a escribir
@@ -111,9 +130,10 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
         const campo = document.getElementById(errors.email ? 'email' : 'password');
         const yaEstaba = document.activeElement === campo;
         campo?.focus();
-        // Al enviar con Enter el foco ya está ahí y nada se anuncia solo: el aviso se dice siempre; el error de un campo,
-        // cuando el foco no cambió (si cambió, el campo se lee con su error)
-        anunciar(bloqueo ? conTiempo('Hiciste demasiados intentos seguidos.') : (aviso ?? (yaEstaba ? (errors.email ?? errors.password) : null)));
+        // Si el foco cambió, el campo se lee con su error o con el aviso (está en su descripción). Si ya estaba ahí
+        // (se envió con Enter), nada se lee solo: se anuncia. El tiempo del bloqueo se dice siempre: solo está en el botón
+        if (bloqueo) anunciar(yaEstaba ? `${aviso} ${tiempo()}` : tiempo());
+        else anunciar(yaEstaba ? (aviso ?? errors.email ?? errors.password) : null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [intentos]);
 
@@ -125,10 +145,9 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
 
     const revisarMayusculas = (e: KeyboardEvent<HTMLInputElement>) => setMayusculas(e.getModifierState('CapsLock'));
 
-    const usarCorreo = () => {
-        // El teclado cambia al volver a enfocar el campo, ya con el modo nuevo
-        // (el modo se recuerda al ingresar, no aquí: quien solo lo toca no ha entrado con correo)
-        flushSync(() => setTeclado('email'));
+    /** Ida y vuelta entre el teclado de números y el de letras con «@» (el teclado cambia al volver a enfocar el campo). */
+    const cambiarTeclado = () => {
+        flushSync(() => setTeclado((t) => (t === 'email' ? 'numeric' : 'email')));
         document.getElementById('email')?.focus();
     };
 
@@ -137,25 +156,34 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
         if (processing) return;
         // Durante el bloqueo, Enter no queda en silencio: se dice cuánto falta
         if (bloqueado) {
-            anunciar(conTiempo('Todavía no.'));
+            anunciar(`Todavía no. ${tiempo()}`);
             return;
         }
 
-        // Lo que falta se dice aquí mismo, sin ir al servidor
-        const sinCorreo = !data.email.trim();
-        const sinClave = !data.password;
-        if (sinCorreo || sinClave) {
+        // Lo que falta o no tiene forma de correo ni de cédula se dice aquí mismo, sin ir al servidor (ni gastar un intento)
+        const identificacion = data.email.trim();
+        const errorUsuario = !identificacion
+            ? 'Escribe tu correo o tu cédula.'
+            : !esCorreo(identificacion) && !esCedula(identificacion)
+              ? 'Escribe tu correo completo (con @) o tu número de cédula.'
+              : null;
+        if (errorUsuario || !data.password) {
             clearErrors();
-            if (sinCorreo) setError('email', 'Escribe tu correo o tu cédula.');
-            if (sinClave) setError('password', 'Escribe tu contraseña.');
+            if (errorUsuario) setError('email', errorUsuario);
+            if (!data.password) setError('password', 'Escribe tu contraseña.');
             setIntentos((n) => n + 1);
             return;
         }
 
-        recordarModo(esCedula(data.email) ? 'cedula' : 'correo');
+        // El modo se recuerda solo si entra (si falla, vuelve el de antes). En un teléfono solo se recuerda la cédula:
+        // si un coordinador entra con su correo en el teléfono de la cuadrilla, el siguiente auxiliar no hereda el teclado de letras
+        const anterior = modoRecordado();
+        const modo: Modo = conCorreo ? 'correo' : 'cedula';
+        if (modo === 'cedula' || !tactil) recordarModo(modo);
         // Si entra, la plataforma se carga completa (AuthenticatedSessionController); si no, vuelve con el aviso
         post(route('login'), {
             onError: (fallo) => {
+                recordarModo(anterior);
                 // La contraseña se vacía tras un intento que no entró; si lo que faltaba era el correo o la cédula, se conserva
                 if (!fallo.email) reset('password');
                 setIntentos((n) => n + 1);
@@ -163,10 +191,9 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
         });
     };
 
-    const conCedula = esCedula(data.email);
-    const ayudaClave = ['password-mayus', conCedula && 'password-primera'].filter(Boolean).join(' ');
-    // El teclado de números no tiene «@»: mientras no se haya escrito una cédula, un botón dentro del campo lo cambia
-    const cambiarTeclado = tactil && teclado === 'numeric' && !conCedula;
+    const ayudaClave = [aviso && 'ingreso-aviso', 'password-mayus', conCedula && 'password-primera'].filter(Boolean).join(' ');
+    // En el teléfono, mientras no se haya escrito una cédula, el campo lleva el botón para cambiar de teclado
+    const conBotonTeclado = tactil && teclado !== 'text' && !conCedula;
 
     return (
         <AuthLayout title="Iniciar sesión" volver={{ texto: 'Volver al sitio web', href: route('home') }}>
@@ -175,8 +202,13 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
             <MensajeEstado mensaje={status} />
 
             <form className="grid gap-5" onSubmit={submit} noValidate>
+                {/* Con cada intento el aviso se vuelve a montar y destella un instante: un fallo igual al anterior también se nota */}
                 {aviso && (
-                    <div className="bg-critical-soft text-critical flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm font-medium">
+                    <div
+                        key={intentos}
+                        id="ingreso-aviso"
+                        className="bg-critical-soft text-critical flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm font-medium motion-safe:animate-[aviso-nuevo_0.7s_ease-out]"
+                    >
                         <XCircle className="mt-0.5 size-4" aria-hidden="true" />
                         <p>{aviso}</p>
                     </div>
@@ -209,17 +241,23 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                             autoComplete="username"
                             value={data.email}
                             onChange={(e) => escribir('email', e.target.value)}
-                            className={cn('h-11 rounded-lg pl-9', cambiarTeclado && 'pr-12')}
+                            className={cn('h-11 rounded-lg pl-9', conBotonTeclado && 'pr-12')}
                         />
-                        {/* Dentro del campo: aparecer o desaparecer no mueve nada de la pantalla */}
-                        {cambiarTeclado && (
+                        {/* Dentro del campo: aparecer o desaparecer no mueve nada. Nombre fijo + aria-pressed; el dibujo
+                            muestra el teclado al que se pasa */}
+                        {conBotonTeclado && (
                             <button
                                 type="button"
-                                onClick={usarCorreo}
-                                aria-label="Escribir un correo (teclado con @)"
+                                onClick={cambiarTeclado}
+                                aria-label="Teclado con @"
+                                aria-pressed={teclado === 'email'}
                                 className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                             >
-                                <At className="size-[1.1rem]" aria-hidden="true" />
+                                {teclado === 'email' ? (
+                                    <Numpad className="size-[1.1rem]" aria-hidden="true" />
+                                ) : (
+                                    <At className="size-[1.1rem]" aria-hidden="true" />
+                                )}
                             </button>
                         )}
                     </div>
@@ -272,9 +310,9 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                     )}
                 </div>
 
-                {/* Solo para quien entra con correo (en su propio equipo): con cédula, el teléfono puede ser de la cuadrilla y
-                    la sesión no se guarda (LoginRequest). Toda la fila se puede tocar, no solo la casilla */}
-                {!conCedula && (
+                {/* Solo con correo (cada quien en su propio equipo): con cédula, el teléfono puede ser de la cuadrilla y la
+                    sesión no se guarda (LoginRequest). Toda la fila se puede tocar, no solo la casilla */}
+                {conCorreo && (
                     <label htmlFor="remember" className="-my-1.5 flex min-h-11 w-fit cursor-pointer items-center gap-3 text-sm">
                         <Checkbox id="remember" name="remember" checked={data.remember} onCheckedChange={(v) => setData('remember', v === true)} />
                         Mantener la sesión iniciada
@@ -291,7 +329,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                         'Ingresando…'
                     ) : bloqueado ? (
                         <span>
-                            Espera <span className="tabular-nums">{restante}</span> s
+                            Espera <span className="tabular-nums">{reloj(restante)}</span>
                         </span>
                     ) : (
                         'Ingresar'
