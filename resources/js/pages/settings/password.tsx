@@ -36,32 +36,40 @@ export default function Password({ obligatorio = false }: { obligatorio?: boolea
     return (
         // Mientras deba cambiarla, no hay a dónde volver: cualquier otra página lo trae de regreso aquí
         <AppLayout volver={obligatorio ? false : undefined}>
-            <Head title="Contraseña" />
+            <Head title={obligatorio ? 'Crea tu contraseña' : 'Contraseña'} />
 
-            <SettingsLayout descripcion="Usa una contraseña larga y difícil de adivinar. Al cambiarla, la usarás en tu próximo ingreso.">
+            {/* En el primer ingreso, el título es la tarea; "próximo ingreso" lo dice una sola vez el mensaje al guardar */}
+            <SettingsLayout
+                titulo={obligatorio ? 'Crea tu contraseña' : undefined}
+                descripcion={
+                    obligatorio
+                        ? 'Usa una contraseña larga y difícil de adivinar.'
+                        : 'Usa una contraseña larga y difícil de adivinar. Al cambiarla, la usarás en tu próximo ingreso.'
+                }
+            >
                 {obligatorio && (
                     <p role="status" className="bg-secondary text-secondary-foreground mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm">
                         <KeyRound className="text-brand-coral-ink mt-0.5 size-5 shrink-0" aria-hidden="true" />
-                        <span>
-                            <strong className="font-semibold">Crea tu propia contraseña para seguir.</strong> Entraste con tu código inicial:
-                            escríbelo como contraseña actual y elige una nueva que solo tú conozcas.
-                        </span>
+                        <span>Ya entraste con tu código inicial. Para seguir, elige una contraseña que solo tú conozcas.</span>
                     </p>
                 )}
                 <form onSubmit={updatePassword} className="space-y-6" noValidate>
-                    <div className="grid gap-2">
-                        <Label htmlFor="current_password">Contraseña actual</Label>
-                        <PasswordInput
-                            {...propsCampo('current_password', errors.current_password)}
-                            value={data.current_password}
-                            onChange={(e) => setData('current_password', e.target.value)}
-                            required
-                            className="h-11 rounded-lg"
-                            autoComplete="current-password"
-                            placeholder={obligatorio ? 'Tu código inicial' : 'La que usas para ingresar'}
-                        />
-                        <InputError id="current_password-error" message={errors.current_password} />
-                    </div>
+                    {/* En el primer ingreso no se pide: la persona acaba de escribir su código para entrar */}
+                    {!obligatorio && (
+                        <div className="grid gap-2">
+                            <Label htmlFor="current_password">Contraseña actual</Label>
+                            <PasswordInput
+                                {...propsCampo('current_password', errors.current_password)}
+                                value={data.current_password}
+                                onChange={(e) => setData('current_password', e.target.value)}
+                                required
+                                className="h-11 rounded-lg"
+                                autoComplete="current-password"
+                                placeholder="La que usas para ingresar"
+                            />
+                            <InputError id="current_password-error" message={errors.current_password} />
+                        </div>
+                    )}
 
                     <div className="grid gap-6 sm:grid-cols-2">
                         <div className="grid content-start gap-2">

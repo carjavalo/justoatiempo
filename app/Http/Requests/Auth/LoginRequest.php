@@ -70,13 +70,16 @@ class LoginRequest extends FormRequest
         // "ingreso" y la pantalla los muestra arriba, con el foco en la contraseña
         $identificacion = $this->identificacion();
         $clave = (string) $this->input('password');
-        $recordar = $this->boolean('remember');
+        // Mantener la sesión solo con correo: quien entra con cédula puede estar en un teléfono compartido de la cuadrilla
+        $recordar = $this->boolean('remember') && ! isset($identificacion['cedula']);
         $entro = Auth::attempt([...$identificacion, 'password' => $clave], $recordar)
             // El código inicial se entrega en dos grupos ("4831 2290"): vale escrito con o sin el espacio
             || (preg_match('/^\d{4}[\s.-]\d{4}$/', trim($clave)) && Auth::attempt([...$identificacion, 'password' => preg_replace('/\D/', '', $clave)], $recordar));
 
         if (! $entro) {
             RateLimiter::hit($this->throttleKey());
+            // El fallo que agota los intentos ya trae el bloqueo (no el intento siguiente): lo que el aviso anterior prometió
+            $this->ensureIsNotRateLimited();
 
             $mensaje = __(isset($identificacion['cedula']) ? 'auth.failed_cedula' : 'auth.failed');
             // Antes del bloqueo, un aviso: el siguiente fallo obliga a esperar
@@ -120,11 +123,11 @@ class LoginRequest extends FormRequest
 
         event(new Lockout($this));
 
-        $segundos = RateLimiter::availableIn($this->throttleKey());
-        $minutos = max(1, (int) ceil($segundos / 60));
+        // Lo que falta de verdad (el plazo corre desde el primer fallo), no un minuto redondo
+        $segundos = max(1, RateLimiter::availableIn($this->throttleKey()));
 
         throw ValidationException::withMessages([
-            'ingreso' => trans_choice('auth.throttle', $minutos, ['minutes' => $minutos]),
+            'ingreso' => trans_choice('auth.throttle', $segundos, ['seconds' => $segundos]),
             // Para la cuenta regresiva de la pantalla
             'bloqueo' => (string) $segundos,
         ]);

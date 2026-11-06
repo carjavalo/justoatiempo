@@ -119,6 +119,9 @@ class User extends Authenticatable
             // El código inicial solo existe mientras la persona no haya creado su contraseña
             if (! $user->acceso || ! $user->debe_cambiar_contrasena) {
                 $user->codigo_inicial = null;
+            } elseif ($user->isDirty('password')) {
+                // Recién dado el código: un "recordarme" guardado en otro equipo ya no abre su cuenta
+                $user->setRememberToken(Str::random(60));
             }
 
             if (filled($user->nombres)) {

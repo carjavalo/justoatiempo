@@ -14,7 +14,7 @@ export function EnlaceVolver({ texto, href, className }: Volver & { className?: 
             href={href}
             prefetch
             className={cn(
-                'group text-muted-foreground hover:text-foreground inline-flex min-h-9 w-fit items-center gap-2.5 rounded-lg pr-2 text-sm font-semibold transition-colors',
+                'group text-muted-foreground hover:text-foreground inline-flex min-h-11 w-fit items-center gap-2.5 rounded-lg pr-2 text-sm font-semibold transition-colors',
                 'focus-visible:ring-ring focus-visible:text-foreground focus-visible:ring-2 focus-visible:outline-hidden',
                 className,
             )}

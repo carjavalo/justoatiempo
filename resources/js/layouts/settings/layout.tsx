@@ -9,8 +9,19 @@ const SECCIONES = [
     { titulo: 'Contraseña', url: '/settings/password', icono: KeyRound },
 ];
 
-/** "Mi cuenta": el título vive aquí; cada sección solo agrega su descripción. */
-export default function SettingsLayout({ descripcion, children }: { descripcion: string; children: ReactNode }) {
+/**
+ * "Mi cuenta": el título vive aquí; cada sección solo agrega su descripción. Una tarea obligatoria (crear la contraseña
+ * en el primer ingreso) lleva su propio título.
+ */
+export default function SettingsLayout({
+    descripcion,
+    titulo = 'Mi cuenta',
+    children,
+}: {
+    descripcion: string;
+    titulo?: string;
+    children: ReactNode;
+}) {
     const pagina = usePage<SharedData>();
     const actual = pagina.url.split('?')[0];
     // Quien ve solo lo suyo no cambia sus datos (los lleva su carnet): solo su contraseña, sin pestañas
@@ -21,7 +32,7 @@ export default function SettingsLayout({ descripcion, children }: { descripcion:
         // Mismo eje que la barra y el enlace "Volver"; el contenido se limita a una columna cómoda de leer
         <div className={cn('mx-auto w-full p-4 pt-3 md:p-6 md:pt-3 lg:p-8 lg:pt-4', ANCHO_PLATAFORMA)}>
             <div className="max-w-3xl">
-                <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">Mi cuenta</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">{titulo}</h1>
 
                 <nav aria-label="Secciones de mi cuenta" className={cn('mt-6 flex gap-1 border-b', secciones.length < 2 && 'hidden')}>
                     {secciones.map(({ titulo, url, icono: Icono }) => {

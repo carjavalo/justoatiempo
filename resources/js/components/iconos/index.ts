@@ -101,6 +101,7 @@ export { XCircle } from './xcircle';
 
 // --- Controles (trazo grueso) ---
 export { ArrowDown } from './arrow-down';
+export { At } from './at';
 export { ArrowDownRight } from './arrow-down-right';
 export { ArrowLeft } from './arrow-left';
 export { ArrowRight } from './arrow-right';

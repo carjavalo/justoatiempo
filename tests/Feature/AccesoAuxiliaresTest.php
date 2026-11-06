@@ -42,12 +42,13 @@ class AccesoAuxiliaresTest extends TestCase
         $this->get('/mi-carnet')->assertRedirect('/settings/password');
         $this->get('/settings/password')->assertInertia(fn (Assert $p) => $p->component('settings/password')->where('obligatorio', true));
 
-        // No sirve dejar el mismo código ni usar la cédula
-        $this->put('/settings/password', ['current_password' => '48312290', 'password' => '48312290', 'password_confirmation' => '48312290'])
-            ->assertSessionHasErrors('password');
-        $this->put('/settings/password', ['current_password' => '48312290', 'password' => '1144203579', 'password_confirmation' => '1144203579'])
-            ->assertSessionHasErrors('password');
-        $this->put('/settings/password', ['current_password' => '48312290', 'password' => 'Camion-Azul-27', 'password_confirmation' => 'Camion-Azul-27'])
+        // Acaba de entrar con su código: no se le pide otra vez. No sirve dejar el mismo código ni usar la cédula
+        $this->put('/settings/password', ['password' => '48312290', 'password_confirmation' => '48312290'])
+            ->assertSessionHasErrors(['password' => 'Elige una contraseña distinta de tu código inicial.']);
+        $this->put('/settings/password', ['password' => '1144203579', 'password_confirmation' => '1144203579'])
+            ->assertSessionHasErrors(['password' => 'No uses tu cédula como contraseña: está en tu carnet.']);
+        $this->put('/settings/password', ['password' => 'Camion-Azul-27', 'password_confirmation' => 'Camion-Azul-27'])
+            ->assertSessionDoesntHaveErrors()
             ->assertRedirect('/mi-carnet');
 
         // Con su contraseña creada, el código deja de existir
@@ -56,6 +57,40 @@ class AccesoAuxiliaresTest extends TestCase
         $this->assertNull($auxiliar->codigo_inicial);
         $this->assertTrue(Hash::check('Camion-Azul-27', $auxiliar->password));
         $this->get('/mi-carnet')->assertOk();
+
+        // Desde ahí, cambiarla sí pide la actual
+        $this->put('/settings/password', ['password' => 'Otra-Clave-2026', 'password_confirmation' => 'Otra-Clave-2026'])
+            ->assertSessionHasErrors('current_password');
+    }
+
+    public function test_con_cedula_la_sesion_no_queda_guardada_en_el_equipo(): void
+    {
+        $auxiliar = $this->auxiliar();
+        $auxiliar->update(['password' => 'Camion-Azul-27', 'debe_cambiar_contrasena' => false]);
+        $recordar = auth()->guard()->getRecallerName();
+
+        // Aunque llegue marcada (p. ej. desde un formulario viejo), con cédula no se guarda: el teléfono puede ser compartido
+        $this->post('/login', ['email' => '1144203579', 'password' => 'Camion-Azul-27', 'remember' => true])
+            ->assertRedirect('/panel')
+            ->assertCookieMissing($recordar);
+        $this->post('/logout');
+
+        // Con correo, sí
+        $coordinador = User::factory()->coordinador()->create(['email' => 'coordinador@example.com']);
+        $this->post('/login', ['email' => 'coordinador@example.com', 'password' => 'password', 'remember' => true])
+            ->assertCookie($recordar);
+        $this->assertAuthenticatedAs($coordinador);
+    }
+
+    public function test_al_darle_un_codigo_nuevo_su_recordarme_en_otros_equipos_deja_de_servir(): void
+    {
+        $auxiliar = $this->auxiliar();
+        $auxiliar->update(['password' => 'Su-Clave-2026', 'debe_cambiar_contrasena' => false]);
+        $auxiliar->forceFill(['remember_token' => 'token-de-un-telefono-viejo'])->save();
+
+        $auxiliar->update(User::contrasenaInicial());
+
+        $this->assertNotSame('token-de-un-telefono-viejo', $auxiliar->fresh()->remember_token);
     }
 
     public function test_el_auxiliar_operativo_solo_ve_su_carnet_y_su_contrasena(): void
@@ -142,15 +177,16 @@ class AccesoAuxiliaresTest extends TestCase
         $this->post('/login', ['email' => '1144 203 579', 'password' => 'otra'])
             ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas.']);
         $this->post('/login', ['email' => '1144203579', 'password' => 'otra'])
-            ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas. Te queda un intento: si fallas otra vez, tendrás que esperar un minuto.']);
-        $this->post('/login', ['email' => '1144203579', 'password' => 'otra']);
+            ->assertSessionHasErrors(['ingreso' => 'La cédula o la contraseña no son correctas. Te queda un intento: si fallas otra vez, tendrás que esperar antes de volver a intentarlo.']);
 
-        // Bloqueado: aun con la contraseña correcta, toca esperar (el mensaje lo dice en minutos y la pantalla cuenta los segundos)
-        $this->post('/login', ['email' => '1.144.203.579', 'password' => '48312290'])
-            ->assertSessionHasErrors(['ingreso' => 'Hiciste demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.'])
-            ->assertSessionHasErrors('bloqueo');
+        // El 5.º fallo ya trae el bloqueo, con los segundos que de verdad faltan (no el intento siguiente)
+        $this->post('/login', ['email' => '1144203579', 'password' => 'otra'])->assertSessionHasErrors('bloqueo');
         $segundos = (int) session('errors')->first('bloqueo');
         $this->assertTrue($segundos > 0 && $segundos <= 60);
+        $this->assertStringStartsWith('Hiciste demasiados intentos seguidos. Espera ', session('errors')->first('ingreso'));
+
+        // Bloqueado: aun con la contraseña correcta, toca esperar
+        $this->post('/login', ['email' => '1.144.203.579', 'password' => '48312290'])->assertSessionHasErrors('bloqueo');
         $this->assertGuest();
     }
 
