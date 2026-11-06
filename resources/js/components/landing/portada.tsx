@@ -1,5 +1,6 @@
 import { DESTACADOS, EMPRESA } from '@/lib/portafolio';
 import { ArrowRight } from '@/components/iconos';
+import { ID_CTA_PORTADA } from './encabezado';
 import { Revelar } from './piezas';
 
 export function Portada() {
@@ -22,6 +23,7 @@ export function Portada() {
                         </Revelar>
                         <Revelar retraso={240} className="mt-9 flex justify-center">
                             <a
+                                id={ID_CTA_PORTADA}
                                 href="#contacto"
                                 className="bg-brand-coral text-brand-coral-foreground group inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-base font-bold shadow-lg shadow-black/25 transition hover:bg-[#ee8574] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                             >

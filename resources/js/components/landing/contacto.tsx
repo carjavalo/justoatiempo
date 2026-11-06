@@ -8,6 +8,7 @@ import { type SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2 } from '@/components/iconos';
 import { type FormEventHandler, useEffect, useRef, useState } from 'react';
+import { canalesDeContacto, MarcaPrueba, useDatosEmpresa } from './datos-empresa';
 import { EncabezadoSeccion, Revelar } from './piezas';
 import { EVENTO_COTIZAR } from './servicios';
 import { Selector } from '@/components/selector';
@@ -25,6 +26,8 @@ export function Contacto({ servicios }: { servicios: string[] }) {
     const { flash } = usePage<SharedData & { flash: { contactoEnviado?: boolean } }>().props;
     const [enviado, setEnviado] = useState(false);
     const confirmacion = useRef<HTMLDivElement>(null);
+    const empresa = useDatosEmpresa();
+    const canales = canalesDeContacto(empresa);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         nombre: '',
@@ -91,6 +94,45 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                             ))}
                         </ol>
                     </Revelar>
+
+                    {/* Para quien prefiere llamar o escribir antes de llenar el formulario */}
+                    {canales.length > 0 && (
+                        <Revelar retraso={150} className="mt-10">
+                            <h3 className="flex flex-wrap items-center gap-3 text-sm font-bold tracking-[0.16em] uppercase">
+                                ¿Prefiere hablar ahora?
+                                {empresa.datosDePrueba && <MarcaPrueba />}
+                            </h3>
+                            <ul role="list" className="mt-4 grid gap-1">
+                                {canales.map(({ icono: Icono, etiqueta, valor, href, externo }) => {
+                                    const contenido = (
+                                        <>
+                                            <Icono className="text-primary size-5" aria-hidden="true" />
+                                            <span className="min-w-0">
+                                                <span className="text-muted-foreground block text-xs">{etiqueta}</span>
+                                                <span className="block font-bold break-words">{valor}</span>
+                                            </span>
+                                        </>
+                                    );
+                                    return (
+                                        <li key={etiqueta}>
+                                            {href ? (
+                                                <a
+                                                    href={href}
+                                                    {...(externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                                                    className="hover:bg-card focus-visible:ring-ring -mx-3 flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-hidden"
+                                                >
+                                                    {contenido}
+                                                    {externo && <span className="sr-only">(se abre en WhatsApp)</span>}
+                                                </a>
+                                            ) : (
+                                                <div className="-mx-3 flex items-center gap-3 px-3 py-2.5">{contenido}</div>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </Revelar>
+                    )}
                 </div>
 
                 <Revelar retraso={150} className="bg-card rounded-3xl border p-6 shadow-[0_8px_30px_rgba(16,24,40,0.06)] md:p-8">
@@ -100,7 +142,11 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                                 <CheckCircle2 className="size-8" aria-hidden="true" />
                             </span>
                             <h3 className="mt-5 text-2xl font-extrabold tracking-tight">¡Gracias! Recibimos su solicitud</h3>
-                            <p className="text-muted-foreground mt-2 max-w-sm">Le responderemos al correo o al teléfono que nos dejó.</p>
+                            <p className="text-muted-foreground mt-2 max-w-sm">
+                                {empresa.tiempoRespuesta
+                                    ? `Le responderemos en menos de ${empresa.tiempoRespuesta} al correo o al teléfono que nos dejó.`
+                                    : 'Le responderemos al correo o al teléfono que nos dejó.'}
+                            </p>
                             <button type="button" onClick={() => setEnviado(false)} className="text-primary mt-6 text-sm font-semibold underline underline-offset-4">
                                 Enviar otra solicitud
                             </button>
@@ -183,7 +229,16 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                                         className="mt-0.5"
                                     />
                                     <Label htmlFor="autoriza_datos" className="text-muted-foreground text-xs leading-relaxed font-normal">
-                                        Autorizo a Justo a Tiempo SP S.A.S a tratar mis datos personales para atender esta solicitud, conforme a la Ley 1581 de 2012.{' '}
+                                        Autorizo a Justo a Tiempo SP S.A.S a tratar mis datos personales para atender esta solicitud, conforme a la Ley 1581 de 2012
+                                        {empresa.politicaDatos ? (
+                                            <>
+                                                {' '}y a la{' '}
+                                                <a href={empresa.politicaDatos} target="_blank" rel="noopener noreferrer" className="text-primary font-semibold underline underline-offset-2">
+                                                    política de tratamiento de datos<span className="sr-only"> (se abre en otra pestaña)</span>
+                                                </a>
+                                            </>
+                                        ) : null}
+                                        .{' '}
                                         <span aria-hidden="true">*</span>
                                     </Label>
                                 </div>
@@ -191,7 +246,10 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                             </div>
 
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-xs leading-relaxed">
+                                    {empresa.tiempoRespuesta && (
+                                        <span className="text-foreground block font-semibold">Le respondemos en menos de {empresa.tiempoRespuesta}.</span>
+                                    )}
                                     <span aria-hidden="true">*</span> Campos obligatorios
                                 </p>
                                 <BotonEnviar procesando={processing} className="bg-brand-coral text-brand-coral-foreground h-11 rounded-xl px-6 font-bold hover:bg-[#ee8574]">

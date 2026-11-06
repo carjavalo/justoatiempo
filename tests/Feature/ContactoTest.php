@@ -33,6 +33,15 @@ class ContactoTest extends TestCase
             ->assertInertia(fn (Assert $p) => $p->component('welcome')->has('servicios', 8)->where('servicios.4', 'Limpieza de obra y posobra'));
     }
 
+    public function test_la_pagina_principal_muestra_solo_los_datos_de_la_empresa_definidos(): void
+    {
+        config(['empresa' => array_fill_keys(array_keys(config('empresa')), null)]);
+        $this->get('/')->assertInertia(fn (Assert $p) => $p->where('empresa', []));
+
+        config(['empresa.telefono' => '+57 602 000 0000', 'empresa.tiempo_respuesta' => '24 horas hábiles', 'empresa.datos_de_prueba' => true]);
+        $this->get('/')->assertInertia(fn (Assert $p) => $p->where('empresa', ['telefono' => '+57 602 000 0000', 'tiempoRespuesta' => '24 horas hábiles', 'datosDePrueba' => true]));
+    }
+
     public function test_guarda_la_solicitud_con_el_consentimiento(): void
     {
         $this->from('/')->post('/contacto', $this->datos())

@@ -119,6 +119,7 @@ import {
     UsersIcon,
     WarehouseIcon,
     WarningIcon,
+    WhatsappLogoIcon,
     XCircleIcon,
     XIcon,
 } from '@phosphor-icons/react';
@@ -205,6 +206,7 @@ export const TreePine = icono(TreeEvergreenIcon, 'concepto', 'TreePine');
 export const Truck = icono(TruckIcon, 'concepto', 'Truck');
 export const UploadCloud = icono(CloudArrowUpIcon, 'concepto', 'UploadCloud');
 export const UserCheck = icono(UserCheckIcon, 'concepto', 'UserCheck');
+export const WhatsApp = icono(WhatsappLogoIcon, 'concepto', 'WhatsApp');
 export const UserRound = icono(UserIcon, 'concepto', 'UserRound');
 export const UsersRound = icono(UsersIcon, 'concepto', 'UsersRound');
 export const UtensilsCrossed = icono(ForkKnifeIcon, 'concepto', 'UtensilsCrossed');

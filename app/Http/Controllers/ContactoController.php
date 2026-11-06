@@ -30,6 +30,29 @@ class ContactoController extends Controller
         'Otro',
     ];
 
+    /**
+     * Contacto, datos legales y tiempo de respuesta para la página principal (config/empresa.php): solo los definidos,
+     * para no mostrar nada sin confirmar.
+     *
+     * @return array<string, string|bool>
+     */
+    public static function datosEmpresa(): array
+    {
+        $e = config('empresa');
+
+        return array_filter([
+            'telefono' => $e['telefono'],
+            'whatsapp' => $e['whatsapp'],
+            'correo' => $e['correo'],
+            'direccion' => $e['direccion'],
+            'ciudad' => $e['ciudad'],
+            'nit' => $e['nit'],
+            'politicaDatos' => $e['politica_datos'],
+            'tiempoRespuesta' => $e['tiempo_respuesta'],
+            'datosDePrueba' => $e['datos_de_prueba'],
+        ], fn ($v) => $v !== null && $v !== '' && $v !== false);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         // Campo trampa: invisible para personas; si viene lleno es un robot y se descarta en silencio

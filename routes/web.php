@@ -31,7 +31,7 @@ use Inertia\Inertia;
 
 // Página principal: presentación de la empresa (portafolio de servicios)
 Route::get('/', function () {
-    return Inertia::render('welcome', ['servicios' => ContactoController::SERVICIOS]);
+    return Inertia::render('welcome', ['servicios' => ContactoController::SERVICIOS, 'empresa' => ContactoController::datosEmpresa()]);
 })->name('home');
 Route::post('contacto', [ContactoController::class, 'store'])->middleware('throttle:5,1')->name('contacto.store');
 // Lo que se abre al escanear el QR de un carnet: la información de la persona y su certificado de ARL
