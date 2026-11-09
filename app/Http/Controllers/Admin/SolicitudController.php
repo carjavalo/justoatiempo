@@ -31,8 +31,12 @@ class SolicitudController extends Controller
                 $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('empresa', 'like', $like)->orWhere('email', 'like', $like));
             })
             ->when($estado !== 'todas', fn (Builder $q) => $q->where('atendida', $estado === 'atendidas'))
-            ->latest()
-            ->latest('id')
+            // Primero las pendientes, de la que más lleva esperando a la más nueva (ningún cliente se queda sin
+            // respuesta); después las atendidas, de la última que se atendió hacia atrás
+            ->orderBy('atendida')
+            ->orderByRaw('case when atendida then null else created_at end')
+            ->orderByDesc('atendida_en')
+            ->orderBy('id')
             ->paginate(10)
             ->withQueryString()
             ->through(fn (SolicitudContacto $s) => [

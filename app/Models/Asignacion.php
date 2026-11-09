@@ -71,6 +71,31 @@ class Asignacion extends Model
             ->where(fn (Builder $w) => $w->whereNull('asignaciones.fecha_fin')->orWhereDate('asignaciones.fecha_fin', '>=', $fecha));
     }
 
+    /** Las que cubren una sede: asignadas a ella o a toda su empresa. */
+    public function scopeCubrenSede(Builder $q, int $sede, ?int $empresa): Builder
+    {
+        return $q->where(function (Builder $w) use ($sede, $empresa) {
+            $w->where('asignaciones.sede_id', $sede);
+            if ($empresa !== null) {
+                $w->orWhere(fn (Builder $e) => $e->where('asignaciones.empresa_id', $empresa)->whereNull('asignaciones.sede_id'));
+            }
+        });
+    }
+
+    /** Las que cubren una sucursal: asignadas a ella, a toda su sede o a toda su empresa (una propia, solo a ella). */
+    public function scopeCubrenSucursal(Builder $q, int $sucursal, ?int $sede, ?int $empresa): Builder
+    {
+        return $q->where(function (Builder $w) use ($sucursal, $sede, $empresa) {
+            $w->where('asignaciones.sucursal_id', $sucursal);
+            if ($sede !== null) {
+                $w->orWhere(fn (Builder $s) => $s->where('asignaciones.sede_id', $sede)->whereNull('asignaciones.sucursal_id'));
+            }
+            if ($sede !== null && $empresa !== null) {
+                $w->orWhere(fn (Builder $e) => $e->where('asignaciones.empresa_id', $empresa)->whereNull('asignaciones.sede_id'));
+            }
+        });
+    }
+
     /** Las actuales: las que no han terminado (vigentes y programadas). */
     public function scopeActuales(Builder $q): Builder
     {

@@ -1,8 +1,20 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
-import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
+import { BarraFiltros, CampoBusqueda, FiltroLista, POCOS_PARA_FILTRAR, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
-import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Iniciales, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
+import {
+    claseTd,
+    claseTh,
+    contenedorModulo,
+    ConteoEnlace,
+    DatosBloque,
+    EncabezadoModulo,
+    EstadoBadge,
+    EstadoVacio,
+    Paginacion,
+    SinResultados,
+    Tabla,
+} from '@/components/admin/piezas';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import InputError from '@/components/input-error';
@@ -17,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Building2, Plus } from '@/components/iconos';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 interface FilaEmpresa {
     id: number;
@@ -111,13 +123,93 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
         </Button>
     );
 
+    // Lo de cada empresa: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). Solo se marca lo que
+    // distingue: el estado si está inactiva, y el NIT o el contacto cuando los hay
+    const empresaDe = (e: FilaEmpresa) => (
+        <div className="min-w-0">
+            <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                <span className="break-words">{e.nombre}</span>
+                {!e.activo && <EstadoBadge activo={false} femenino />}
+            </p>
+            {e.nit && <p className="text-muted-foreground mt-0.5 text-xs tabular-nums">NIT {formatearNit(e.nit)}</p>}
+        </div>
+    );
+    const lineasDe = (e: FilaEmpresa) => {
+        const nombres = nombresLineas(e.lineas);
+        return nombres.length === 0 ? (
+            <span className="text-muted-foreground text-xs">Ninguna</span>
+        ) : (
+            <ul role="list" className="grid gap-0.5 text-xs leading-relaxed">
+                {nombres.map((n) => (
+                    <li key={n} className="text-pretty">
+                        {n}
+                    </li>
+                ))}
+            </ul>
+        );
+    };
+    const tieneContacto = (e: FilaEmpresa) => Boolean(e.contactoNombre || e.contactoEmail || e.contactoTelefono);
+    const contactoDe = (e: FilaEmpresa) =>
+        tieneContacto(e) ? (
+            <div className="min-w-0 text-xs leading-relaxed">
+                {e.contactoNombre && <p className="text-foreground text-sm font-medium break-words">{e.contactoNombre}</p>}
+                {e.contactoEmail && (
+                    <p className="truncate" title={e.contactoEmail}>
+                        {e.contactoEmail}
+                    </p>
+                )}
+                {e.contactoTelefono && <p className="tabular-nums">{e.contactoTelefono}</p>}
+            </div>
+        ) : (
+            <span className="text-muted-foreground text-xs">
+                <span aria-hidden="true">—</span>
+                <span className="sr-only">Sin contacto</span>
+            </span>
+        );
+    const sedesDe = (e: FilaEmpresa) => (
+        <ConteoEnlace
+            n={e.sedes}
+            uno="sede"
+            varios="sedes"
+            ninguno="Ninguna"
+            de={e.nombre}
+            href={puede('sedes.ver') ? route('sedes.index', { empresa: e.id }) : undefined}
+        />
+    );
+    const usuariosDe = (e: FilaEmpresa) => (
+        <ConteoEnlace
+            n={e.usuarios}
+            uno="usuario"
+            varios="usuarios"
+            ninguno="Ninguno"
+            de={e.nombre}
+            href={puede('usuarios.ver') ? route('usuarios.index', { empresa: e.id }) : undefined}
+        />
+    );
+    const accionesDe = (e: FilaEmpresa) => (
+        <AccionesFila
+            nombre={e.nombre}
+            activo={e.activo}
+            urlEstado={puede('empresas.estado') ? route('empresas.estado', e.id) : undefined}
+            onEditar={puede('empresas.editar') ? (boton) => abrir(e, boton) : undefined}
+            urlEliminar={puede('empresas.eliminar') ? route('empresas.destroy', e.id) : undefined}
+            consecuencia={`No se le podrán asignar nuevas sedes ni usuarios. ${mayuscula(seConserva(e.sedes, 'sede', 'sedes'))} y ${seConserva(e.usuarios, 'usuario', 'usuarios')}. Puedes volver a activarla cuando quieras.`}
+        />
+    );
+    // Los filtros aparecen cuando hay muchas empresas (o si ya hay uno puesto, para poder quitarlo)
+    const conFiltros = total > POCOS_PARA_FILTRAR || activos;
+
     return (
         <AppLayout>
             <Head title="Empresas" />
 
             <div className={contenedorModulo}>
                 {/* Sin empresas, la acción vive en el estado vacío: un solo botón para crear */}
-                <EncabezadoModulo titulo="Empresas" descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditransa), con su contacto y las líneas de servicio que reciben." accion={total > 0 && puede('empresas.crear') && botonNueva('Nueva empresa')} />
+                <EncabezadoModulo
+                    titulo="Empresas"
+                    descripcion="Las empresas clientes de Justo a Tiempo (por ejemplo, Ditransa), con su contacto y las líneas de servicio que reciben."
+                    accion={total > 0 && puede('empresas.crear') && botonNueva('Nueva empresa')}
+                />
 
                 {total === 0 ? (
                     <EstadoVacio
@@ -128,125 +220,105 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                     />
                 ) : (
                     <>
-                        <BarraFiltros
-                            resumen={empresas.total ? plural(empresas.total, 'empresa', 'empresas') : 'Ninguna empresa coincide con los filtros.'}
-                            soloAnunciar={empresas.total === 0}
-                            activos={activos}
-                            onLimpiar={limpiar}
-                            idBusqueda="buscar-empresas"
-                        >
-                            <CampoBusqueda id="buscar-empresas" etiqueta="Buscar empresas" placeholder="Buscar por razón social, NIT o contacto" valor={valores.q} onCambio={(v) => cambiar('q', v, { inmediato: false })} />
-                            <FiltroLista
-                                id="filtro-estado"
-                                etiqueta="Estado"
-                                valor={valores.estado}
-                                onCambio={(v) => cambiar('estado', v)}
-                                opciones={[
-                                    { valor: '', texto: 'Activas e inactivas' },
-                                    { valor: 'activas', texto: 'Solo activas' },
-                                    { valor: 'inactivas', texto: 'Solo inactivas' },
-                                ]}
-                            />
-                        </BarraFiltros>
+                        {conFiltros && (
+                            <BarraFiltros
+                                resumen={empresas.total ? plural(empresas.total, 'empresa', 'empresas') : 'Ninguna empresa coincide con los filtros.'}
+                                soloAnunciar={empresas.total === 0}
+                                activos={activos}
+                                onLimpiar={limpiar}
+                                idBusqueda="buscar-empresas"
+                            >
+                                <CampoBusqueda
+                                    id="buscar-empresas"
+                                    etiqueta="Buscar empresas"
+                                    placeholder="Buscar por razón social, NIT o contacto"
+                                    valor={valores.q}
+                                    onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                                />
+                                <FiltroLista
+                                    id="filtro-estado"
+                                    etiqueta="Estado"
+                                    valor={valores.estado}
+                                    onCambio={(v) => cambiar('estado', v)}
+                                    opciones={[
+                                        { valor: '', texto: 'Activas e inactivas' },
+                                        { valor: 'activas', texto: 'Solo activas' },
+                                        { valor: 'inactivas', texto: 'Solo inactivas' },
+                                    ]}
+                                />
+                            </BarraFiltros>
+                        )}
 
                         {empresas.data.length === 0 ? (
                             <SinResultados texto="Ninguna empresa coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Empresas clientes" columnas={['25%', '22%', '20%', '9%', '10%', '9%', '3.5rem']}>
-                                <thead className="text-muted-foreground border-b">
-                                    <tr>
-                                        <th scope="col" className={claseTh}>
-                                            Empresa
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Líneas de servicio
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Contacto
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Sedes
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Usuarios
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Estado
-                                        </th>
-                                        <th scope="col" className={cn(claseTh, 'w-14')}>
-                                            <span className="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
+                            <>
+                                <div className="hidden lg:block">
+                                    <Tabla titulo="Empresas clientes" minimo="min-w-[760px]" columnas={['27%', '25%', '22%', '12%', '12%', '3.5rem']}>
+                                        <thead className="text-muted-foreground border-b">
+                                            <tr>
+                                                <th scope="col" className={claseTh}>
+                                                    Empresa
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Líneas de servicio
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Contacto
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Sedes
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Usuarios
+                                                </th>
+                                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                                    <span className="sr-only">Acciones</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {empresas.data.map((e) => (
+                                                <tr
+                                                    key={e.id}
+                                                    className={cn('hover:bg-muted/40 transition-colors', !e.activo && 'text-muted-foreground')}
+                                                >
+                                                    <th scope="row" className={cn(claseTd, 'font-normal')}>
+                                                        {empresaDe(e)}
+                                                    </th>
+                                                    <td className={claseTd}>{lineasDe(e)}</td>
+                                                    <td className={claseTd}>{contactoDe(e)}</td>
+                                                    <td className={claseTd}>{sedesDe(e)}</td>
+                                                    <td className={claseTd}>{usuariosDe(e)}</td>
+                                                    <td className={cn(claseTd, 'text-right')}>{accionesDe(e)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Tabla>
+                                </div>
+                                <ul
+                                    role="list"
+                                    aria-label="Empresas clientes"
+                                    className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden"
+                                >
                                     {empresas.data.map((e) => (
-                                        <tr key={e.id} className={cn('hover:bg-muted/40 transition-colors', !e.activo && 'text-muted-foreground')}>
-                                            <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                                <div className="flex items-center gap-3">
-                                                    <Iniciales texto={e.nombre} />
-                                                    <div className="min-w-0">
-                                                        <p className="text-foreground truncate font-semibold" title={e.nombre}>
-                                                            {e.nombre}
-                                                        </p>
-                                                        <p className="text-muted-foreground text-xs">{e.nit ? `NIT ${formatearNit(e.nit)}` : 'Sin NIT'}</p>
-                                                    </div>
-                                                </div>
-                                            </th>
-                                            <td className={cn(claseTd, 'text-xs leading-relaxed')}>
-                                                {e.lineas.length === 0 ? (
-                                                    <span className="text-muted-foreground">Ninguna</span>
-                                                ) : (
-                                                    <ul role="list">
-                                                        {nombresLineas(e.lineas).map((n) => (
-                                                            <li key={n} className="truncate" title={n}>
-                                                                {n}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                )}
-                                            </td>
-                                            <td className={claseTd}>
-                                                {e.contactoNombre || e.contactoEmail || e.contactoTelefono ? (
-                                                    <div className="min-w-0 text-xs leading-relaxed">
-                                                        {e.contactoNombre && (
-                                                            <p className="text-foreground truncate text-sm font-medium" title={e.contactoNombre}>
-                                                                {e.contactoNombre}
-                                                            </p>
-                                                        )}
-                                                        {e.contactoEmail && (
-                                                            <p className="truncate" title={e.contactoEmail}>
-                                                                {e.contactoEmail}
-                                                            </p>
-                                                        )}
-                                                        {e.contactoTelefono && <p>{e.contactoTelefono}</p>}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground text-xs">Sin contacto</span>
-                                                )}
-                                            </td>
-                                            <td className={claseTd}>
-                                                <ConteoEnlace n={e.sedes} uno="sede" varios="sedes" ninguno="Ninguna" de={e.nombre} href={puede('sedes.ver') ? route('sedes.index', { empresa: e.id }) : undefined} />
-                                            </td>
-                                            <td className={claseTd}>
-                                                <ConteoEnlace n={e.usuarios} uno="usuario" varios="usuarios" ninguno="Ninguno" de={e.nombre} href={puede('usuarios.ver') ? route('usuarios.index', { empresa: e.id }) : undefined} />
-                                            </td>
-                                            <td className={claseTd}>
-                                                <EstadoBadge activo={e.activo} femenino />
-                                            </td>
-                                            <td className={cn(claseTd, 'text-right')}>
-                                                <AccionesFila
-                                                    nombre={e.nombre}
-                                                    activo={e.activo}
-                                                    urlEstado={puede('empresas.estado') ? route('empresas.estado', e.id) : undefined}
-                                                    onEditar={puede('empresas.editar') ? (boton) => abrir(e, boton) : undefined}
-                                                    urlEliminar={puede('empresas.eliminar') ? route('empresas.destroy', e.id) : undefined}
-                                                    consecuencia={`No se le podrán asignar nuevas sedes ni usuarios. ${mayuscula(seConserva(e.sedes, 'sede', 'sedes'))} y ${seConserva(e.usuarios, 'usuario', 'usuarios')}. Puedes volver a activarla cuando quieras.`}
-                                                />
-                                            </td>
-                                        </tr>
+                                        <li key={e.id} className={cn('grid gap-3 px-4 py-4 sm:px-5', !e.activo && 'text-muted-foreground')}>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">{empresaDe(e)}</div>
+                                                <div className="-mt-1 -mr-1">{accionesDe(e)}</div>
+                                            </div>
+                                            <DatosBloque
+                                                datos={[
+                                                    ['Líneas', lineasDe(e)],
+                                                    ...(tieneContacto(e) ? [['Contacto', contactoDe(e)] as [string, ReactNode]] : []),
+                                                    ['Sedes', sedesDe(e)],
+                                                    ['Usuarios', usuariosDe(e)],
+                                                ]}
+                                            />
+                                        </li>
                                     ))}
-                                </tbody>
-                            </Tabla>
+                                </ul>
+                            </>
                         )}
 
                         <Paginacion pagina={empresas} nombre="empresas" />
@@ -291,7 +363,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                     <p id="lineas-ayuda" className="text-muted-foreground mb-1 text-xs">
                         En cada línea marcada, la empresa aparece en su tablero y puede tener personal asignado.
                     </p>
-                    <ul role="list" className="grid gap-1.5">
+                    {/* Una sola lista, una línea por fila; la marcada, sombreada */}
+                    <ul role="list" className="bg-card divide-y overflow-hidden rounded-xl border">
                         {lineas.filter((l) => l.activa || editando?.lineas.includes(l.id)).map((l, i) => {
                             const Icono = iconoLinea(l);
                             // La primera casilla lleva el id "lineas" para recibir el foco si el campo tiene error
@@ -301,12 +374,12 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                                 <li
                                     key={l.id}
                                     className={cn(
-                                        'flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors',
-                                        marcada ? 'border-primary/40 bg-secondary/60' : 'hover:bg-muted/50',
+                                        'flex items-center gap-3 px-3.5 py-2.5 transition-colors',
+                                        marcada ? 'bg-secondary dark:bg-primary/10' : 'hover:bg-muted/50',
                                     )}
                                 >
                                     <Checkbox id={id} checked={marcada} onCheckedChange={(v) => alternarLinea(l.id, v === true)} aria-invalid={form.errors.lineas ? true : undefined} />
-                                    <Icono className="text-primary size-4" aria-hidden="true" />
+                                    <Icono className="text-primary size-4 shrink-0" aria-hidden="true" />
                                     <label htmlFor={id} className="flex-1 cursor-pointer text-sm">
                                         {l.activa ? l.nombre : `${l.nombre} (inactiva)`}
                                     </label>
@@ -317,8 +390,8 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
                     <InputError id="lineas-error" message={form.errors.lineas} />
                 </fieldset>
 
-                <fieldset className="grid gap-4 rounded-xl border p-4">
-                    <legend className="px-1 text-sm font-semibold">Contacto principal</legend>
+                <fieldset className="grid gap-4">
+                    <legend className="mb-3 text-sm leading-none font-semibold">Contacto principal</legend>
                     <Campo id="contacto_nombre" etiqueta="Nombre" error={form.errors.contacto_nombre}>
                         <Input {...propsCampo('contacto_nombre', form.errors.contacto_nombre)} autoComplete="off" value={form.data.contacto_nombre} onChange={(e) => form.setData('contacto_nombre', e.target.value)} className="h-10 rounded-lg" />
                     </Campo>

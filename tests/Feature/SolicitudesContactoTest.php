@@ -139,14 +139,14 @@ class SolicitudesContactoTest extends TestCase
         $this->travel(5)->minutes();
         $nueva = SolicitudContacto::create([...collect($this->datos(['nombre' => 'Segunda', 'empresa' => 'Logística Cali']))->except(['autoriza_datos', 'sitio_web'])->all()]);
 
-        // Sin filtro: las pendientes, la más reciente primero
+        // Sin filtro: las pendientes, la que más lleva esperando primero (ningún cliente se queda sin respuesta)
         $this->actingAs($admin)->get('/solicitudes')->assertInertia(fn (Assert $p) => $p
             ->component('solicitudes/index')
             ->where('total', 2)
             ->where('pendientes', 2)
             ->where('filtros.estado', '')
-            ->where('solicitudes.data.0.nombre', 'Segunda')
-            ->where('solicitudes.data.1.nombre', 'Primera'));
+            ->where('solicitudes.data.0.nombre', 'Primera')
+            ->where('solicitudes.data.1.nombre', 'Segunda'));
 
         $this->actingAs($admin)->patch("/solicitudes/{$vieja->id}/atencion", ['atendida' => true])
             ->assertSessionHas('success', 'La solicitud de Primera quedó como atendida.');
@@ -162,6 +162,10 @@ class SolicitudesContactoTest extends TestCase
         $this->actingAs($admin)->get('/solicitudes?estado=todas&q=Logística')->assertInertia(fn (Assert $p) => $p
             ->has('solicitudes.data', 1)
             ->where('solicitudes.data.0.id', $nueva->id));
+        // Todas: primero las pendientes y después las atendidas
+        $this->actingAs($admin)->get('/solicitudes?estado=todas')->assertInertia(fn (Assert $p) => $p
+            ->where('solicitudes.data.0.nombre', 'Segunda')
+            ->where('solicitudes.data.1.nombre', 'Primera'));
 
         // Volver a pendientes borra quién y cuándo
         $this->actingAs($admin)->patch("/solicitudes/{$vieja->id}/atencion", ['atendida' => false]);

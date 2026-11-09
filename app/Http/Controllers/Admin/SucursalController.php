@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SucursalRequest;
+use App\Models\Asignacion;
 use App\Models\InformeDiario;
 use App\Models\NovedadLinea;
 use App\Models\Orden;
@@ -32,7 +33,14 @@ class SucursalController extends Controller
 
         $sucursales = Sucursal::query()
             ->with('sede:id,empresa_id,nombre', 'sede.empresa:id,nombre')
-            ->withCount(['asignaciones as usuarios_count' => fn ($q) => $q->vigentes()->select(DB::raw('count(distinct asignaciones.user_id)'))])
+            // Quienes trabajan en ella: asignados a la sucursal, a toda su sede o a toda su empresa (como la programa la operación)
+            ->addSelect(['usuarios_count' => Asignacion::vigentes()
+                ->selectRaw('count(distinct asignaciones.user_id)')
+                ->where(fn (Builder $w) => $w->whereColumn('asignaciones.sucursal_id', 'sucursales.id')
+                    ->orWhere(fn (Builder $s) => $s->whereColumn('asignaciones.sede_id', 'sucursales.sede_id')->whereNull('asignaciones.sucursal_id'))
+                    ->orWhere(fn (Builder $e) => $e->whereNull('asignaciones.sede_id')
+                        ->whereIn('asignaciones.empresa_id', DB::table('sedes')->select('empresa_id')->whereColumn('sedes.id', 'sucursales.sede_id')))),
+            ])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('ciudad', 'like', $like)->orWhere('direccion', 'like', $like)->orWhere('alias_drivin', 'like', $like));
@@ -41,6 +49,11 @@ class SucursalController extends Controller
                 ? $q->whereNull('sede_id')
                 : $q->where('sede_id', (int) $sede))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activas'))
+            // Agrupadas por sede (con su empresa) y las propias al final: la lista las muestra bajo cada una
+            ->orderByRaw('sucursales.sede_id is null')
+            ->orderBy(DB::table('sedes')->join('empresas', 'empresas.id', '=', 'sedes.empresa_id')->select('empresas.nombre')->whereColumn('sedes.id', 'sucursales.sede_id'))
+            ->orderBy(DB::table('sedes')->select('nombre')->whereColumn('sedes.id', 'sucursales.sede_id'))
+            ->orderBy('sede_id')
             ->orderByDesc('activo')
             ->orderBy('nombre')
             ->paginate(15)

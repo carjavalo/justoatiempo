@@ -70,8 +70,14 @@ class UsuarioController extends Controller
                 ? $q->where('acceso', true)->where('debe_cambiar_contrasena', true)
                 : $q->where('acceso', $acceso === 'con'))
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('empresa_id', $id)))
-            ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sede_id', $id)))
-            ->when($filtros['sucursal'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('sucursal_id', $id)))
+            // Desde una sede o sucursal: quienes trabajan ahí, también por estar asignados a toda la empresa o la sede
+            ->when($filtros['sede'] ?? null, fn (Builder $q, int $id) => $q->whereHas('asignacionesVigentes', fn ($a) => $a
+                ->cubrenSede($id, Sede::withTrashed()->whereKey($id)->value('empresa_id'))))
+            ->when($filtros['sucursal'] ?? null, function (Builder $q, int $id) {
+                $sede = Sucursal::withTrashed()->whereKey($id)->value('sede_id');
+                $empresa = $sede ? Sede::withTrashed()->whereKey($sede)->value('empresa_id') : null;
+                $q->whereHas('asignacionesVigentes', fn ($a) => $a->cubrenSucursal($id, $sede, $empresa));
+            })
             ->when($filtros['linea'] ?? null, fn (Builder $q, int $id) => $q->tap($enLugar('linea', $id)))
             ->orderByDesc('activo')
             ->orderBy('primer_apellido')

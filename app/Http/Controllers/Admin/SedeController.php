@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SedeRequest;
+use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\InformeDiario;
 use App\Models\NovedadLinea;
@@ -32,13 +33,22 @@ class SedeController extends Controller
 
         $sedes = Sede::query()
             ->with('empresa:id,nombre')
-            ->withCount(['sucursales', 'asignaciones as usuarios_count' => fn ($q) => $q->vigentes()->select(DB::raw('count(distinct asignaciones.user_id)'))])
+            ->withCount('sucursales')
+            // Quienes trabajan en ella: asignados a la sede o a toda su empresa (como la programa la operación)
+            ->addSelect(['usuarios_count' => Asignacion::vigentes()
+                ->selectRaw('count(distinct asignaciones.user_id)')
+                ->where(fn (Builder $w) => $w->whereColumn('asignaciones.sede_id', 'sedes.id')
+                    ->orWhere(fn (Builder $e) => $e->whereColumn('asignaciones.empresa_id', 'sedes.empresa_id')->whereNull('asignaciones.sede_id'))),
+            ])
             ->when($filtros['q'] ?? null, function (Builder $q, string $texto) {
                 $like = '%'.addcslashes($texto, '%_\\').'%';
                 $q->where(fn (Builder $w) => $w->where('nombre', 'like', $like)->orWhere('codigo', 'like', $like));
             })
             ->when($filtros['empresa'] ?? null, fn (Builder $q, int|string $empresa) => $q->where('empresa_id', (int) $empresa))
             ->when($filtros['estado'] ?? null, fn (Builder $q, string $estado) => $q->where('activo', $estado === 'activas'))
+            // Agrupadas por empresa: la lista las muestra bajo el nombre de cada una
+            ->orderBy(DB::table('empresas')->select('nombre')->whereColumn('empresas.id', 'sedes.empresa_id'))
+            ->orderBy('empresa_id')
             ->orderByDesc('activo')
             ->orderBy('nombre')
             ->paginate(15)

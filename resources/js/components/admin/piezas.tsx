@@ -98,6 +98,43 @@ function PaginaLink({ href, etiqueta, children }: { href: string | null; etiquet
     );
 }
 
+/** Filas seguidas con la misma clave, en el orden en que llegan (el servidor ya las ordena por grupo). */
+export function agrupar<T>(filas: T[], clave: (fila: T) => string): { clave: string; filas: T[] }[] {
+    const grupos: { clave: string; filas: T[] }[] = [];
+    for (const fila of filas) {
+        const k = clave(fila);
+        const ultimo = grupos[grupos.length - 1];
+        if (ultimo?.clave === k) ultimo.filas.push(fila);
+        else grupos.push({ clave: k, filas: [fila] });
+    }
+    return grupos;
+}
+
+/** Fila que encabeza un grupo dentro de la tabla (la sede de unas sucursales, la empresa de unas sedes). */
+export function EncabezadoGrupo({ columnas, children }: { columnas: number; children: ReactNode }) {
+    return (
+        <tr className="bg-muted/50">
+            <th scope="rowgroup" colSpan={columnas} className="px-5 py-2.5 text-left text-sm font-semibold">
+                {children}
+            </th>
+        </tr>
+    );
+}
+
+/** Los datos de cada fila en los bloques del teléfono: el rótulo a la izquierda y su valor al lado. */
+export function DatosBloque({ datos }: { datos: [string, ReactNode][] }) {
+    return (
+        <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2 text-sm">
+            {datos.map(([rotulo, valor]) => (
+                <div key={rotulo} className="contents">
+                    <dt className="text-muted-foreground text-xs font-semibold">{rotulo}</dt>
+                    <dd className="min-w-0">{valor}</dd>
+                </div>
+            ))}
+        </dl>
+    );
+}
+
 /** Primera vez, sin registros: explica para qué sirve el módulo y ofrece la única acción posible. */
 export function EstadoVacio({ icono: Icono, titulo, texto, accion }: { icono: TipoIcono; titulo: string; texto: string; accion: ReactNode }) {
     return (

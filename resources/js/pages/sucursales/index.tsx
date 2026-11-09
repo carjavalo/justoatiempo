@@ -1,12 +1,15 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
-import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
+import { BarraFiltros, CampoBusqueda, FiltroLista, POCOS_PARA_FILTRAR, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import {
+    agrupar,
     claseTd,
     claseTh,
     contenedorModulo,
     ConteoEnlace,
+    DatosBloque,
+    EncabezadoGrupo,
     EncabezadoModulo,
     EstadoBadge,
     EstadoVacio,
@@ -14,7 +17,7 @@ import {
     SinResultados,
     Tabla,
 } from '@/components/admin/piezas';
-import { MapPin, MapPinned, Plus } from '@/components/iconos';
+import { MapPinned, Plus } from '@/components/iconos';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +40,7 @@ interface FilaSucursal {
     sede: string | null;
     empresa: string | null;
     activo: boolean;
+    /** Quienes trabajan en ella: asignados a la sucursal, a toda su sede o a toda su empresa. */
     usuarios: number;
 }
 
@@ -54,6 +58,8 @@ interface Props {
     sedes: Sede[];
 }
 
+/** Sucursal propia de Justo a Tiempo (sin sede): se elige, no queda así por olvido (el servidor pide una de las dos). */
+const PROPIA = 'propia';
 const VACIO = { nombre: '', sede_id: '', alias_drivin: '', ciudad: '', direccion: '' };
 const ORDEN_CAMPOS = Object.keys(VACIO);
 
@@ -87,6 +93,8 @@ const CIUDADES = [
 
 /** Nombre de la sede con su empresa ("TuGo · Ditransa"): dos empresas pueden atender a clientes parecidos. */
 const nombreSede = (s: Sede) => [s.nombre, s.empresa].filter(Boolean).join(' · ') + (s.activo ? '' : ' (inactiva)');
+/** Mismo texto sin importar mayúsculas: el nombre del plan no dice nada nuevo (CALI NORTE de Cali Norte). */
+const mismoTexto = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'accent' }) === 0;
 
 export default function Sucursales({ sucursales, total, filtros, sedes }: Props) {
     const puede = usePuede();
@@ -108,13 +116,13 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
             sucursal
                 ? {
                       nombre: sucursal.nombre,
-                      sede_id: sucursal.sedeId ? String(sucursal.sedeId) : '',
+                      sede_id: sucursal.sedeId ? String(sucursal.sedeId) : PROPIA,
                       alias_drivin: sucursal.aliasDrivin ?? '',
                       ciudad: sucursal.ciudad,
                       direccion: sucursal.direccion ?? '',
                   }
-                : // Si la lista está filtrada por una sede, la sucursal nueva nace en esa sede
-                  { ...VACIO, sede_id: /^\d+$/.test(valores.sede) ? valores.sede : '' },
+                : // Si la lista está filtrada por una sede (o por las propias), la sucursal nueva nace ahí; si no, se elige
+                  { ...VACIO, sede_id: /^\d+$/.test(valores.sede) ? valores.sede : valores.sede === 'propias' ? PROPIA : '' },
         );
         setAbierto(true);
     };
@@ -130,6 +138,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
 
     // En el formulario: sedes activas, más la actual si quedó inactiva (para no perderla al editar)
     const sedesFormulario = sedes.filter((s) => s.activo || String(s.id) === form.data.sede_id);
+    const deUnaSede = form.data.sede_id !== '' && form.data.sede_id !== PROPIA;
 
     const botonNueva = (texto: string) => (
         <Button onClick={() => abrir(null)} className="h-10 rounded-lg px-4 font-semibold">
@@ -137,6 +146,51 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
             {texto}
         </Button>
     );
+
+    // Lo de cada sucursal: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). La sede encabeza su grupo
+    // (no se repite en cada fila) y el estado solo se marca si está inactiva
+    const sucursalDe = (s: FilaSucursal) => (
+        <div className="min-w-0">
+            <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                <span className="break-words">{s.nombre}</span>
+                {!s.activo && <EstadoBadge activo={false} femenino />}
+            </p>
+            {s.aliasDrivin && !mismoTexto(s.aliasDrivin, s.nombre) && (
+                <p className="text-muted-foreground mt-0.5 text-xs break-words">Plan en Drivin: {s.aliasDrivin}</p>
+            )}
+        </div>
+    );
+    const ciudadDe = (s: FilaSucursal) => (
+        <>
+            <p>{s.ciudad}</p>
+            {s.direccion && <p className="text-muted-foreground text-xs break-words">{s.direccion}</p>}
+        </>
+    );
+    const usuariosDe = (s: FilaSucursal) => (
+        <ConteoEnlace
+            n={s.usuarios}
+            uno="usuario"
+            varios="usuarios"
+            ninguno="Ninguno"
+            de={`la sucursal ${s.nombre}`}
+            href={puede('usuarios.ver') ? route('usuarios.index', { sucursal: s.id }) : undefined}
+        />
+    );
+    const accionesDe = (s: FilaSucursal) => (
+        <AccionesFila
+            nombre={`la sucursal ${s.nombre}`}
+            activo={s.activo}
+            urlEstado={puede('sucursales.estado') ? route('sucursales.estado', s.id) : undefined}
+            onEditar={puede('sucursales.editar') ? (boton) => abrir(s, boton) : undefined}
+            urlEliminar={puede('sucursales.eliminar') ? route('sucursales.destroy', s.id) : undefined}
+            consecuencia="No se le podrán asignar nuevas personas; quien trabaja ahí conserva su asignación. Puedes volver a activarla cuando quieras."
+        />
+    );
+    const grupos = agrupar(sucursales.data, (s) => (s.sedeId ? String(s.sedeId) : 'propias'));
+    const tituloGrupo = (s: FilaSucursal) =>
+        !s.sedeId ? 'Propias de Justo a Tiempo' : s.sede ? [s.sede, s.empresa].filter(Boolean).join(' · ') : 'Sede eliminada';
+    // Los filtros aparecen cuando hay muchas sucursales (o si ya hay uno puesto, para poder quitarlo)
+    const conFiltros = total > POCOS_PARA_FILTRAR || activos;
 
     return (
         <AppLayout>
@@ -158,140 +212,123 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                     />
                 ) : (
                     <>
-                        <BarraFiltros
-                            resumen={
-                                sucursales.total
-                                    ? `${sucursales.total} ${sucursales.total === 1 ? 'sucursal' : 'sucursales'}`
-                                    : 'Ninguna sucursal coincide con los filtros.'
-                            }
-                            soloAnunciar={sucursales.total === 0}
-                            activos={activos}
-                            onLimpiar={limpiar}
-                            idBusqueda="buscar-sucursales"
-                        >
-                            <CampoBusqueda
-                                id="buscar-sucursales"
-                                etiqueta="Buscar sucursales"
-                                placeholder="Buscar por nombre, ciudad o dirección"
-                                valor={valores.q}
-                                onCambio={(v) => cambiar('q', v, { inmediato: false })}
-                            />
-                            <FiltroLista
-                                id="filtro-sede"
-                                etiqueta="Sede"
-                                valor={valores.sede}
-                                onCambio={(v) => cambiar('sede', v)}
-                                className="sm:w-64"
-                                opciones={[
-                                    { valor: '', texto: 'Todas las sedes' },
-                                    { valor: 'propias', texto: 'Sucursales propias' },
-                                    ...sedes.map((s) => ({ valor: String(s.id), texto: nombreSede(s) })),
-                                ]}
-                            />
-                            <FiltroLista
-                                id="filtro-estado"
-                                etiqueta="Estado"
-                                valor={valores.estado}
-                                onCambio={(v) => cambiar('estado', v)}
-                                opciones={[
-                                    { valor: '', texto: 'Activas e inactivas' },
-                                    { valor: 'activas', texto: 'Solo activas' },
-                                    { valor: 'inactivas', texto: 'Solo inactivas' },
-                                ]}
-                            />
-                        </BarraFiltros>
+                        {conFiltros && (
+                            <BarraFiltros
+                                resumen={
+                                    sucursales.total
+                                        ? `${sucursales.total} ${sucursales.total === 1 ? 'sucursal' : 'sucursales'}`
+                                        : 'Ninguna sucursal coincide con los filtros.'
+                                }
+                                soloAnunciar={sucursales.total === 0}
+                                activos={activos}
+                                onLimpiar={limpiar}
+                                idBusqueda="buscar-sucursales"
+                            >
+                                <CampoBusqueda
+                                    id="buscar-sucursales"
+                                    etiqueta="Buscar sucursales"
+                                    placeholder="Buscar por nombre, ciudad o dirección"
+                                    valor={valores.q}
+                                    onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                                />
+                                <FiltroLista
+                                    id="filtro-sede"
+                                    etiqueta="Sede"
+                                    valor={valores.sede}
+                                    onCambio={(v) => cambiar('sede', v)}
+                                    className="sm:w-64"
+                                    opciones={[
+                                        { valor: '', texto: 'Todas las sedes' },
+                                        { valor: 'propias', texto: 'Sucursales propias' },
+                                        ...sedes.map((s) => ({ valor: String(s.id), texto: nombreSede(s) })),
+                                    ]}
+                                />
+                                <FiltroLista
+                                    id="filtro-estado"
+                                    etiqueta="Estado"
+                                    valor={valores.estado}
+                                    onCambio={(v) => cambiar('estado', v)}
+                                    opciones={[
+                                        { valor: '', texto: 'Activas e inactivas' },
+                                        { valor: 'activas', texto: 'Solo activas' },
+                                        { valor: 'inactivas', texto: 'Solo inactivas' },
+                                    ]}
+                                />
+                            </BarraFiltros>
+                        )}
 
                         {sucursales.data.length === 0 ? (
                             <SinResultados texto="Ninguna sucursal coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Sucursales" columnas={['37%', '27%', '15%', '12%', '3.5rem']}>
-                                <thead className="text-muted-foreground border-b">
-                                    <tr>
-                                        <th scope="col" className={claseTh}>
-                                            Sucursal
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Sede y empresa
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Usuarios
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Estado
-                                        </th>
-                                        <th scope="col" className={cn(claseTh, 'w-14')}>
-                                            <span className="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {sucursales.data.map((s) => (
-                                        <tr key={s.id} className={cn('hover:bg-muted/40 transition-colors', !s.activo && 'text-muted-foreground')}>
-                                            <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                                <div className="flex items-center gap-3">
-                                                    <span
-                                                        className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-xl"
-                                                        aria-hidden="true"
+                            <>
+                                {/* Desde 1024 px, la tabla con un grupo por sede; debajo, los mismos grupos en bloques */}
+                                <div className="hidden lg:block">
+                                    <Tabla titulo="Sucursales por sede" minimo="min-w-[680px]" columnas={['44%', '30%', '18%', '3.5rem']}>
+                                        <thead className="text-muted-foreground border-b">
+                                            <tr>
+                                                <th scope="col" className={claseTh}>
+                                                    Sucursal
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Ciudad
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Usuarios
+                                                </th>
+                                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                                    <span className="sr-only">Acciones</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        {grupos.map((g, i) => (
+                                            <tbody key={g.clave} className={cn('divide-y', i > 0 && 'border-t')}>
+                                                <EncabezadoGrupo columnas={4}>{tituloGrupo(g.filas[0])}</EncabezadoGrupo>
+                                                {g.filas.map((s) => (
+                                                    <tr
+                                                        key={s.id}
+                                                        className={cn('hover:bg-muted/40 transition-colors', !s.activo && 'text-muted-foreground')}
                                                     >
-                                                        <MapPin className="size-4" />
-                                                    </span>
-                                                    <div className="min-w-0">
-                                                        <p className="text-foreground truncate font-semibold" title={s.nombre}>
-                                                            {s.nombre}
-                                                        </p>
-                                                        <p className="text-muted-foreground truncate text-xs">
-                                                            {[s.ciudad, s.direccion, s.aliasDrivin && `Plan Drivin: ${s.aliasDrivin}`]
-                                                                .filter(Boolean)
-                                                                .join(' · ')}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </th>
-                                            <td className={claseTd}>
-                                                {s.sede ? (
-                                                    <>
-                                                        <p className="text-foreground truncate" title={s.sede}>
-                                                            {s.sede}
-                                                        </p>
-                                                        {s.empresa && (
-                                                            <p className="text-muted-foreground truncate text-xs" title={s.empresa}>
-                                                                {s.empresa}
-                                                            </p>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span className="bg-brand-coral-soft text-brand-coral-ink rounded-full px-2.5 py-0.5 text-xs font-semibold">
-                                                        Propia
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className={claseTd}>
-                                                <ConteoEnlace
-                                                    n={s.usuarios}
-                                                    uno="usuario"
-                                                    varios="usuarios"
-                                                    ninguno="Ninguno"
-                                                    de={`la sucursal ${s.nombre}`}
-                                                    href={puede('usuarios.ver') ? route('usuarios.index', { sucursal: s.id }) : undefined}
-                                                />
-                                            </td>
-                                            <td className={claseTd}>
-                                                <EstadoBadge activo={s.activo} femenino />
-                                            </td>
-                                            <td className={cn(claseTd, 'text-right')}>
-                                                <AccionesFila
-                                                    nombre={`la sucursal ${s.nombre}`}
-                                                    activo={s.activo}
-                                                    urlEstado={puede('sucursales.estado') ? route('sucursales.estado', s.id) : undefined}
-                                                    onEditar={puede('sucursales.editar') ? (boton) => abrir(s, boton) : undefined}
-                                                    urlEliminar={puede('sucursales.eliminar') ? route('sucursales.destroy', s.id) : undefined}
-                                                    consecuencia={`No se le podrán asignar nuevos usuarios; ${s.usuarios === 1 ? 'el usuario que tiene se conserva' : s.usuarios > 1 ? `los ${s.usuarios} usuarios que tiene se conservan` : 'no tiene usuarios asignados'}. Puedes volver a activarla cuando quieras.`}
-                                                />
-                                            </td>
-                                        </tr>
+                                                        <th scope="row" className={cn(claseTd, 'font-normal')}>
+                                                            {sucursalDe(s)}
+                                                        </th>
+                                                        <td className={claseTd}>{ciudadDe(s)}</td>
+                                                        <td className={claseTd}>{usuariosDe(s)}</td>
+                                                        <td className={cn(claseTd, 'text-right')}>{accionesDe(s)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        ))}
+                                    </Tabla>
+                                </div>
+                                <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden">
+                                    {grupos.map((g, i) => (
+                                        <section key={g.clave} aria-labelledby={`sede-${g.clave}`} className={cn(i > 0 && 'border-t')}>
+                                            <h2 id={`sede-${g.clave}`} className="bg-muted/50 border-b px-4 py-2.5 text-sm font-semibold sm:px-5">
+                                                {tituloGrupo(g.filas[0])}
+                                            </h2>
+                                            <ul role="list" className="divide-y">
+                                                {g.filas.map((s) => (
+                                                    <li
+                                                        key={s.id}
+                                                        className={cn('grid gap-3 px-4 py-4 sm:px-5', !s.activo && 'text-muted-foreground')}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0 flex-1">{sucursalDe(s)}</div>
+                                                            <div className="-mt-1 -mr-1">{accionesDe(s)}</div>
+                                                        </div>
+                                                        <DatosBloque
+                                                            datos={[
+                                                                ['Ciudad', ciudadDe(s)],
+                                                                ['Usuarios', usuariosDe(s)],
+                                                            ]}
+                                                        />
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </section>
                                     ))}
-                                </tbody>
-                            </Tabla>
+                                </div>
+                            </>
                         )}
 
                         <Paginacion pagina={sucursales} nombre="sucursales" />
@@ -323,20 +360,24 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
                     />
                 </Campo>
 
-                <Campo id="sede_id" etiqueta="Sede" error={form.errors.sede_id}>
+                <Campo id="sede_id" etiqueta="Sede" requerido error={form.errors.sede_id}>
                     <Selector
                         {...propsCampo('sede_id', form.errors.sede_id)}
                         valor={form.data.sede_id}
                         // Una sucursal propia no recibe órdenes de Drivin: sin sede, sin nombre de plan
-                        onCambio={(v) => form.setData((d) => ({ ...d, sede_id: v, alias_drivin: v ? d.alias_drivin : '' }))}
+                        onCambio={(v) => {
+                            form.setData((d) => ({ ...d, sede_id: v, alias_drivin: v !== PROPIA ? d.alias_drivin : '' }));
+                            if (form.errors.sede_id) form.clearErrors('sede_id');
+                        }}
+                        placeholder="Elige la sede de esta sucursal"
                         opciones={[
-                            { valor: '', texto: 'Ninguna · sucursal propia de Justo a Tiempo' },
                             ...sedesFormulario.map((s) => ({ valor: String(s.id), texto: nombreSede(s) })),
+                            { valor: PROPIA, texto: 'Propia de Justo a Tiempo (sin sede)' },
                         ]}
                     />
                 </Campo>
 
-                {form.data.sede_id && (
+                {deUnaSede && (
                     <Campo
                         id="alias_drivin"
                         etiqueta="Nombre del plan en Drivin"

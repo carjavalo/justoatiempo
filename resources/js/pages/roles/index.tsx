@@ -1,6 +1,6 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
-import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
+import { BarraFiltros, CampoBusqueda, FiltroLista, POCOS_PARA_FILTRAR, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
 import { Hammer, Lock, Plus, ShieldCheck, UserCheck } from '@/components/iconos';
@@ -73,8 +73,6 @@ interface Props {
 const VACIO = { nombre: '', descripcion: '', permisos: [] as string[], alcance: 'asignacion' };
 const ORDEN_CAMPOS = ['nombre', 'descripcion', 'alcance', 'permisos'];
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
-/** Con pocos roles caben todos a la vista: buscar y filtrar sobra. */
-const POCOS_ROLES = 8;
 
 /** Módulos que se usan desde el tablero de la línea: darlos incluye ver el tablero. */
 const DESDE_EL_TABLERO = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion'];
@@ -223,7 +221,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
         />
     );
     // Los filtros aparecen cuando hay muchos roles (o si ya hay uno puesto, para poder quitarlo)
-    const conFiltros = total > POCOS_ROLES || activos;
+    const conFiltros = total > POCOS_PARA_FILTRAR || activos;
 
     const botonNuevo = (texto: string) => (
         <Button onClick={() => abrir(null)} className="h-10 rounded-lg px-4 font-semibold">

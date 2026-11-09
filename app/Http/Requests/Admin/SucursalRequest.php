@@ -15,6 +15,9 @@ class SucursalRequest extends FormRequest
 {
     use LimpiaTexto;
 
+    /** Valor de sede_id para una sucursal propia de Justo a Tiempo (sin sede). */
+    public const PROPIA = 'propia';
+
     /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
     {
@@ -37,7 +40,8 @@ class SucursalRequest extends FormRequest
     {
         return [
             'nombre' => ['required', 'string', 'max:120'],
-            'sede_id' => ['nullable', 'integer', Rule::exists('sedes', 'id')->whereNull('deleted_at')],
+            // Una sede, o "propia" (de Justo a Tiempo, sin sede): que sea propia se elige, no queda así por olvido
+            'sede_id' => ['required', Rule::when($this->input('sede_id') !== self::PROPIA, ['integer', Rule::exists('sedes', 'id')->whereNull('deleted_at')])],
             'ciudad' => ['required', 'string', 'max:80'],
             'direccion' => ['nullable', 'string', 'max:255'],
             // Con dos sucursales con el mismo alias, Drivin no sabría a cuál asignar las órdenes
@@ -97,7 +101,10 @@ class SucursalRequest extends FormRequest
 
     public function messages(): array
     {
-        return ['alias_drivin.unique' => 'Otra sucursal ya usa ese nombre de plan en Drivin.'];
+        return [
+            'alias_drivin.unique' => 'Otra sucursal ya usa ese nombre de plan en Drivin.',
+            'sede_id.required' => 'Elige la sede de esta sucursal, o «Propia de Justo a Tiempo» si no es de ninguna empresa.',
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -107,7 +114,7 @@ class SucursalRequest extends FormRequest
 
         return [
             'nombre' => $datos['nombre'],
-            'sede_id' => $datos['sede_id'] ?? null,
+            'sede_id' => $datos['sede_id'] === self::PROPIA ? null : (int) $datos['sede_id'],
             'ciudad' => $datos['ciudad'],
             'direccion' => $datos['direccion'] ?? null,
             'alias_drivin' => $datos['alias_drivin'] ?? null,

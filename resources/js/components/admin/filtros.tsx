@@ -6,6 +6,9 @@ import { Selector } from '@/components/selector';
 
 type Filtros = Record<string, string>;
 
+/** Con pocos registros caben todos a la vista: buscar y filtrar sobra (los filtros aparecen desde aquí, o si ya hay uno puesto). */
+export const POCOS_PARA_FILTRAR = 8;
+
 /**
  * Filtros en la dirección de la página (se pueden compartir y sobreviven a recargar).
  * La búsqueda espera a que se deje de escribir; las listas aplican al instante.

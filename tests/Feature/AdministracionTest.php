@@ -214,11 +214,14 @@ class AdministracionTest extends TestCase
         $tugo = $this->sede('TuGo');
         $sodimac = $this->sede('Sodimac');
 
-        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali'])->assertSessionHasNoErrors();
+        // Que sea propia se elige: sin sede ni "propia", no se crea
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali'])
+            ->assertSessionHasErrors(['sede_id' => 'Elige la sede de esta sucursal, o «Propia de Justo a Tiempo» si no es de ninguna empresa.']);
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => 'propia'])->assertSessionHasNoErrors();
         $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => $tugo->id])->assertSessionHasNoErrors();
         $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Yumbo', 'sede_id' => $sodimac->id])->assertSessionHasNoErrors();
 
-        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali'])
+        $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => 'propia'])
             ->assertSessionHasErrors(['nombre' => 'Ya hay una sucursal propia con ese nombre.']);
         $this->actingAs($this->admin)->post('/sucursales', ['nombre' => 'Principal', 'ciudad' => 'Cali', 'sede_id' => $tugo->id])
             ->assertSessionHasErrors(['nombre' => 'Esta sede ya tiene una sucursal con ese nombre.']);
@@ -447,17 +450,28 @@ class AdministracionTest extends TestCase
         $this->actingAs($this->admin)->post('/usuarios', ['nombres' => 'X', 'primer_apellido' => 'Y', 'email' => ['a@b.co'], 'rol_id' => $this->rolBase(Rol::Auxiliar), 'password' => 'Clave-segura-1'])->assertSessionHasErrors('email');
     }
 
-    public function test_filtra_usuarios_por_sede_y_por_sucursal_desde_los_conteos(): void
+    public function test_quien_trabaja_en_una_sede_o_sucursal_incluye_a_quien_esta_en_toda_la_sede_o_la_empresa(): void
     {
         $sede = $this->sede('TuGo');
         $sucursal = $sede->sucursales()->create(['nombre' => 'Cali Sur', 'ciudad' => 'Cali']);
+        $otra = $sede->sucursales()->create(['nombre' => 'Cali Norte', 'ciudad' => 'Cali']);
         User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id, 'name' => 'En Cali Sur']);
-        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'name' => 'En TuGo']);
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $otra->id, 'name' => 'En Cali Norte']);
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'name' => 'En toda TuGo']);
+        User::factory()->create(['empresa_id' => $sede->empresa_id, 'name' => 'En toda la empresa']);
         User::factory()->create(['name' => 'Propio']);
 
+        // Así los programa la operación: quien está en toda la empresa o toda la sede también trabaja en cada sucursal
+        $this->actingAs($this->admin)->get('/sedes')
+            ->assertInertia(fn (Assert $p) => $p->where('sedes.data.0.usuarios', 4));
+        $this->actingAs($this->admin)->get("/sucursales?sede={$sede->id}")
+            ->assertInertia(fn (Assert $p) => $p->where('sucursales.data', fn ($filas) => collect($filas)->pluck('usuarios', 'nombre')->all() === ['Cali Norte' => 3, 'Cali Sur' => 3]));
+
+        // Y el número lleva a esas mismas personas
         $this->actingAs($this->admin)->get("/usuarios?sede={$sede->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 2)->where('contexto.sede', 'TuGo'));
+            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 4)->where('contexto.sede', 'TuGo'));
         $this->actingAs($this->admin)->get("/usuarios?sucursal={$sucursal->id}")
-            ->assertInertia(fn (Assert $p) => $p->has('usuarios.data', 1)->where('usuarios.data.0.nombre', 'En Cali Sur')->where('contexto.sucursal', 'Cali Sur'));
+            ->assertInertia(fn (Assert $p) => $p->where('usuarios.data', fn ($filas) => collect($filas)->pluck('nombre')->sort()->values()->all() === ['En Cali Sur', 'En toda TuGo', 'En toda la empresa'])
+                ->where('contexto.sucursal', 'Cali Sur'));
     }
 }
