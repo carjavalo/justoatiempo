@@ -43,8 +43,8 @@ export function Cola({ ordenes, seleccionadaId, filtros }: { ordenes: OrdenCola[
     return (
         <nav aria-labelledby="titulo-cola" className="bg-card flex min-h-0 flex-col rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <h2 id="titulo-cola" className="border-b px-4 py-3 text-sm font-bold">
-                Órdenes <span className="text-muted-foreground font-medium">({ordenes.length})</span>
-                {ordenes.length > 0 && <span className="text-muted-foreground block text-xs font-medium">con {productos(totalProductos)} en total</span>}
+                Órdenes
+                {ordenes.length > 0 && <span className="text-muted-foreground block text-xs font-medium">{productos(totalProductos)} en total</span>}
             </h2>
             {ordenes.length === 0 ? (
                 <p className="text-muted-foreground px-4 py-8 text-center text-sm">No hay órdenes con este filtro.</p>

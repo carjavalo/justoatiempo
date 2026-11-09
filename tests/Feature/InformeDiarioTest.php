@@ -61,6 +61,8 @@ class InformeDiarioTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $p) => $p->component('informes/index')
                 ->where('fecha', '2026-10-02')
+                // La jornada más reciente con informe: a ella vuelve el selector de fecha
+                ->where('ultima', '2026-10-02')
                 ->has('informes', 1)
                 ->where('informes.0.sede', 'TuGo')
                 ->where('informes.0.sucursal', 'Cali Sur')

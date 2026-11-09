@@ -37,7 +37,7 @@ function Item({ numero, titulo, detalle, estado, children }: { numero: number; t
                         <p className="text-sm font-semibold">{titulo}</p>
                         {estado}
                     </div>
-                    <p className="text-muted-foreground text-xs">{detalle}</p>
+                    <p className="text-muted-foreground text-xs text-pretty">{detalle}</p>
                 </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-3 pl-10">{children}</div>

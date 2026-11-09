@@ -64,6 +64,9 @@ class InformeController extends Controller
 
         return Inertia::render('informes/index', [
             'fecha' => $fecha,
+            // Para el selector de fecha: el hoy del servidor y la jornada más reciente con informe (a la que vuelve)
+            'hoy' => today()->toDateString(),
+            'ultima' => $jornadas->first(),
             // La anterior y la siguiente jornada con informe
             'anterior' => $fecha ? $jornadas->first(fn ($f) => $f < $fecha) : null,
             'siguiente' => $fecha ? $jornadas->reverse()->first(fn ($f) => $f > $fecha) : null,

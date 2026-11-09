@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Info, type TipoIcono, XCircle 
 import { aFecha, fmt, type NivelEstado, nivelFrenteAMeta, semaforo } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
-import { type ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 
 /** Cómo está algo: bien, conviene revisarlo, es crítico o solo se informa. Siempre con dibujo y texto, nunca solo color. */
 export type Estado = 'bien' | 'atencion' | 'critico' | 'neutro';
@@ -53,21 +53,27 @@ export interface DiaLogistica {
     informes: { sinCerrar: number; desde: string | null; href: string | null } | null;
 }
 
+/**
+ * La programación de un día y su asistencia (`JornadaLinea::resumenDia` en el servidor). `necesarias`: las requeridas de
+ * cada lugar (o sus programadas, donde no se dijo cuántas). `tarde`, donde se cuenta: presentes que llegaron tarde.
+ */
+export interface ResumenDia {
+    lugares: number;
+    incompletos: number;
+    necesarias: number;
+    programadas: number;
+    presentes: number;
+    tarde?: number;
+    faltas: number;
+    justificadas: number;
+    sinRegistrar: number;
+    cobertura: number | null;
+}
+
 /** El día de una línea sin Drivin (`DiaLinea` en el servidor). Cada parte es null si su rol no la ve. */
 export interface DiaLinea {
-    /** La programación de hoy y su asistencia. `necesarias`: las requeridas de cada lugar (o sus programadas). */
-    hoy: {
-        lugares: number;
-        incompletos: number;
-        necesarias: number;
-        programadas: number;
-        presentes: number;
-        faltas: number;
-        justificadas: number;
-        sinRegistrar: number;
-        cobertura: number | null;
-        href: string;
-    } | null;
+    /** La programación de hoy y su asistencia. */
+    hoy: (ResumenDia & { href: string }) | null;
     novedades: { sinCerrar: number; graves: number; href: string } | null;
 }
 
@@ -187,22 +193,24 @@ export function pasosLogistica(
 }
 
 /**
- * El día de una línea sin Drivin en el orden en que pasa: la programación de hoy, su asistencia y las novedades sin
- * cerrar. La asistencia solo se califica cuando está toda registrada: antes, quien no tiene registro no es una falta.
- * `yaEnPantalla`: destinos que la página ya ofrece (p. ej. sus pestañas); esos pasos van sin enlace.
+ * La programación de un día y su asistencia, con las mismas palabras en el inicio, el tablero y la programación. La
+ * asistencia solo se califica cuando está toda registrada: antes, quien no tiene registro no es una falta. Un día que
+ * aún no llega no tiene asistencia que registrar (`futuro`). `deHoy` lo dice en la etiqueta (donde no hay otra fecha).
  */
-export function pasosLinea(dia: DiaLinea, { yaEnPantalla }: { yaEnPantalla?: EnPantalla } = {}): Paso[] {
-    const pasos: Paso[] = [];
-    const enlace = sinRepetir(yaEnPantalla);
-    const h = dia.hoy;
+export function pasosDelDia(
+    h: ResumenDia,
+    { deHoy = false, futuro = false, href = null }: { deHoy?: boolean; futuro?: boolean; href?: string | null } = {},
+): Paso[] {
+    const de = deHoy ? ' de hoy' : '';
+    if (h.lugares === 0) {
+        return [{ clave: 'programacion', etiqueta: `Programación${de}`, valor: 'Sin programar', estado: 'atencion', href }];
+    }
 
-    if (h && h.lugares === 0) {
-        pasos.push({ clave: 'programacion', etiqueta: 'Programación de hoy', valor: 'Sin programar', estado: 'atencion', href: enlace(h.href) });
-    } else if (h) {
-        const corta = h.incompletos > 0 || h.programadas < h.necesarias;
-        pasos.push({
+    const corta = h.incompletos > 0 || h.programadas < h.necesarias;
+    const pasos: Paso[] = [
+        {
             clave: 'programacion',
-            etiqueta: 'Programación de hoy',
+            etiqueta: `Programación${de}`,
             valor: [
                 plural(h.lugares, 'lugar', 'lugares'),
                 `${fmt.numero(h.programadas)} de ${plural(h.necesarias, 'persona', 'personas')}`,
@@ -211,44 +219,59 @@ export function pasosLinea(dia: DiaLinea, { yaEnPantalla }: { yaEnPantalla?: EnP
                 .filter(Boolean)
                 .join(' · '),
             estado: corta ? 'atencion' : 'bien',
-            href: enlace(h.href),
-        });
+            href,
+        },
+    ];
 
-        // La asistencia se registra en la misma programación: su enlace ya está en el paso anterior
-        if (h.programadas > 0) {
-            const noAsistieron = h.faltas + h.justificadas;
-            const ausencias =
-                noAsistieron > 0 &&
-                `${plural(noAsistieron, 'no asistió', 'no asistieron')}${h.justificadas ? ` (${plural(h.justificadas, 'justificada', 'justificadas')})` : ''}`;
-            const sinRegistrar = h.sinRegistrar > 0 && `${fmt.numero(h.sinRegistrar)} sin registrar`;
-            const nivel = semaforo(h.cobertura);
-            pasos.push(
-                h.sinRegistrar === h.programadas
-                    ? // Nada registrado todavía: no hay a quién calificar
-                      { clave: 'asistencia', etiqueta: 'Asistencia de hoy', valor: `${fmt.numero(h.sinRegistrar)} sin registrar`, estado: 'neutro' }
-                    : h.sinRegistrar > 0
-                      ? {
-                            clave: 'asistencia',
-                            etiqueta: 'Asistencia de hoy',
-                            valor: [plural(h.presentes, 'presente', 'presentes'), ausencias, sinRegistrar].filter(Boolean).join(' · '),
-                            estado: ausencias ? 'atencion' : 'neutro',
-                        }
-                      : // Toda registrada: se califica con el semáforo del informe, también en texto
-                        {
-                            clave: 'asistencia',
-                            etiqueta: 'Asistencia de hoy',
-                            valor: [
-                                `${fmt.numero(h.presentes)} de ${fmt.numero(h.necesarias)} presentes (${fmt.pct(h.cobertura)})`,
-                                ausencias,
-                                nivel?.texto.toLowerCase(),
-                            ]
-                                .filter(Boolean)
-                                .join(' · '),
-                            estado: nivel ? DEL_NIVEL[nivel.nivel] : 'neutro',
-                        },
-            );
-        }
+    // La asistencia se registra en la misma programación: su enlace ya está en el paso anterior
+    if (futuro) {
+        pasos.push({ clave: 'asistencia', etiqueta: 'Asistencia', valor: 'Se registra ese día', estado: 'neutro' });
+    } else if (h.programadas > 0) {
+        const noAsistieron = h.faltas + h.justificadas;
+        const ausencias =
+            noAsistieron > 0 &&
+            `${plural(noAsistieron, 'no asistió', 'no asistieron')}${h.justificadas ? ` (${plural(h.justificadas, 'justificada', 'justificadas')})` : ''}`;
+        const tarde = !!h.tarde && plural(h.tarde, 'llegó tarde', 'llegaron tarde');
+        const sinRegistrar = h.sinRegistrar > 0 && `${fmt.numero(h.sinRegistrar)} sin registrar`;
+        const nivel = semaforo(h.cobertura);
+        pasos.push(
+            h.sinRegistrar === h.programadas
+                ? // Nada registrado todavía: no hay a quién calificar
+                  { clave: 'asistencia', etiqueta: `Asistencia${de}`, valor: `${fmt.numero(h.sinRegistrar)} sin registrar`, estado: 'neutro' }
+                : h.sinRegistrar > 0
+                  ? {
+                        clave: 'asistencia',
+                        etiqueta: `Asistencia${de}`,
+                        valor: [plural(h.presentes, 'presente', 'presentes'), tarde, ausencias, sinRegistrar].filter(Boolean).join(' · '),
+                        estado: ausencias ? 'atencion' : 'neutro',
+                    }
+                  : // Toda registrada: se califica con el semáforo del informe, también en texto
+                    {
+                        clave: 'asistencia',
+                        etiqueta: `Asistencia${de}`,
+                        valor: [
+                            `${fmt.numero(h.presentes)} de ${fmt.numero(h.necesarias)} presentes (${fmt.pct(h.cobertura)})`,
+                            tarde,
+                            ausencias,
+                            nivel?.texto.toLowerCase(),
+                        ]
+                            .filter(Boolean)
+                            .join(' · '),
+                        estado: nivel ? DEL_NIVEL[nivel.nivel] : 'neutro',
+                    },
+        );
     }
+
+    return pasos;
+}
+
+/**
+ * El día de una línea sin Drivin en el orden en que pasa: la programación de hoy, su asistencia y las novedades sin
+ * cerrar. `yaEnPantalla`: destinos que la página ya ofrece (p. ej. sus pestañas); esos pasos van sin enlace.
+ */
+export function pasosLinea(dia: DiaLinea, { yaEnPantalla }: { yaEnPantalla?: EnPantalla } = {}): Paso[] {
+    const enlace = sinRepetir(yaEnPantalla);
+    const pasos: Paso[] = dia.hoy ? pasosDelDia(dia.hoy, { deHoy: true, href: enlace(dia.hoy.href) }) : [];
 
     if (dia.novedades) {
         const { sinCerrar, graves, href } = dia.novedades;
@@ -271,12 +294,16 @@ export function pasosLinea(dia: DiaLinea, { yaEnPantalla }: { yaEnPantalla?: EnP
 /** Columnas de "Hoy" según cuántos pasos ve: nunca queda una celda vacía. */
 const COLUMNAS: Record<number, string> = { 2: 'sm:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'sm:grid-cols-2 xl:grid-cols-4' };
 
-/** "Hoy" en el tablero de una línea: su día, cada paso con su estado y, si hay algo que hacer allí, su enlace. */
-export function FranjaHoy({ pasos }: { pasos: Paso[] }) {
+/**
+ * "Hoy" en el tablero de una línea: su día, cada paso con su estado y, si hay algo que hacer allí, su enlace. En la
+ * programación es el resumen del día elegido: su título queda solo para los lectores de pantalla (la fecha ya se ve).
+ */
+export function FranjaHoy({ pasos, titulo = 'Hoy', tituloOculto = false }: { pasos: Paso[]; titulo?: string; tituloOculto?: boolean }) {
+    const id = useId();
     return (
-        <section aria-labelledby="titulo-hoy" className="flex flex-col gap-3">
-            <h2 id="titulo-hoy" className="text-lg font-extrabold tracking-tight">
-                Hoy
+        <section aria-labelledby={id} className="flex flex-col gap-3">
+            <h2 id={id} className={tituloOculto ? 'sr-only' : 'text-lg font-extrabold tracking-tight'}>
+                {titulo}
             </h2>
             {/* La separación entre pasos es el fondo del borde que asoma entre celdas (gap de 1 px) */}
             <ul

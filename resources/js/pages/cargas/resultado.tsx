@@ -1,4 +1,4 @@
-import { Cifra, EstadoCargaBadge, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila, type EstadoCarga } from '@/components/cargas/piezas';
+import { Cifra, Cifras, EstadoCargaBadge, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila, type EstadoCarga } from '@/components/cargas/piezas';
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -37,7 +37,10 @@ interface Props {
         anuladaPor: string | null;
         anulada: string | null;
     };
-    /** Lo que mostró la revisión al importar; aquí solo se usa la efectividad. */
+    /**
+     * Lo que mostró la revisión al importar. No se muestra: su efectividad se contaba por orden y la del informe (la que
+     * vale) por producto; la de cada informe ya está en su fila.
+     */
     totales: { efectividad: number } | null;
     advertencias: Advertencia[];
     errores: ErrorFila[];
@@ -47,7 +50,7 @@ interface Props {
 
 const fechaHora = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 
-export default function Resultado({ carga, totales, advertencias, errores, informes, puedeAnular }: Props) {
+export default function Resultado({ carga, advertencias, errores, informes, puedeAnular }: Props) {
     const anulada = carga.estado === 'anulada';
     const [anulando, setAnulando] = useState(false);
 
@@ -57,8 +60,7 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                     {!anulada && <Pasos actual={4} />}
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="min-w-0">
-                            <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">{anulada ? 'Carga anulada' : 'Carga importada'}</p>
-                            <h2 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
+                            <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight break-all sm:text-2xl md:text-[1.6rem]">
                                 <FileSpreadsheet className="text-primary size-6 shrink-0" aria-hidden="true" />
                                 {carga.archivo}
                             </h2>
@@ -118,16 +120,17 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                     </div>
                 )}
 
-                <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Cifras columnas={3}>
                     <Cifra etiqueta={anulada ? 'Órdenes retiradas' : 'Órdenes importadas'} valor={fmt.numero(carga.ordenes)} detalle={`de ${fmt.numero(carga.filas)} filas del archivo`} />
                     <Cifra etiqueta="Jornada" valor={<span className="text-lg">{carga.fechaOperacion ? fmt.fechaMedia(carga.fechaOperacion) : '—'}</span>} detalle={carga.hoja ? `Hoja ${carga.hoja}` : undefined} />
-                    <Cifra etiqueta="Filas omitidas" valor={fmt.numero(carga.filasError)} tono={carga.filasError ? 'warning' : 'good'} detalle={carga.filasError ? 'Ver el detalle abajo' : 'Ninguna'} />
                     <Cifra
-                        etiqueta="Tiempo de proceso"
-                        valor={carga.duracionMs !== null ? `${(carga.duracionMs / 1000).toLocaleString('es-CO', { maximumFractionDigits: 1 })} s` : '—'}
-                        detalle={totales ? `Efectividad ${fmt.pct(totales.efectividad)}` : undefined}
+                        etiqueta="Filas omitidas"
+                        valor={fmt.numero(carga.filasError)}
+                        tono={carga.filasError ? 'warning' : 'good'}
+                        detalle={carga.filasError ? undefined : 'Ninguna'}
+                        enlace={carga.filasError ? { href: '#filas-error', texto: 'Ver cuáles' } : undefined}
                     />
-                </dl>
+                </Cifras>
 
                 {!anulada && (
                     <Panel titulo="Informes diarios actualizados" descripcion="Quedan en borrador hasta auditar las evidencias y cerrarlos." cuerpoClassName="px-0 pb-2">
@@ -183,7 +186,9 @@ export default function Resultado({ carga, totales, advertencias, errores, infor
                     </Panel>
                 )}
 
-                <TablaErrores errores={errores} total={errores.length} titulo="Filas que no se importaron" />
+                <div id="filas-error" className="scroll-mt-24 empty:hidden">
+                    <TablaErrores errores={errores} total={errores.length} titulo="Filas que no se importaron" />
+                </div>
                 {!anulada && <ListaAdvertencias advertencias={advertencias} />}
         </MarcoLinea>
     );

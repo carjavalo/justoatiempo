@@ -27,11 +27,11 @@ export function useFiltros<T extends Filtros>(url: string, iniciales: T) {
         else espera.current = window.setTimeout(() => visitar(nuevos), 350);
     };
 
-    const limpiar = () => {
-        const vacios = Object.fromEntries(Object.keys(valores).map((k) => [k, ''])) as T;
+    const limpiar = (conservar: (keyof T)[] = []) => {
+        const vacios = Object.fromEntries(Object.keys(valores).map((k) => [k, conservar.includes(k) ? valores[k] : ''])) as T;
         setValores(vacios);
         window.clearTimeout(espera.current);
-        router.get(url, {}, { preserveState: true, preserveScroll: true, replace: true });
+        visitar(vacios);
     };
 
     useEffect(() => () => window.clearTimeout(espera.current), []);

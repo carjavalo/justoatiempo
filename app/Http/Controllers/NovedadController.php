@@ -38,20 +38,23 @@ class NovedadController extends Controller
         $lugar = $op->lugarDe($filtros['lugar'] ?? null);
         $texto = trim($filtros['q'] ?? '');
 
-        $base = fn (): Builder => $op->filtrar(NovedadLinea::query(), 'novedades_linea')->where('linea_servicio_id', $linea->id);
-        $novedades = $base()
-            ->when($estado === null, fn ($q) => $q->where('estado', '!=', 'cerrada'))
-            ->when($estado !== null, fn ($q) => $q->where('estado', $estado))
+        // Con el lugar y la búsqueda (no el estado): con ellas se cuentan también los estados, que así cuadran con la lista
+        $filtradas = fn (): Builder => $op->filtrar(NovedadLinea::query(), 'novedades_linea')->where('linea_servicio_id', $linea->id)
             ->when($lugar, fn ($q) => $q->where('empresa_id', $lugar['empresa_id'])
                 ->when($lugar['sede_id'], fn ($s, int $id) => $s->where('sede_id', $id))
                 ->when($lugar['sucursal_id'], fn ($s, int $id) => $s->where('sucursal_id', $id)))
             ->when($texto !== '', fn ($q) => $q->where(fn ($w) => $w->where('tipo', 'like', '%'.addcslashes($texto, '%_\\').'%')
                 ->orWhere('descripcion', 'like', '%'.addcslashes($texto, '%_\\').'%')
-                ->orWhereHas('persona', fn ($p) => $p->where('name', 'like', '%'.addcslashes($texto, '%_\\').'%')->orWhere('cedula', 'like', '%'.addcslashes($texto, '%_\\').'%'))))
-            // Primero las abiertas y las graves; luego las más recientes
-            ->orderByRaw("case estado when 'abierta' then 0 when 'en_seguimiento' then 1 else 2 end")
-            ->orderByRaw("case gravedad when 'grave' then 0 when 'leve' then 1 else 2 end")
-            ->orderByDesc('fecha')->orderByDesc('id')
+                ->orWhereHas('persona', fn ($p) => $p->where('name', 'like', '%'.addcslashes($texto, '%_\\').'%')->orWhere('cedula', 'like', '%'.addcslashes($texto, '%_\\').'%'))));
+        $novedades = $filtradas()
+            ->when($estado === null, fn ($q) => $q->where('estado', '!=', 'cerrada'))
+            ->when($estado !== null, fn ($q) => $q->where('estado', $estado))
+            // Las cerradas, de la más reciente a la más antigua. Las demás, por atender: primero las graves (abiertas o en
+            // seguimiento) y, en cada gravedad, la que más lleva sin cerrar
+            ->when($estado === 'cerrada', fn ($q) => $q->orderByDesc('fecha'), fn ($q) => $q
+                ->orderByRaw("case gravedad when 'grave' then 0 when 'leve' then 1 else 2 end")
+                ->orderBy('fecha'))
+            ->orderByDesc('id')
             ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'persona:id,name,cedula', 'registradaPor:id,name', 'cerradaPor:id,name', 'acciones.registradoPor:id,name'])
             ->paginate(20)
             ->withQueryString()
@@ -75,7 +78,7 @@ class NovedadController extends Controller
                 'acciones' => $n->acciones->map(fn (AccionDesempeno $a) => ['id' => $a->id, 'tipo' => $a->tipo->value, 'texto' => $a->tipo->label(), 'fecha' => $a->fecha->toDateString(), 'descripcion' => $a->descripcion, 'registradaPor' => $a->registradoPor?->name])->values(),
             ]);
 
-        $conteo = $base()->selectRaw('estado, count(*) as total')->groupBy('estado')->pluck('total', 'estado');
+        $conteo = $filtradas()->selectRaw('estado, count(*) as total')->groupBy('estado')->pluck('total', 'estado');
 
         return Inertia::render('lineas/novedades', [
             'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre, 'icono' => $linea->icono],
@@ -178,10 +181,11 @@ class NovedadController extends Controller
 
         $datos = $request->validate([
             'estado' => ['required', Rule::in(array_keys(NovedadLinea::ESTADOS))],
-            'seguimiento' => ['nullable', 'string', 'max:2000', 'required_if:estado,cerrada'],
+            // Lo que no fue una falta (una felicitación del cliente) se cierra sin contar cómo se resolvió
+            'seguimiento' => ['nullable', 'string', 'max:2000', Rule::requiredIf(fn () => $request->input('estado') === 'cerrada' && $novedad->gravedad !== 'ninguna')],
             'accion' => ['nullable', Rule::in(TipoAccion::values())],
             'accion_descripcion' => ['nullable', 'string', 'max:500'],
-        ], ['seguimiento.required_if' => 'Para cerrarla, cuenta cómo se resolvió.', 'accion.in' => 'Elige una de las acciones de la lista.']);
+        ], ['seguimiento.required' => 'Para cerrarla, cuenta cómo se resolvió.', 'accion.in' => 'Elige una de las acciones de la lista.']);
 
         if (! empty($datos['accion'])) {
             if (! $novedad->user_id) {

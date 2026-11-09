@@ -1,6 +1,6 @@
 import { claseTd, claseTh, Tabla } from '@/components/admin/piezas';
 import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
-import { CalendarDays, Download, FileSpreadsheet } from '@/components/iconos';
+import { Download, FileSpreadsheet } from '@/components/iconos';
 import { DialogoDescarga } from '@/components/linea/dialogo-descarga';
 import { MarcoLinea } from '@/components/linea/marco-linea';
 import { NavegadorFecha } from '@/components/linea/navegador-fecha';
@@ -44,6 +44,9 @@ interface Lugar {
 interface Props {
     linea: { id: number; slug: string; nombre: string; icono: string | null };
     fecha: string;
+    /** El hoy del servidor y la jornada más reciente hasta hoy (a la que vuelve el selector de fecha). */
+    hoy: string;
+    ultima: string | null;
     anterior: string | null;
     siguiente: string | null;
     resumen: {
@@ -77,7 +80,7 @@ const claseEnlace =
  * Informe diario de una línea: por cada lugar programado, quién fue, su asistencia, la cobertura frente a lo requerido
  * y las novedades del día. Se descarga en Excel con el formato del informe de la operación.
  */
-export default function InformeLinea({ linea, fecha, anterior, siguiente, resumen, lugares }: Props) {
+export default function InformeLinea({ linea, fecha, hoy, ultima, anterior, siguiente, resumen, lugares }: Props) {
     const puede = usePuede();
     const [descargar, setDescargar] = useState(false);
     const nivel = resumen.programadas > resumen.sinRegistrar ? semaforo(resumen.cobertura) : null;
@@ -96,8 +99,10 @@ export default function InformeLinea({ linea, fecha, anterior, siguiente, resume
                         id="fecha-informe"
                         etiqueta="Jornada"
                         fecha={fecha}
+                        hoy={hoy}
                         anterior={anterior}
                         siguiente={siguiente}
+                        atajo={ultima ? { fecha: ultima, texto: ultima === hoy ? 'Ir a hoy' : 'Ir a la más reciente' } : null}
                         onIr={(f) => router.get(route('lineas.informe', linea.slug), { fecha: f }, { preserveScroll: true, preserveState: true })}
                     />
                     {puede('informes.descargar') && (
@@ -126,11 +131,6 @@ export default function InformeLinea({ linea, fecha, anterior, siguiente, resume
                 </div>
             ) : (
                 <>
-                    <p className="text-muted-foreground -mt-2 flex items-center gap-2 text-sm">
-                        <CalendarDays className="size-4" aria-hidden="true" />
-                        Operación del <strong className="text-foreground font-semibold">{fmt.fechaLarga(fecha)}</strong>
-                    </p>
-
                     <ul role="list" aria-label="Resumen de la jornada" className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Dato
                             titulo="Cobertura"

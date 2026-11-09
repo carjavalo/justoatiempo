@@ -5,7 +5,7 @@ import { usePuede } from '@/hooks/use-puede';
 import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link, router, usePage } from '@inertiajs/react';
-import { CalendarClock, ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from '@/components/iconos';
+import { ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from '@/components/iconos';
 import { type DragEvent, useRef, useState } from 'react';
 
 interface FilaCarga {
@@ -78,22 +78,6 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
 
     return (
         <MarcoLinea slug={LINEA_LOGISTICA} titulo="Cargas Drivin" seccion="cargas" pestanas>
-                {/* El título lo da la pestaña activa ("Cargas Drivin") */}
-                <p className="text-muted-foreground -mt-2 max-w-2xl text-sm">
-                    {puede('cargas.subir')
-                        ? 'Sube la preliquidación exportada de Drivin. El sistema la revisa contigo antes de importar y arma el informe diario de cada sede y sucursal.'
-                        : 'Las preliquidaciones de Drivin que se han subido, con el resultado de cada una.'}
-                </p>
-
-                {jornadaPendiente && (
-                    <div className="bg-secondary text-secondary-foreground flex items-center gap-3 rounded-xl px-4 py-3 text-sm">
-                        <CalendarClock className="size-5 shrink-0" aria-hidden="true" />
-                        <p>
-                            Falta cargar la operación del <strong className="first-letter:uppercase">{fmt.fechaLarga(jornadaPendiente)}</strong>.
-                        </p>
-                    </div>
-                )}
-
                 {/* Zona de carga (solo con permiso de subir): el input es accesible por teclado; la etiqueta es la zona visible */}
                 {puede('cargas.subir') && (
                     <div>
@@ -116,7 +100,7 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                             onDragLeave={() => setArrastrando(false)}
                             onDrop={soltar}
                             className={cn(
-                                'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors',
+                                'bg-card flex cursor-pointer flex-col items-center gap-x-5 gap-y-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors sm:flex-row sm:text-left',
                                 'peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
                                 'hover:border-primary/50 hover:bg-secondary/40',
                                 arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
@@ -126,22 +110,42 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                         >
                             {processing ? (
                                 <>
-                                    <LoaderCircle className="text-primary size-10 motion-safe:animate-spin" aria-hidden="true" />
-                                    <span className="text-base font-bold">Leyendo {nombre}…</span>
-                                    <span className="bg-muted h-1.5 w-full max-w-xs overflow-hidden rounded-full" role="progressbar" aria-label="Progreso de la subida" aria-valuenow={progreso} aria-valuemin={0} aria-valuemax={100}>
-                                        <span className="bg-primary block h-full rounded-full transition-[width]" style={{ width: `${Math.max(progreso, 5)}%` }} />
+                                    <LoaderCircle className="text-primary size-9 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+                                    <span className="flex w-full min-w-0 flex-col items-center gap-2 sm:items-start">
+                                        <span className="text-base font-bold break-all">Leyendo {nombre}…</span>
+                                        <span
+                                            className="bg-muted h-1.5 w-full max-w-xs overflow-hidden rounded-full"
+                                            role="progressbar"
+                                            aria-label="Progreso de la subida"
+                                            aria-valuenow={progreso}
+                                            aria-valuemin={0}
+                                            aria-valuemax={100}
+                                        >
+                                            <span className="bg-primary block h-full rounded-full transition-[width]" style={{ width: `${Math.max(progreso, 5)}%` }} />
+                                        </span>
                                     </span>
                                 </>
                             ) : (
                                 <>
-                                    <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
-                                        <UploadCloud className="size-7" aria-hidden="true" />
+                                    <UploadCloud className="text-primary size-9 shrink-0" aria-hidden="true" />
+                                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                        {/* Lo que falta subir, si se sabe: la jornada pendiente */}
+                                        <span className="text-base font-bold text-balance">
+                                            {jornadaPendiente ? (
+                                                <>
+                                                    Sube la preliquidación del <span className="whitespace-nowrap">{fmt.fechaLarga(jornadaPendiente)}</span>
+                                                </>
+                                            ) : (
+                                                'Sube la preliquidación de Drivin'
+                                            )}
+                                        </span>
+                                        <span id="archivo-ayuda" className="text-muted-foreground text-xs text-pretty">
+                                            Arrástrala aquí: Excel (.xlsx, .xls) o CSV exportado de Drivin, máximo 10 MB. Antes de importar la revisas con
+                                            el sistema; nada se guarda hasta que la confirmes.
+                                        </span>
                                     </span>
-                                    <span className="text-base font-bold">
-                                        Arrastra aquí la preliquidación o <span className="text-primary underline underline-offset-4">elige el archivo</span>
-                                    </span>
-                                    <span id="archivo-ayuda" className="text-muted-foreground text-xs">
-                                        Excel (.xlsx, .xls) o CSV exportado de Drivin · máximo 10 MB
+                                    <span className="border-input bg-background text-foreground inline-flex h-10 shrink-0 items-center rounded-lg border px-4 text-sm font-semibold">
+                                        Elegir el archivo
                                     </span>
                                 </>
                             )}
@@ -193,7 +197,9 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                                                 <td className="py-3 pl-5">
                                                     <Link href={`/cargas/${c.id}`} className="flex items-center gap-3 font-semibold hover:underline">
                                                         <FileSpreadsheet className="text-primary size-4 shrink-0" aria-hidden="true" />
-                                                        <span className="max-w-72 truncate">{c.archivo}</span>
+                                                        <span className="max-w-72 truncate" title={c.archivo}>
+                                                            {c.archivo}
+                                                        </span>
                                                     </Link>
                                                 </td>
                                                 <td className="px-3 py-3 whitespace-nowrap">{c.fechaOperacion ? fmt.fechaMedia(c.fechaOperacion) : '—'}</td>

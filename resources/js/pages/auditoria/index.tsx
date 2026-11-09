@@ -3,7 +3,7 @@ import { Cola, consultaFiltros, EstadoAuditoriaBadge } from '@/components/audito
 import { Evidencias } from '@/components/auditoria/evidencias';
 import { FormularioAuditoria } from '@/components/auditoria/formulario';
 import { type FiltrosAuditoria, type Jornada, type OrdenCola, type OrdenDetalle, type Resumen, type TipoNovedad } from '@/components/auditoria/tipos';
-import { ClipboardCheck, Search } from '@/components/iconos';
+import { Search } from '@/components/iconos';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { usePuede } from '@/hooks/use-puede';
 import { Selector } from '@/components/selector';
@@ -23,8 +23,9 @@ interface Props {
     tiposNovedad: TipoNovedad[];
 }
 
-const claseSelect =
-    'border-input bg-card h-9 rounded-lg border px-2.5 text-sm transition-[color,border-color,box-shadow] focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25';
+/** El campo de búsqueda como el de las demás listas (mismo alto que las listas desplegables). */
+const claseBusqueda =
+    'border-input bg-card placeholder:text-muted-foreground h-10 w-full rounded-lg border pr-3 pl-9 text-sm transition-[color,border-color,box-shadow] focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25';
 
 export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, seleccionada, siguiente, tiposNovedad }: Props) {
     const puede = usePuede();
@@ -46,7 +47,8 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
     const opcionesEstado: { valor: FiltrosAuditoria['estado']; texto: string; cuenta?: number }[] = [
         { valor: 'pendientes', texto: 'Por auditar', cuenta: resumen.pendientes },
         { valor: 'no_cumplen', texto: 'No cumplen', cuenta: resumen.noCumplen },
-        { valor: 'sin_evidencia', texto: 'Sin evidencia', cuenta: resumen.sinEvidencia },
+        // Las que no tienen archivos (por auditar o auditadas así): el mismo nombre que en la cola
+        { valor: 'sin_evidencia', texto: 'Sin archivos', cuenta: resumen.sinEvidencia },
         { valor: 'auditadas', texto: 'Auditadas' },
         { valor: 'todas', texto: 'Todas' },
     ];
@@ -55,50 +57,24 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
 
     return (
         <MarcoLinea slug={LINEA_LOGISTICA} titulo={seleccionada ? `Auditoría ${seleccionada.codigo}` : 'Auditoría POD'} seccion="auditoria" pestanas>
-            <div className="-mt-2 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                <div>
-                    {/* El título lo da la pestaña activa ("Auditoría POD") */}
-                    <p className="text-muted-foreground max-w-2xl text-sm">
-                        Revisa la prueba de entrega de cada orden aprobada: fachada, producto sellado y destapado, y remesa firmada.
-                    </p>
-                </div>
-
-                {/* Avance de la jornada */}
-                <div className="bg-card w-full max-w-md rounded-2xl border p-4 xl:w-96">
-                    <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <p className="font-semibold">
-                            {fmt.numero(resumen.auditadas)} de {fmt.numero(resumen.aprobadas)} órdenes auditadas
-                        </p>
-                        {resumen.cumplimiento !== null && <p className="text-muted-foreground text-xs">{fmt.pct(resumen.cumplimiento)} cumple</p>}
-                    </div>
-                    <div
-                        className="bg-muted mt-2 h-2 rounded-full"
-                        role="progressbar"
-                        aria-label="Avance de la auditoría de la jornada"
-                        aria-valuenow={Math.round(avance)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuetext={`${fmt.pctEntero(avance)} auditado`}
-                    >
-                        <div className="bg-primary h-full rounded-full transition-[width] duration-500" style={{ width: `${avance}%` }} />
-                    </div>
-                </div>
-            </div>
-
             {/* Filtros */}
             <div className="flex flex-wrap items-end gap-3">
                 <div className="grid gap-1">
                     <label htmlFor="filtro-jornada" className="text-muted-foreground text-xs font-semibold">
                         Jornada
                     </label>
+                    {/* Cada jornada dice cuántas le faltan; la elegida, solo su fecha (lo suyo está en los segmentos) */}
                     <Selector
                         id="filtro-jornada"
                         valor={filtros.fecha}
                         onCambio={(v) => filtrar({ fecha: v })}
-                        className="bg-card h-9 min-w-56"
+                        className="bg-card min-w-52"
                         opciones={jornadas.map((j) => ({
                             valor: j.fecha,
-                            texto: `${fmt.fechaMedia(j.fecha)}${j.pendientes > 0 ? ` · ${j.pendientes} por auditar` : ' · al día'}`,
+                            texto:
+                                j.fecha === filtros.fecha
+                                    ? fmt.fechaMedia(j.fecha)
+                                    : `${fmt.fechaMedia(j.fecha)}${j.pendientes > 0 ? ` · ${j.pendientes} por auditar` : ' · al día'}`,
                         }))}
                     />
                 </div>
@@ -110,7 +86,7 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                         id="filtro-sede"
                         valor={filtros.sede ? String(filtros.sede) : ''}
                         onCambio={(v) => filtrar({ sede: v ? Number(v) : null })}
-                        className="bg-card h-9 min-w-44"
+                        className="bg-card min-w-44"
                         opciones={[{ valor: '', texto: 'Todas' }, ...sedes.map((s) => ({ valor: String(s.id), texto: s.nombre }))]}
                     />
                 </div>
@@ -120,7 +96,7 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                     </label>
                     <div className="relative">
                         <Search
-                            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+                            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
                             aria-hidden="true"
                         />
                         <input
@@ -129,12 +105,16 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                             value={busqueda}
                             onChange={(e) => setBusqueda(e.target.value)}
                             placeholder="Código, destinatario, auxiliar o placa"
-                            className={cn(claseSelect, 'w-full pl-8')}
+                            autoComplete="off"
+                            className={claseBusqueda}
                         />
                     </div>
                 </div>
+            </div>
 
-                <div role="group" aria-label="Estado de la auditoría" className="bg-muted flex flex-wrap rounded-lg p-0.5">
+            {/* Los estados con cuántas hay (como en las demás listas) y, al lado, el avance de la jornada */}
+            <div className="-mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div role="group" aria-label="Estado de la auditoría" className="bg-muted flex w-full gap-1 overflow-x-auto rounded-lg p-1 sm:w-fit">
                     {opcionesEstado.map((o) => {
                         const activo = filtros.estado === o.valor;
                         return (
@@ -142,21 +122,44 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                                 key={o.valor}
                                 type="button"
                                 aria-pressed={activo}
-                                onClick={() => filtrar({ estado: o.valor })}
+                                onClick={() => !activo && filtrar({ estado: o.valor })}
                                 className={cn(
-                                    'focus-visible:ring-ring flex min-h-8 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
-                                    activo ? 'bg-accion text-accion-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                    'focus-visible:ring-ring flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:outline-hidden',
+                                    activo
+                                        ? 'bg-background text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.08)]'
+                                        : 'text-muted-foreground hover:text-foreground',
                                 )}
                             >
                                 {o.texto}
                                 {o.cuenta !== undefined && (
-                                    <span className={cn('tabular rounded-full px-1.5 text-[0.68rem]', activo ? 'bg-black/20' : 'bg-card')}>
-                                        {fmt.numero(o.cuenta)}
-                                    </span>
+                                    <>
+                                        {' '}
+                                        <span className={cn('tabular-nums', activo ? 'text-foreground' : 'text-muted-foreground')}>{fmt.numero(o.cuenta)}</span>
+                                    </>
                                 )}
                             </button>
                         );
                     })}
+                </div>
+                <div className="flex min-w-0 items-center gap-3 text-sm lg:w-80">
+                    <p className="shrink-0">
+                        <span className="font-semibold">
+                            {fmt.numero(resumen.auditadas)} de {fmt.numero(resumen.aprobadas)}
+                        </span>{' '}
+                        auditadas
+                        {resumen.cumplimiento !== null && <span className="text-muted-foreground"> · {fmt.pct(resumen.cumplimiento)} cumple</span>}
+                    </p>
+                    <div
+                        className="bg-foreground/10 h-2 min-w-16 flex-1 overflow-hidden rounded-full"
+                        role="progressbar"
+                        aria-label="Avance de la auditoría de la jornada"
+                        aria-valuenow={Math.round(avance)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuetext={`${fmt.pctEntero(avance)} auditado`}
+                    >
+                        <div className="bg-primary h-full rounded-full transition-[width] duration-500" style={{ width: `${avance}%` }} />
+                    </div>
                 </div>
             </div>
 
@@ -173,14 +176,11 @@ export default function Auditoria({ filtros, jornadas, sedes, resumen, ordenes, 
                     {seleccionada ? (
                         <Detalle orden={seleccionada} tiposNovedad={tiposNovedad} siguiente={siguiente} filtros={filtros} />
                     ) : (
-                        <div className="bg-card flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
-                            <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
-                                <ClipboardCheck className="size-7" aria-hidden="true" />
-                            </span>
-                            <h2 className="mt-4 text-lg font-bold">
+                        <div className="bg-card rounded-2xl border px-6 py-8">
+                            <h2 className="text-lg font-bold text-balance">
                                 {resumen.aprobadas ? 'No hay órdenes con este filtro' : 'No hay órdenes aprobadas en esta jornada'}
                             </h2>
-                            <p className="text-muted-foreground mt-1 max-w-md text-sm">
+                            <p className="text-muted-foreground mt-1 max-w-prose text-sm text-pretty">
                                 {resumen.aprobadas && filtros.estado === 'pendientes'
                                     ? 'Todas las entregas de esta jornada ya están auditadas.'
                                     : 'Cambia la jornada o el filtro para ver otras órdenes.'}
@@ -227,15 +227,10 @@ function Detalle({
         <article aria-labelledby="titulo-orden" className="bg-card rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
             <header className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
                 <div className="min-w-0">
-                    <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">Orden</p>
                     {/* Destino del foco al pasar de una orden a otra (ver app.tsx) */}
-                    <h2
-                        id="titulo-orden"
-                        tabIndex={-1}
-                        data-foco-navegacion
-                        className="mt-0.5 scroll-mt-24 font-mono text-xl font-bold tracking-tight outline-none"
-                    >
-                        {orden.codigo}
+                    <h2 id="titulo-orden" tabIndex={-1} data-foco-navegacion className="scroll-mt-24 text-xl font-bold tracking-tight outline-none">
+                        <span className="text-muted-foreground text-base font-semibold">Orden </span>
+                        <span className="font-mono">{orden.codigo}</span>
                     </h2>
                     {orden.ruta && <p className="text-muted-foreground mt-0.5 text-xs">{orden.ruta}</p>}
                 </div>

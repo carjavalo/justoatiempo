@@ -57,14 +57,16 @@ export function CargaLote({ fecha }: { fecha: string }) {
                     subir(e.dataTransfer.files);
                 }}
                 className={cn(
-                    'bg-card hover:border-primary/50 flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border-2 border-dashed px-4 py-3 transition-colors peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
+                    'bg-card hover:border-primary/50 flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border-2 border-dashed px-4 py-2.5 transition-colors peer-focus-visible:border-ring peer-focus-visible:border-solid peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/25',
                     arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
                     avance !== null && 'pointer-events-none',
                 )}
             >
-                <span className="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-xl">
-                    {avance ? <LoaderCircle className="size-5 motion-safe:animate-spin" aria-hidden="true" /> : <FolderUp className="size-5" aria-hidden="true" />}
-                </span>
+                {avance ? (
+                    <LoaderCircle className="text-primary size-5 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+                ) : (
+                    <FolderUp className="text-primary size-5 shrink-0" aria-hidden="true" />
+                )}
                 <span className="min-w-0 flex-1">
                     <span id="titulo-lote" className="block text-sm font-bold">
                         {avance ? `Asignando archivos: ${avance.enviados} de ${avance.total}` : 'Carga masiva de evidencias'}
@@ -74,8 +76,9 @@ export function CargaLote({ fecha }: { fecha: string }) {
                             <span className="bg-primary block h-full rounded-full transition-[width]" style={{ width: `${Math.max(4, (avance.enviados / avance.total) * 100)}%` }} />
                         </span>
                     ) : (
-                        <span id="ayuda-lote" className="text-muted-foreground block text-xs">
-                            Arrastra aquí los PDF de prueba de entrega de Drivin o fotos: cada archivo se asigna a su orden por el código del nombre (p. ej. POD_PDVT000228311.pdf).
+                        <span id="ayuda-lote" className="text-muted-foreground block text-xs text-pretty">
+                            Arrastra aquí los PDF de Drivin o fotos: cada uno va a su orden por el código del nombre
+                            <span className="hidden sm:inline"> (p. ej. POD_PDVT000228311.pdf)</span>.
                         </span>
                     )}
                 </span>

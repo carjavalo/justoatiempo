@@ -79,6 +79,12 @@ class OperacionLineasTest extends TestCase
 
         $this->get("/lineas/aseo-general/programacion?fecha={$hoy}")->assertInertia(fn (Assert $p) => $p
             ->component('lineas/programacion')
+            // El selector de fecha nombra el día frente al hoy del servidor
+            ->where('hoy', $hoy)
+            // Las cuentas del día con las reglas del tablero y el inicio: un lugar, con menos personas de las requeridas
+            ->where('resumen.lugares', 1)
+            ->where('resumen.incompletos', 1)
+            ->where('resumen.necesarias', 3)
             ->where('resumen.requeridas', 3)
             ->where('resumen.programadas', 2)
             ->where('resumen.presentes', 2)
@@ -205,6 +211,32 @@ class OperacionLineasTest extends TestCase
             ->where('novedades.data.0.acciones.0.tipo', 'retroalimentacion'));
     }
 
+    public function test_las_novedades_sin_cerrar_van_por_atender_y_lo_que_no_fue_falta_se_cierra_sin_texto(): void
+    {
+        $novedad = fn (array $d) => NovedadLinea::create(['linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'descripcion' => 'x', ...$d]);
+        $felicitacion = $novedad(['fecha' => today(), 'tipo' => 'Felicitación del cliente', 'gravedad' => 'ninguna', 'estado' => 'abierta']);
+        $novedad(['fecha' => today()->subDays(4), 'tipo' => 'Uniforme o presentación', 'gravedad' => 'leve', 'estado' => 'abierta']);
+        $novedad(['fecha' => today()->subDay(), 'tipo' => 'Accidente o incidente', 'gravedad' => 'grave', 'estado' => 'en_seguimiento']);
+        $novedad(['fecha' => today()->subDays(3), 'tipo' => 'Inasistencia', 'gravedad' => 'grave', 'estado' => 'abierta', 'user_id' => $this->luis->id, 'sede_id' => $this->planta->id]);
+
+        // Primero las graves, estén abiertas o en seguimiento; en cada gravedad, la que más lleva sin cerrar
+        $this->actingAs($this->coordinador)->get('/lineas/aseo-general/novedades')->assertInertia(fn (Assert $p) => $p
+            ->where('novedades.data', fn ($d) => collect($d)->pluck('tipo')->all() === ['Inasistencia', 'Accidente o incidente', 'Uniforme o presentación', 'Felicitación del cliente']));
+
+        // Los conteos de cada estado van con la búsqueda y el lugar elegidos (cuadran con la lista)
+        $this->get('/lineas/aseo-general/novedades?q=Luis')->assertInertia(fn (Assert $p) => $p
+            ->has('novedades.data', 1)
+            ->where('conteo', ['abierta' => 1, 'en_seguimiento' => 0, 'cerrada' => 0]));
+        $this->get('/lineas/aseo-general/novedades?lugar='.$this->clave($this->planta))->assertInertia(fn (Assert $p) => $p
+            ->where('conteo.abierta', 1));
+
+        // Una felicitación se cierra sin contar cómo se resolvió; una falta, no
+        $this->patch("/novedades/{$felicitacion->id}", ['estado' => 'cerrada'])->assertSessionHasNoErrors();
+        $this->assertSame('cerrada', $felicitacion->fresh()->estado);
+        $leve = NovedadLinea::where('gravedad', 'leve')->sole();
+        $this->patch("/novedades/{$leve->id}", ['estado' => 'cerrada'])->assertSessionHasErrors(['seguimiento' => 'Para cerrarla, cuenta cómo se resolvió.']);
+    }
+
     public function test_el_informe_diario_resume_la_jornada_y_se_descarga_en_excel(): void
     {
         $programacion = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 2, 'observaciones' => 'Lavado de tanques']);
@@ -215,6 +247,9 @@ class OperacionLineasTest extends TestCase
         $this->actingAs($this->coordinador)->get('/lineas/aseo-general/informe')->assertInertia(fn (Assert $p) => $p
             ->component('lineas/informe')
             ->where('fecha', today()->toDateString())
+            // La jornada más reciente (a la que vuelve el selector de fecha) y el hoy del servidor
+            ->where('ultima', today()->toDateString())
+            ->where('hoy', today()->toDateString())
             ->where('resumen.cobertura', 50)
             ->where('resumen.faltas', 1)
             ->where('resumen.novedades', 1)

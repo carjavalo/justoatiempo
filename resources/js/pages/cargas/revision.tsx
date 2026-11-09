@@ -1,4 +1,4 @@
-import { Cifra, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila } from '@/components/cargas/piezas';
+import { Cifra, Cifras, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila } from '@/components/cargas/piezas';
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -108,12 +108,11 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                 <header className="flex flex-col gap-3">
                     <Pasos actual={2} />
                     <div>
-                        <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">Revisión de la preliquidación</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-2xl font-extrabold tracking-tight break-all md:text-[1.6rem]">
+                        <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight break-all sm:text-2xl md:text-[1.6rem]">
                             <FileSpreadsheet className="text-primary size-6 shrink-0" aria-hidden="true" />
                             {carga.archivo}
                         </h2>
-                        <p className="text-muted-foreground mt-1 text-sm">
+                        <p className="text-muted-foreground mt-1 text-sm text-pretty">
                             Nada se ha guardado todavía. Revisa lo que el sistema entendió del archivo y confirma la importación.
                         </p>
                     </div>
@@ -132,6 +131,34 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                                 : `${analisis.totales.ordenes} órdenes válidas, ${analisis.filasConError} filas con error.`}
                         </p>
                         <Resumen analisis={analisis} />
+
+                        {/* Si no queda ninguna orden por importar, lo primero es por qué y dónde se arregla */}
+                        {analisis.totales.ordenes === 0 && analisis.columnasFaltantes.length === 0 && (
+                            <div role="alert" className="bg-critical-soft text-critical flex items-start gap-3 rounded-xl p-4 text-sm">
+                                <XCircle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
+                                <p className="text-pretty">
+                                    <strong>Aún no se puede importar.</strong>{' '}
+                                    {analisis.ordenesFuera > 0 ? (
+                                        <>
+                                            Todas las órdenes válidas son de personas sin asignación en su operación: asígnalas o márcalas para incluirlas
+                                            en{' '}
+                                            <a href="#personal-fuera" className="font-semibold underline underline-offset-4">
+                                                Personal fuera de esta operación
+                                            </a>
+                                            .
+                                        </>
+                                    ) : (
+                                        <>
+                                            Ninguna fila del archivo es una orden válida: revisa{' '}
+                                            <a href="#filas-error" className="font-semibold underline underline-offset-4">
+                                                las filas que no se importan
+                                            </a>
+                                            .
+                                        </>
+                                    )}
+                                </p>
+                            </div>
+                        )}
 
                         {analisis.columnasFaltantes.length > 0 && (
                             <div role="alert" className="bg-critical-soft text-critical flex items-start gap-3 rounded-xl p-4 text-sm">
@@ -158,8 +185,13 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
                         </div>
 
                         <VistaPrevia grupos={analisis.grupos} totales={analisis.totales} />
-                        <PersonalFuera cargaId={carga.id} personas={analisis.fueraDeOperacion} disabled={guardando || soloConsulta} onCambio={(incluir) => ajustar({ incluir })} />
-                        <TablaErrores errores={analisis.errores} total={analisis.totalErrores} />
+                        {/* Destinos de los enlaces de las cifras y del aviso */}
+                        <div id="personal-fuera" className="scroll-mt-24 empty:hidden">
+                            <PersonalFuera cargaId={carga.id} personas={analisis.fueraDeOperacion} disabled={guardando || soloConsulta} onCambio={(incluir) => ajustar({ incluir })} />
+                        </div>
+                        <div id="filas-error" className="scroll-mt-24 empty:hidden">
+                            <TablaErrores errores={analisis.errores} total={analisis.totalErrores} />
+                        </div>
                         <ListaAdvertencias advertencias={analisis.advertencias} />
                     </div>
                 )}
@@ -171,26 +203,30 @@ export default function Revision({ carga, errorLectura, lectura, campos, analisi
 
 function Resumen({ analisis }: { analisis: Analisis }) {
     const fechas = Object.keys(analisis.fechas);
+    const personasFuera = analisis.fueraDeOperacion.filter((p) => !p.incluida).length;
     return (
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Cifras>
             <Cifra etiqueta="Órdenes a importar" valor={fmt.numero(analisis.totales.ordenes)} detalle={`de ${fmt.numero(analisis.filasLeidas)} filas leídas`} />
+            <Cifra
+                etiqueta="Órdenes por fuera"
+                valor={fmt.numero(analisis.ordenesFuera)}
+                tono={analisis.ordenesFuera ? 'warning' : 'good'}
+                detalle={analisis.ordenesFuera ? `de ${personasFuera === 1 ? '1 persona' : `${fmt.numero(personasFuera)} personas`} sin asignación` : 'Nadie de otra operación'}
+                enlace={analisis.ordenesFuera ? { href: '#personal-fuera', texto: 'Ver quiénes' } : undefined}
+            />
+            <Cifra
+                etiqueta="Filas con error"
+                valor={fmt.numero(analisis.filasConError)}
+                tono={analisis.filasConError ? 'warning' : 'good'}
+                detalle={analisis.filasConError ? 'No se importan' : 'Todas son válidas'}
+                enlace={analisis.filasConError ? { href: '#filas-error', texto: 'Ver cuáles' } : undefined}
+            />
             <Cifra
                 etiqueta="Jornada"
                 valor={<span className="text-lg first-letter:uppercase">{fechas.length === 1 ? fmt.fechaMedia(fechas[0]) : fechas.length > 1 ? `${fechas.length} fechas` : '—'}</span>}
-                detalle={fechas.length > 1 ? fechas.map(fmt.fechaCorta).join(' · ') : 'Fecha de operación'}
+                detalle={fechas.length > 1 ? fechas.map(fmt.fechaCorta).join(' · ') : fechas.length ? 'Fecha de operación' : 'Sin órdenes válidas'}
             />
-            <Cifra
-                etiqueta="Filas que se omiten"
-                valor={fmt.numero(analisis.filasConError)}
-                detalle={analisis.filasConError ? 'Ver el detalle abajo' : 'Todas las filas son válidas'}
-                tono={analisis.filasConError ? 'critical' : 'good'}
-            />
-            <Cifra
-                etiqueta="Efectividad prevista"
-                valor={analisis.totales.ordenes ? fmt.pct(analisis.totales.efectividad) : '—'}
-                detalle={`${fmt.numero(analisis.totales.realizadas)} de ${fmt.numero(analisis.totales.asignadas)} entregas realizadas`}
-            />
-        </dl>
+        </Cifras>
     );
 }
 
@@ -500,7 +536,7 @@ function PersonalFuera({ cargaId, personas, disabled, onCambio }: { cargaId: num
     return (
         <Panel
             titulo="Personal fuera de esta operación"
-            descripcion="No tienen una asignación en la empresa o la sede de sus órdenes: sus órdenes no entran al informe. Si alguien sí trabaja allí, asígnalo (queda para las próximas cargas) o márcalo para incluirlo solo en esta."
+            descripcion="No tienen una asignación en la empresa o la sede de sus órdenes: sus órdenes no entran al informe. Si alguien sí trabaja allí, asígnalo (queda para las próximas cargas) o márcalo para incluirlo solo en esta. Quien no está en Usuarios se registra allí primero; esta revisión te espera."
             cuerpoClassName="px-0 pb-2"
         >
             <div className="focus-visible:ring-ring relative overflow-x-auto focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset" tabIndex={0} role="region" aria-label="Personal fuera de esta operación, desplazable">
@@ -553,11 +589,6 @@ function PersonalFuera({ cargaId, personas, disabled, onCambio }: { cargaId: num
                                             Asignar<span className="sr-only"> a {p.nombre}</span>
                                         </Link>
                                     )}
-                                    {!p.usuarioId && puede('usuarios.crear') && (
-                                        <Link href={route('usuarios.index')} className="text-primary focus-visible:ring-ring rounded-sm font-semibold hover:underline focus-visible:ring-2 focus-visible:outline-hidden">
-                                            Ir a Usuarios<span className="sr-only"> para registrar a {p.nombre}</span>
-                                        </Link>
-                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -585,7 +616,7 @@ function BarraAcciones({ cargaId, analisis, guardando }: { cargaId: number; anal
     return (
         <div className="bg-card/95 sticky bottom-0 z-10 mt-auto border-t px-4 py-3 backdrop-blur-md md:rounded-b-xl md:px-8">
             <div className={cn('mx-auto flex flex-wrap items-center justify-between gap-3', ANCHO_PLATAFORMA)}>
-                <p className="text-muted-foreground text-sm" aria-live="polite">
+                <p className="text-muted-foreground text-sm text-pretty" aria-live="polite">
                     {analisis ? (
                         <>
                             Se importarán <strong className="text-foreground">{fmt.numero(ordenes)}</strong> {ordenes === 1 ? 'orden' : 'órdenes'}

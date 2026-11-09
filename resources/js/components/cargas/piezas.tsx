@@ -38,10 +38,39 @@ export function EstadoCargaBadge({ estado, texto }: { estado: EstadoCarga; texto
     );
 }
 
-/** Cifra resumida: valor grande + etiqueta. */
-export function Cifra({ etiqueta, valor, detalle, tono }: { etiqueta: string; valor: ReactNode; detalle?: ReactNode; tono?: 'critical' | 'warning' | 'good' }) {
+/**
+ * Las cifras de una carga en una sola franja, como el día en el tablero: celdas separadas por una línea (el fondo del
+ * borde que asoma entre ellas), no tarjetas sueltas. Con tres, en el teléfono van una debajo de otra (sin celda vacía).
+ */
+export function Cifras({ children, columnas = 4 }: { children: ReactNode; columnas?: 3 | 4 }) {
     return (
-        <div className="bg-card rounded-2xl border p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <dl
+            className={cn(
+                'bg-border grid gap-px overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-white/10',
+                columnas === 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3',
+            )}
+        >
+            {children}
+        </dl>
+    );
+}
+
+/** Una cifra de la franja: valor grande + etiqueta; `enlace` lleva a la sección donde se ve el detalle. */
+export function Cifra({
+    etiqueta,
+    valor,
+    detalle,
+    tono,
+    enlace,
+}: {
+    etiqueta: string;
+    valor: ReactNode;
+    detalle?: ReactNode;
+    tono?: 'critical' | 'warning' | 'good';
+    enlace?: { href: string; texto: string };
+}) {
+    return (
+        <div className="bg-card p-4">
             <dt className="text-muted-foreground text-xs font-medium">{etiqueta}</dt>
             <dd
                 className={cn(
@@ -53,7 +82,20 @@ export function Cifra({ etiqueta, valor, detalle, tono }: { etiqueta: string; va
             >
                 {valor}
             </dd>
-            {detalle && <dd className="text-muted-foreground mt-0.5 text-xs">{detalle}</dd>}
+            {(detalle || enlace) && (
+                <dd className="text-muted-foreground mt-0.5 text-xs">
+                    {detalle}
+                    {detalle && enlace && ' · '}
+                    {enlace && (
+                        <a
+                            href={enlace.href}
+                            className="text-primary focus-visible:ring-ring rounded-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                        >
+                            {enlace.texto}
+                        </a>
+                    )}
+                </dd>
+            )}
         </div>
     );
 }

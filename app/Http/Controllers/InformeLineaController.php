@@ -37,7 +37,8 @@ class InformeLineaController extends Controller
         // Sin fecha: la última jornada con programación o novedades (hasta hoy)
         $fechas = fn () => $op->filtrar(Programacion::query(), 'programaciones')->where('linea_servicio_id', $linea->id)->select('fecha')
             ->union($op->filtrar(NovedadLinea::query(), 'novedades_linea')->where('linea_servicio_id', $linea->id)->select('fecha'));
-        $fecha = Carbon::parse($pedida ?? (DB::query()->fromSub($fechas(), 'f')->where('fecha', '<=', today()->toDateString())->max('fecha') ?? today()));
+        $ultima = DB::query()->fromSub($fechas(), 'f')->where('fecha', '<=', today()->toDateString())->max('fecha');
+        $fecha = Carbon::parse($pedida ?? $ultima ?? today());
         $anterior = DB::query()->fromSub($fechas(), 'f')->where('fecha', '<', $fecha->toDateString())->max('fecha');
         $siguiente = DB::query()->fromSub($fechas(), 'f')->where('fecha', '>', $fecha->toDateString())->min('fecha');
 
@@ -49,6 +50,9 @@ class InformeLineaController extends Controller
         return Inertia::render('lineas/informe', [
             'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre, 'icono' => $linea->icono],
             'fecha' => $fecha->toDateString(),
+            // Para el selector de fecha: el hoy del servidor y la jornada más reciente (a la que vuelve)
+            'hoy' => today()->toDateString(),
+            'ultima' => $ultima ? Carbon::parse($ultima)->toDateString() : null,
             'anterior' => $anterior ? Carbon::parse($anterior)->toDateString() : null,
             'siguiente' => $siguiente ? Carbon::parse($siguiente)->toDateString() : null,
             'resumen' => [

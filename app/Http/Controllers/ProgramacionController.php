@@ -89,6 +89,7 @@ class ProgramacionController extends Controller
 
         $todas = $filas->flatMap(fn ($f) => $f['personas']);
         $registradas = $todas->whereNotNull('asistencia');
+        $lugares = $filas->map(fn ($f) => ['requeridas' => $f['requeridas'], 'programadas' => $f['personas']->count(), 'presentes' => $f['presentes']]);
 
         // Para copiar: el último día anterior con programación en lo que ve
         $anterior = $op->filtrar(Programacion::query(), 'programaciones')->where('linea_servicio_id', $linea->id)
@@ -97,19 +98,25 @@ class ProgramacionController extends Controller
         return Inertia::render('lineas/programacion', [
             'linea' => ['id' => $linea->id, 'slug' => $linea->slug, 'nombre' => $linea->nombre, 'icono' => $linea->icono, 'logistica' => $linea->esLogistica()],
             'fecha' => $fecha->toDateString(),
+            // El hoy del servidor (el de los datos): el selector de fecha dice "Hoy" y ofrece volver a él
+            'hoy' => today()->toDateString(),
             'esFutura' => $fecha->isAfter(today()),
             'filtros' => ['lugar' => $lugar['clave'] ?? ''],
             'lugares' => $op->lugares()->map(fn ($l) => ['valor' => $l['clave'], 'texto' => $l['nombre'], 'detalle' => $l['detalle']])->values(),
             'programaciones' => $filas,
+            // Con las mismas cuentas del día en el tablero y el inicio (JornadaLinea::resumenDia), sobre lo que se ve
             'resumen' => [
+                'lugares' => $lugares->count(),
+                'incompletos' => $lugares->filter(fn ($l) => $l['programadas'] < $l['requeridas'])->count(),
                 'requeridas' => $filas->sum('requeridas'),
+                'necesarias' => $lugares->sum(fn ($l) => $l['requeridas'] ?: $l['programadas']),
                 'programadas' => $todas->count(),
                 'presentes' => $registradas->filter(fn ($a) => EstadoAsistencia::from($a['asistencia'])->presente())->count(),
                 'tarde' => $registradas->where('asistencia', EstadoAsistencia::Tarde->value)->count(),
                 'faltas' => $registradas->where('asistencia', EstadoAsistencia::Falta->value)->count(),
                 'justificadas' => $registradas->filter(fn ($a) => EstadoAsistencia::from($a['asistencia'])->justificada())->count(),
                 'sinRegistrar' => $todas->whereNull('asistencia')->count(),
-                'cobertura' => JornadaLinea::cobertura($filas->map(fn ($f) => ['requeridas' => $f['requeridas'], 'programadas' => $f['personas']->count(), 'presentes' => $f['presentes']])),
+                'cobertura' => JornadaLinea::cobertura($lugares),
             ],
             'copiarDe' => $anterior ? Carbon::parse($anterior)->toDateString() : null,
             'estados' => EstadoAsistencia::opciones(),

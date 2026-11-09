@@ -185,8 +185,10 @@ export function MarcoLinea({
             <Head title={titulo} />
 
             <div className={cn('mx-auto flex w-full flex-1 flex-col gap-6 p-4 pt-3 md:p-6 md:pt-3 lg:p-8 lg:pt-4', ANCHO_PLATAFORMA, className)}>
-                <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div className="flex min-w-0 items-center gap-4">
+                {/* Nombre, pestañas y los controles de la página, en ese orden (también para el teclado). En el teléfono van
+                    uno bajo otro: las pestañas, enseguida del nombre; desde 1024 px, los controles suben a la derecha del nombre */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-x-6 lg:gap-y-5">
+                    <header className="flex min-w-0 items-center gap-4 lg:col-start-1 lg:row-start-1">
                         <span className="bg-brand-navy-deep flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-md">
                             <Icono className="text-brand-coral-on-dark size-8" aria-hidden="true" />
                         </span>
@@ -194,45 +196,47 @@ export function MarcoLinea({
                             <h1 className="text-2xl leading-tight font-extrabold tracking-tight text-balance md:text-[1.75rem]">{nombreLinea}</h1>
                             {bienvenida && <p className="text-muted-foreground mt-0.5 text-sm">{bienvenida}</p>}
                         </div>
-                    </div>
-                    {acciones}
-                </header>
+                    </header>
 
-                {verPestanas && (
-                    <nav aria-label={`Herramientas de ${nombreLinea}`} className="-mt-1 border-b">
-                        {/* Si no caben (en el teléfono), el borde que sigue se desvanece: hay más pestañas al desplazar */}
-                        <ul
-                            ref={desborde.ref}
-                            role="list"
-                            className="-mb-px flex gap-1 overflow-x-auto [mask-image:var(--desvanecido,none)] focus-within:[mask-image:none]"
-                            style={desborde.estilo}
-                        >
-                            {pestanasVisibles.map(({ id, texto, icono: IconoPestana, href }) => {
-                                const activa = id === seccion;
-                                return (
-                                    <li key={id} className="shrink-0">
-                                        <Link
-                                            href={href(slug)}
-                                            prefetch
-                                            aria-current={activa ? 'page' : undefined}
-                                            className={cn(
-                                                'focus-visible:ring-ring flex items-center gap-2 rounded-t-md border-b-2 px-3 pt-1 pb-3 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset',
-                                                activa
-                                                    ? 'border-brand-coral-ink text-foreground'
-                                                    : 'text-muted-foreground hover:text-foreground border-transparent',
-                                            )}
-                                        >
-                                            <IconoPestana className={cn('size-4', activa && 'text-brand-coral-ink')} aria-hidden="true" />
-                                            {texto}
-                                        </Link>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </nav>
-                )}
-                {/* La pestaña activa ya se ve; aquí queda como encabezado para quien navega por encabezados */}
-                {verPestanas && pestana && seccion !== 'tablero' && <h2 className="sr-only">{pestana.texto}</h2>}
+                    {verPestanas && (
+                        <nav aria-label={`Herramientas de ${nombreLinea}`} className="border-b lg:col-span-2 lg:row-start-2">
+                            {/* Si no caben (en el teléfono), el borde que sigue se desvanece: hay más pestañas al desplazar */}
+                            <ul
+                                ref={desborde.ref}
+                                role="list"
+                                className="-mb-px flex gap-1 overflow-x-auto [mask-image:var(--desvanecido,none)] focus-within:[mask-image:none]"
+                                style={desborde.estilo}
+                            >
+                                {pestanasVisibles.map(({ id, texto, icono: IconoPestana, href }) => {
+                                    const activa = id === seccion;
+                                    return (
+                                        <li key={id} className="shrink-0">
+                                            <Link
+                                                href={href(slug)}
+                                                prefetch
+                                                aria-current={activa ? 'page' : undefined}
+                                                className={cn(
+                                                    'focus-visible:ring-ring flex items-center gap-2 rounded-t-md border-b-2 px-3 pt-1 pb-3 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset',
+                                                    activa
+                                                        ? 'border-brand-coral-ink text-foreground'
+                                                        : 'text-muted-foreground hover:text-foreground border-transparent',
+                                                )}
+                                            >
+                                                <IconoPestana className={cn('size-4', activa && 'text-brand-coral-ink')} aria-hidden="true" />
+                                                {texto}
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </nav>
+                    )}
+                    {/* La pestaña activa ya se ve; aquí queda como encabezado para quien navega por encabezados (sus
+                        controles y su contenido van debajo) */}
+                    {verPestanas && pestana && seccion !== 'tablero' && <h2 className="sr-only">{pestana.texto}</h2>}
+
+                    {acciones && <div className="min-w-0 lg:col-start-2 lg:row-start-1">{acciones}</div>}
+                </div>
 
                 {children}
             </div>
@@ -255,6 +259,15 @@ function useDesborde(activo: boolean) {
             const der = lista.scrollLeft + lista.clientWidth < lista.scrollWidth - 1;
             setLados((antes) => (antes.izq === izq && antes.der === der ? antes : { izq, der }));
         };
+        // En el teléfono, la pestaña activa se ve aunque esté al final (sin mover la página: solo la lista). Se mide con la
+        // letra ya cargada: antes, los textos son más angostos
+        const mostrarActiva = () => {
+            const activa = lista.querySelector<HTMLElement>('[aria-current="page"]');
+            const fuera = activa ? activa.getBoundingClientRect().right - lista.getBoundingClientRect().right : 0;
+            if (fuera > 0) lista.scrollLeft += fuera + 24;
+        };
+        mostrarActiva();
+        document.fonts?.ready.then(mostrarActiva);
         medir();
         lista.addEventListener('scroll', medir, { passive: true });
         const observador = new ResizeObserver(medir);

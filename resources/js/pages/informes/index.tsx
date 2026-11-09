@@ -4,7 +4,6 @@ import { claseTd, claseTh, Tabla } from '@/components/admin/piezas';
 import { DialogoFormulario } from '@/components/dialogo-formulario';
 import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import {
-    CalendarDays,
     CheckCircle2,
     ClipboardCheck,
     Download,
@@ -99,6 +98,9 @@ interface Resumen {
 
 interface Props {
     fecha: string | null;
+    /** El hoy del servidor y la jornada más reciente con informe (a la que vuelve el selector de fecha). */
+    hoy: string;
+    ultima: string | null;
     anterior: string | null;
     siguiente: string | null;
     sede: number | null;
@@ -120,7 +122,7 @@ interface Props {
 
 const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
 
-export default function Informes({ fecha, anterior, siguiente, sede, sedes, informes, resumen, porCiudad, tiposAccion, umbrales }: Props) {
+export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede, sedes, informes, resumen, porCiudad, tiposAccion, umbrales }: Props) {
     const puede = usePuede();
     const [descargar, setDescargar] = useState(false);
     const [accion, setAccion] = useState<{ informe: Informe; fila: Fila } | null>(null);
@@ -149,8 +151,10 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                         id="fecha-informe"
                         etiqueta="Jornada"
                         fecha={fecha}
+                        hoy={hoy}
                         anterior={anterior}
                         siguiente={siguiente}
+                        atajo={ultima ? { fecha: ultima, texto: ultima === hoy ? 'Ir a hoy' : 'Ir a la más reciente' } : null}
                         onIr={(f) => ir({ fecha: f })}
                     />
                     {sedes.length > 1 && (
@@ -198,11 +202,6 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                 </div>
             ) : (
                 <>
-                    <p className="text-muted-foreground -mt-2 flex items-center gap-2 text-sm">
-                        <CalendarDays className="size-4" aria-hidden="true" />
-                        Operación del <strong className="text-foreground font-semibold">{fmt.fechaLarga(fecha)}</strong>
-                    </p>
-
                     {/* Como la hoja "Dashboard Gerencial" */}
                     <ul role="list" aria-label="Resumen de la jornada" className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Dato
