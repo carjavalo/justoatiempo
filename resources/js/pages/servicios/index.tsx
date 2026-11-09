@@ -1,8 +1,8 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
-import { claseTd, claseTh, contenedorModulo, ConteoEnlace, EncabezadoModulo, EstadoBadge, Tabla } from '@/components/admin/piezas';
-import { CalendarRange, LayoutGrid, Plus } from '@/components/iconos';
+import { claseTd, claseTh, contenedorModulo, ConteoEnlace, DatosBloque, EncabezadoModulo, EstadoBadge, Tabla } from '@/components/admin/piezas';
+import { Plus } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,6 @@ interface Props {
 const VACIO = { nombre: '', descripcion: '', icono: '' };
 const ORDEN_CAMPOS = Object.keys(VACIO);
 const MAX_DESCRIPCION = 300;
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
 const claseTextarea =
     'border-input bg-background w-full rounded-lg border px-3 py-2 text-base leading-relaxed transition-[color,border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/25 focus-visible:ring-[3px] focus-visible:outline-hidden aria-invalid:border-critical aria-invalid:focus-visible:border-critical aria-invalid:focus-visible:ring-critical/25 md:text-sm';
@@ -69,7 +68,60 @@ export default function Servicios({ lineas }: Props) {
         else form.post(route('servicios.store'), opciones);
     };
 
-    const activas = lineas.filter((l) => l.activa).length;
+    // Lo de cada línea: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). Lo que tienen todas se dice una
+    // vez arriba; aquí solo lo que distingue: las herramientas de Drivin y si está inactiva
+    const lineaDe = (l: FilaLinea) => {
+        const Icono = iconoLinea(l);
+        return (
+            <div className="flex items-start gap-3">
+                <span
+                    className={cn(
+                        'flex size-10 shrink-0 items-center justify-center rounded-xl',
+                        l.activa ? 'bg-secondary text-primary' : 'bg-muted',
+                    )}
+                >
+                    <Icono className="size-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                    <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                        <span className="break-words">{l.nombre}</span>
+                        {l.drivin && (
+                            <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
+                                Con Drivin<span className="sr-only">: cargas y auditoría POD</span>
+                            </span>
+                        )}
+                        {!l.activa && <EstadoBadge activo={false} femenino />}
+                    </p>
+                    {l.descripcion && <p className="text-muted-foreground mt-0.5 max-w-prose text-xs leading-relaxed text-pretty">{l.descripcion}</p>}
+                </div>
+            </div>
+        );
+    };
+    const empresasDe = (l: FilaLinea) => <ConteoEnlace n={l.empresas} uno="empresa" varios="empresas" ninguno="Ninguna" de={l.nombre} />;
+    const personasDe = (l: FilaLinea) => (
+        <ConteoEnlace
+            n={l.personas}
+            uno="persona"
+            varios="personas"
+            ninguno="Nadie"
+            de={l.nombre}
+            href={puede('asignaciones.ver') ? route('asignaciones.index', { linea: l.id, estado: 'vigentes' }) : undefined}
+        />
+    );
+    // Sin enlaces: la línea ya está en el menú lateral y sus asignaciones, en el número de personal
+    const accionesDe = (l: FilaLinea) => (
+        <AccionesFila
+            nombre={l.nombre}
+            activo={l.activa}
+            // Logística no se desactiva: de ella dependen las herramientas de Drivin
+            urlEstado={puede('servicios.estado') && !(l.drivin && l.activa) ? route('servicios.estado', l.id) : undefined}
+            onEditar={puede('servicios.editar') ? (boton) => abrir(l, boton) : undefined}
+            // De la de Drivin dependen el tablero, las cargas y la auditoría
+            urlEliminar={!l.drivin && puede('servicios.eliminar') ? route('servicios.destroy', l.id) : undefined}
+            consecuencia="Ya no se ofrecerá al marcar las líneas de una empresa ni al crear asignaciones. Las empresas que la reciben la conservan y su historial se mantiene. Si alguien tiene una asignación vigente o por empezar en ella, primero hay que terminarla."
+        />
+    );
+
     const IconoVista = iconoLinea({ icono: form.data.icono });
     const iconoElegido = ICONOS_LINEA.find((i) => i.clave === form.data.icono);
 
@@ -80,7 +132,7 @@ export default function Servicios({ lineas }: Props) {
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Líneas de servicio"
-                    descripcion="Lo que presta Justo a Tiempo. Cada empresa recibe las suyas y cada persona se asigna a las que hace allí."
+                    descripcion="Lo que presta Justo a Tiempo. Todas tienen tablero, programación, novedades e informe diario; cada empresa recibe las suyas y cada persona se asigna a las que hace allí."
                     accion={
                         puede('servicios.crear') && (
                             <Button onClick={() => abrir(null)} className="h-10 rounded-lg px-4 font-semibold">
@@ -91,121 +143,59 @@ export default function Servicios({ lineas }: Props) {
                     }
                 />
 
-                <p className="text-muted-foreground -mt-2 text-sm">
-                    {plural(activas, 'línea activa', 'líneas activas')}
-                    {lineas.length > activas && ` · ${plural(lineas.length - activas, 'inactiva', 'inactivas')}`}
-                </p>
-
-                <Tabla titulo="Líneas de servicio" columnas={['40%', '17%', '12%', '13%', '10%', '3.5rem']}>
-                    <thead className="text-muted-foreground border-b">
-                        <tr>
-                            <th scope="col" className={claseTh}>
-                                Línea
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Herramientas
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Empresas
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Personal hoy
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Estado
-                            </th>
-                            <th scope="col" className={cn(claseTh, 'w-14')}>
-                                <span className="sr-only">Acciones</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {lineas.map((l) => {
-                            const Icono = iconoLinea(l);
-                            return (
+                {/* Desde 1024 px, la tabla; debajo, un bloque por línea (nada se desplaza de lado) */}
+                <div className="hidden lg:block">
+                    <Tabla titulo="Líneas de servicio" minimo="min-w-[720px]" columnas={['62%', '15%', '15%', '3.5rem']}>
+                        <thead className="text-muted-foreground border-b">
+                            <tr>
+                                <th scope="col" className={claseTh}>
+                                    Línea
+                                </th>
+                                <th scope="col" className={claseTh}>
+                                    Empresas
+                                </th>
+                                <th scope="col" className={claseTh}>
+                                    Personal hoy
+                                </th>
+                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                    <span className="sr-only">Acciones</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {lineas.map((l) => (
                                 <tr key={l.id} className={cn('hover:bg-muted/40 transition-colors', !l.activa && 'text-muted-foreground')}>
                                     <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                        <div className="flex items-center gap-3">
-                                            <span
-                                                className={cn(
-                                                    'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                                                    l.activa ? 'bg-secondary text-primary' : 'bg-muted',
-                                                )}
-                                            >
-                                                <Icono className="size-5" aria-hidden="true" />
-                                            </span>
-                                            <div className="min-w-0">
-                                                <p className="text-foreground truncate font-semibold" title={l.nombre}>
-                                                    {l.nombre}
-                                                </p>
-                                                {l.descripcion ? (
-                                                    <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed" title={l.descripcion}>
-                                                        {l.descripcion}
-                                                    </p>
-                                                ) : (
-                                                    <p className="text-muted-foreground text-xs">Sin descripción</p>
-                                                )}
-                                            </div>
-                                        </div>
+                                        {lineaDe(l)}
                                     </th>
-                                    <td className={claseTd}>
-                                        <span className="text-muted-foreground text-xs">
-                                            {l.drivin ? 'Drivin, auditoría e informe' : 'Programación, novedades e informe'}
-                                        </span>
-                                    </td>
-                                    <td className={claseTd}>
-                                        <ConteoEnlace n={l.empresas} uno="empresa" varios="empresas" ninguno="Ninguna" de={l.nombre} />
-                                    </td>
-                                    <td className={claseTd}>
-                                        <ConteoEnlace
-                                            n={l.personas}
-                                            uno="persona"
-                                            varios="personas"
-                                            ninguno="Nadie"
-                                            de={l.nombre}
-                                            href={
-                                                puede('asignaciones.ver')
-                                                    ? route('asignaciones.index', { linea: l.id, estado: 'vigentes' })
-                                                    : undefined
-                                            }
-                                        />
-                                    </td>
-                                    <td className={claseTd}>
-                                        <EstadoBadge activo={l.activa} femenino />
-                                    </td>
-                                    <td className={cn(claseTd, 'text-right')}>
-                                        <AccionesFila
-                                            nombre={l.nombre}
-                                            activo={l.activa}
-                                            // Logística no se desactiva: de ella dependen las herramientas de Drivin
-                                            urlEstado={
-                                                puede('servicios.estado') && !(l.drivin && l.activa) ? route('servicios.estado', l.id) : undefined
-                                            }
-                                            onEditar={puede('servicios.editar') ? (boton) => abrir(l, boton) : undefined}
-                                            // De la de Drivin dependen el tablero, las cargas y la auditoría
-                                            urlEliminar={!l.drivin && puede('servicios.eliminar') ? route('servicios.destroy', l.id) : undefined}
-                                            consecuencia="Ya no se ofrecerá al marcar las líneas de una empresa ni al crear asignaciones. Las empresas que la reciben la conservan y su historial se mantiene. Si alguien tiene una asignación vigente o por empezar en ella, primero hay que terminarla."
-                                            enlaces={[
-                                                ...(l.verLinea
-                                                    ? [{ texto: 'Ver la línea', href: route('lineas.show', l.slug), icono: LayoutGrid }]
-                                                    : []),
-                                                ...(puede('asignaciones.ver')
-                                                    ? [
-                                                          {
-                                                              texto: 'Asignaciones',
-                                                              href: route('asignaciones.index', { linea: l.id }),
-                                                              icono: CalendarRange,
-                                                          },
-                                                      ]
-                                                    : []),
-                                            ]}
-                                        />
-                                    </td>
+                                    <td className={claseTd}>{empresasDe(l)}</td>
+                                    <td className={claseTd}>{personasDe(l)}</td>
+                                    <td className={cn(claseTd, 'text-right')}>{accionesDe(l)}</td>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </Tabla>
+                            ))}
+                        </tbody>
+                    </Tabla>
+                </div>
+                <ul
+                    role="list"
+                    aria-label="Líneas de servicio"
+                    className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden"
+                >
+                    {lineas.map((l) => (
+                        <li key={l.id} className={cn('grid gap-3 px-4 py-4 sm:px-5', !l.activa && 'text-muted-foreground')}>
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">{lineaDe(l)}</div>
+                                <div className="-mt-1 -mr-1">{accionesDe(l)}</div>
+                            </div>
+                            <DatosBloque
+                                datos={[
+                                    ['Empresas', empresasDe(l)],
+                                    ['Personal hoy', personasDe(l)],
+                                ]}
+                            />
+                        </li>
+                    ))}
+                </ul>
             </div>
 
             <FormularioLateral
@@ -298,7 +288,7 @@ export default function Servicios({ lineas }: Props) {
 
                 {/* Cómo se verá en el panel, con lo que se va escribiendo */}
                 <div className="grid gap-2" aria-hidden="true">
-                    <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Vista previa</span>
+                    <span className="text-sm leading-none font-medium">Vista previa</span>
                     <div className="bg-muted/40 flex items-center gap-3 rounded-xl border p-3">
                         <span className="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
                             <IconoVista className="size-6" />

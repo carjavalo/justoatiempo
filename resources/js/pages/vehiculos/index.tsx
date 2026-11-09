@@ -1,11 +1,12 @@
 import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
-import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
+import { BarraFiltros, CampoBusqueda, FiltroLista, POCOS_PARA_FILTRAR, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import {
     claseTd,
     claseTh,
     contenedorModulo,
+    DatosBloque,
     EncabezadoModulo,
     EstadoBadge,
     EstadoVacio,
@@ -25,7 +26,7 @@ import { propsCampo, useFocoPrimerError } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
 import { type Paginado } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 interface FilaVehiculo {
     id: number;
@@ -105,6 +106,56 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
     ];
     const tiposSugeridos = tipos.filter((t) => t.toLowerCase() !== form.data.tipo.trim().toLowerCase()).slice(0, 6);
 
+    // Lo de cada vehículo: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). Solo se marca lo que
+    // distingue: el estado si está inactivo, y el código, el tipo o la descripción cuando los hay
+    const vehiculoDe = (v: FilaVehiculo) => {
+        const detalle = [v.codigoInterno && `Código ${v.codigoInterno}`, v.tipo, v.descripcion].filter(Boolean).join(' · ');
+        return (
+            <div className="min-w-0">
+                <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-mono font-semibold tracking-wide">{v.placa}</span>
+                    {!v.activo && <EstadoBadge activo={false} />}
+                </p>
+                {detalle && <p className="text-muted-foreground mt-0.5 text-xs text-pretty">{detalle}</p>}
+            </div>
+        );
+    };
+    const conductorDe = (v: FilaVehiculo) =>
+        v.conductor ? (
+            <p className="break-words">{v.conductor}</p>
+        ) : (
+            <span className="text-muted-foreground text-xs">
+                <span aria-hidden="true">—</span>
+                <span className="sr-only">Sin conductor habitual</span>
+            </span>
+        );
+    // La última vez que salió y, si salió en el último mes, cuántas órdenes llevó
+    const usoDe = (v: FilaVehiculo) =>
+        v.ultimaJornada ? (
+            <>
+                <p>{fmt.fechaMedia(v.ultimaJornada)}</p>
+                {v.ordenesMes > 0 && (
+                    <p className="text-muted-foreground text-xs tabular-nums">
+                        {fmt.numero(v.ordenesMes)} {v.ordenesMes === 1 ? 'orden' : 'órdenes'} en los últimos 30 días
+                    </p>
+                )}
+            </>
+        ) : (
+            <span className="text-muted-foreground text-xs">Aún no ha salido</span>
+        );
+    const accionesDe = (v: FilaVehiculo) => (
+        <AccionesFila
+            nombre={`el vehículo ${v.placa}`}
+            activo={v.activo}
+            urlEstado={puede('vehiculos.estado') ? route('vehiculos.estado', v.id) : undefined}
+            onEditar={puede('vehiculos.editar') ? (boton) => abrir(v, boton) : undefined}
+            urlEliminar={puede('vehiculos.eliminar') ? route('vehiculos.destroy', v.id) : undefined}
+            consecuencia="Su historial de órdenes se conserva. Si vuelve a llegar en una preliquidación, sus órdenes se cargan igual. Puedes activarlo de nuevo cuando quieras."
+        />
+    );
+    // Los filtros aparecen cuando hay muchos vehículos (o si ya hay uno puesto, para poder quitarlo)
+    const conFiltros = total > POCOS_PARA_FILTRAR || activos;
+
     const botonNuevo = (texto: string) => (
         <Button onClick={() => abrir(null)} className="h-10 rounded-lg px-4 font-semibold">
             <Plus className="size-4" aria-hidden="true" />
@@ -132,133 +183,100 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
                     />
                 ) : (
                     <>
-                        <BarraFiltros
-                            resumen={
-                                vehiculos.total
-                                    ? `${vehiculos.total} ${vehiculos.total === 1 ? 'vehículo' : 'vehículos'}`
-                                    : 'Ningún vehículo coincide con los filtros.'
-                            }
-                            soloAnunciar={vehiculos.total === 0}
-                            activos={activos}
-                            onLimpiar={limpiar}
-                            idBusqueda="buscar-vehiculos"
-                        >
-                            <CampoBusqueda
-                                id="buscar-vehiculos"
-                                etiqueta="Buscar vehículos"
-                                placeholder="Buscar por placa, código interno o tipo"
-                                valor={valores.q}
-                                onCambio={(v) => cambiar('q', v, { inmediato: false })}
-                            />
-                            <FiltroLista
-                                id="filtro-estado"
-                                etiqueta="Estado"
-                                valor={valores.estado}
-                                onCambio={(v) => cambiar('estado', v)}
-                                opciones={[
-                                    { valor: '', texto: 'Activos e inactivos' },
-                                    { valor: 'activos', texto: 'Solo activos' },
-                                    { valor: 'inactivos', texto: 'Solo inactivos' },
-                                ]}
-                            />
-                        </BarraFiltros>
+                        {conFiltros && (
+                            <BarraFiltros
+                                resumen={
+                                    vehiculos.total
+                                        ? `${vehiculos.total} ${vehiculos.total === 1 ? 'vehículo' : 'vehículos'}`
+                                        : 'Ningún vehículo coincide con los filtros.'
+                                }
+                                soloAnunciar={vehiculos.total === 0}
+                                activos={activos}
+                                onLimpiar={limpiar}
+                                idBusqueda="buscar-vehiculos"
+                            >
+                                <CampoBusqueda
+                                    id="buscar-vehiculos"
+                                    etiqueta="Buscar vehículos"
+                                    placeholder="Buscar por placa, código interno o tipo"
+                                    valor={valores.q}
+                                    onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                                />
+                                <FiltroLista
+                                    id="filtro-estado"
+                                    etiqueta="Estado"
+                                    valor={valores.estado}
+                                    onCambio={(v) => cambiar('estado', v)}
+                                    opciones={[
+                                        { valor: '', texto: 'Activos e inactivos' },
+                                        { valor: 'activos', texto: 'Solo activos' },
+                                        { valor: 'inactivos', texto: 'Solo inactivos' },
+                                    ]}
+                                />
+                            </BarraFiltros>
+                        )}
 
                         {vehiculos.data.length === 0 ? (
                             <SinResultados texto="Ningún vehículo coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Flota" columnas={['30%', '26%', '20%', '12%', '3.5rem']}>
-                                <thead className="text-muted-foreground border-b">
-                                    <tr>
-                                        <th scope="col" className={claseTh}>
-                                            Vehículo
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Conductor habitual
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Últimos 30 días
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Estado
-                                        </th>
-                                        <th scope="col" className={cn(claseTh, 'w-14')}>
-                                            <span className="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {vehiculos.data.map((v) => {
-                                        const detalle = [v.codigoInterno && `Código ${v.codigoInterno}`, v.tipo, v.descripcion]
-                                            .filter(Boolean)
-                                            .join(' · ');
-                                        return (
-                                            <tr
-                                                key={v.id}
-                                                className={cn('hover:bg-muted/40 transition-colors', !v.activo && 'text-muted-foreground')}
-                                            >
-                                                <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                                    <div className="flex items-center gap-3">
-                                                        <span
-                                                            className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-xl"
-                                                            aria-hidden="true"
-                                                        >
-                                                            <Truck className="size-4" />
-                                                        </span>
-                                                        <div className="min-w-0">
-                                                            <p className="text-foreground font-mono font-semibold tracking-wide">{v.placa}</p>
-                                                            <p className="text-muted-foreground truncate text-xs" title={detalle || undefined}>
-                                                                {detalle || 'Sin código interno'}
-                                                            </p>
-                                                        </div>
-                                                    </div>
+                            <>
+                                {/* Desde 1024 px, la tabla; debajo, un bloque por vehículo (nada se desplaza de lado) */}
+                                <div className="hidden lg:block">
+                                    <Tabla titulo="Flota" minimo="min-w-[680px]" columnas={['40%', '28%', '24%', '3.5rem']}>
+                                        <thead className="text-muted-foreground border-b">
+                                            <tr>
+                                                <th scope="col" className={claseTh}>
+                                                    Vehículo
                                                 </th>
-                                                <td className={claseTd}>
-                                                    {v.conductor ? (
-                                                        <p className="truncate" title={v.conductor}>
-                                                            {v.conductor}
-                                                        </p>
-                                                    ) : (
-                                                        <span className="text-muted-foreground text-xs">Sin asignar</span>
-                                                    )}
-                                                </td>
-                                                <td className={claseTd}>
-                                                    {v.ordenesMes > 0 ? (
-                                                        <>
-                                                            <p className="font-semibold tabular-nums">
-                                                                {fmt.numero(v.ordenesMes)} {v.ordenesMes === 1 ? 'orden' : 'órdenes'}
-                                                            </p>
-                                                            {v.ultimaJornada && (
-                                                                <p className="text-muted-foreground text-xs">
-                                                                    Última jornada: {fmt.fechaMedia(v.ultimaJornada)}
-                                                                </p>
-                                                            )}
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-muted-foreground text-xs">
-                                                            {v.ultimaJornada
-                                                                ? `Sin órdenes · última: ${fmt.fechaMedia(v.ultimaJornada)}`
-                                                                : 'Sin órdenes aún'}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className={claseTd}>
-                                                    <EstadoBadge activo={v.activo} />
-                                                </td>
-                                                <td className={cn(claseTd, 'text-right')}>
-                                                    <AccionesFila
-                                                        nombre={`el vehículo ${v.placa}`}
-                                                        activo={v.activo}
-                                                        urlEstado={puede('vehiculos.estado') ? route('vehiculos.estado', v.id) : undefined}
-                                                        onEditar={puede('vehiculos.editar') ? (boton) => abrir(v, boton) : undefined}
-                                                        urlEliminar={puede('vehiculos.eliminar') ? route('vehiculos.destroy', v.id) : undefined}
-                                                        consecuencia="Su historial de órdenes se conserva. Si vuelve a llegar en una preliquidación, sus órdenes se cargan igual. Puedes activarlo de nuevo cuando quieras."
-                                                    />
-                                                </td>
+                                                <th scope="col" className={claseTh}>
+                                                    Conductor habitual
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Última jornada
+                                                </th>
+                                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                                    <span className="sr-only">Acciones</span>
+                                                </th>
                                             </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </Tabla>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {vehiculos.data.map((v) => (
+                                                <tr
+                                                    key={v.id}
+                                                    className={cn('hover:bg-muted/40 transition-colors', !v.activo && 'text-muted-foreground')}
+                                                >
+                                                    <th scope="row" className={cn(claseTd, 'font-normal')}>
+                                                        {vehiculoDe(v)}
+                                                    </th>
+                                                    <td className={claseTd}>{conductorDe(v)}</td>
+                                                    <td className={claseTd}>{usoDe(v)}</td>
+                                                    <td className={cn(claseTd, 'text-right')}>{accionesDe(v)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Tabla>
+                                </div>
+                                <ul
+                                    role="list"
+                                    aria-label="Flota"
+                                    className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden"
+                                >
+                                    {vehiculos.data.map((v) => (
+                                        <li key={v.id} className={cn('grid gap-3 px-4 py-4 sm:px-5', !v.activo && 'text-muted-foreground')}>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">{vehiculoDe(v)}</div>
+                                                <div className="-mt-1 -mr-1">{accionesDe(v)}</div>
+                                            </div>
+                                            <DatosBloque
+                                                datos={[
+                                                    ...(v.conductor ? [['Conductor', conductorDe(v)] as [string, ReactNode]] : []),
+                                                    ['Última jornada', usoDe(v)],
+                                                ]}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
                         )}
 
                         <Paginacion pagina={vehiculos} nombre="vehículos" />
