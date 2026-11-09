@@ -1,20 +1,22 @@
 import { ConfirmarEliminar } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
-import { claseTd, claseTh, Tabla } from '@/components/admin/piezas';
+import { claseTd, claseTh } from '@/components/admin/piezas';
 import { DialogoFormulario } from '@/components/dialogo-formulario';
-import { Dato, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
+import { Cifra, Cifras } from '@/components/cargas/piezas';
+import { EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import {
+    AlertTriangle,
     CheckCircle2,
     ClipboardCheck,
     Download,
     EnRevision,
-    FileSpreadsheet,
     Lock,
     MessageCircle,
     Pencil,
     Plus,
     Trash2,
     Undo2,
+    XCircle,
 } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { DialogoDescarga } from '@/components/linea/dialogo-descarga';
@@ -28,7 +30,7 @@ import { usePuede } from '@/hooks/use-puede';
 import { fmt, semaforo } from '@/lib/formato';
 import { propsCampo } from '@/lib/formularios';
 import { cn } from '@/lib/utils';
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { type FormEvent, useState } from 'react';
 
 interface Accion {
@@ -122,6 +124,13 @@ interface Props {
 
 const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
 
+/** La escala de la efectividad, la misma del Excel del informe (su leyenda): se muestra una vez, bajo las cifras. */
+const ESCALA = [
+    { icono: CheckCircle2, clase: 'text-good', rango: '100%', texto: 'operación completa' },
+    { icono: AlertTriangle, clase: 'text-warning', rango: '80–99%', texto: 'revisar pendientes' },
+    { icono: XCircle, clase: 'text-critical', rango: 'menos de 80%', texto: 'seguimiento inmediato' },
+];
+
 export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede, sedes, informes, resumen, porCiudad, tiposAccion, umbrales }: Props) {
     const puede = usePuede();
     const [descargar, setDescargar] = useState(false);
@@ -184,59 +193,73 @@ export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede
             }
         >
             {!fecha || informes.length === 0 ? (
-                <div className="bg-card flex flex-col items-center rounded-2xl border border-dashed px-6 py-14 text-center">
-                    <span className="bg-secondary text-primary flex size-16 items-center justify-center rounded-2xl">
-                        <FileSpreadsheet className="size-8" aria-hidden="true" />
-                    </span>
-                    <h2 className="mt-5 text-lg font-extrabold tracking-tight">
+                <section aria-labelledby="sin-informe" className="bg-card rounded-2xl border px-5 py-6 sm:px-6">
+                    <h2 id="sin-informe" className="text-lg font-extrabold tracking-tight text-balance">
                         {fecha ? 'No hay informe para esta jornada' : 'Aún no hay informes'}
                     </h2>
-                    <p className="text-muted-foreground mt-1.5 max-w-md text-sm">
-                        El informe de cada sede y sucursal se arma solo al confirmar la preliquidación de Drivin de esa jornada.
+                    <p className="text-muted-foreground mt-1 max-w-prose text-sm text-pretty">
+                        El informe de cada sede y sucursal se arma solo al confirmar la preliquidación de Drivin de esa jornada, en Cargas Drivin.
                     </p>
-                    {puede('cargas.subir') && (
-                        <Button asChild className="mt-6 h-10 rounded-lg px-4 font-semibold">
-                            <Link href={route('cargas.index')}>Ir a Cargas Drivin</Link>
-                        </Button>
-                    )}
-                </div>
+                </section>
             ) : (
                 <>
-                    {/* Como la hoja "Dashboard Gerencial" */}
-                    <ul role="list" aria-label="Resumen de la jornada" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                        <Dato
-                            titulo="Efectividad"
-                            valor={fmt.pct(resumen.cumplimiento)}
-                            detalle={nivelDia && <EstadoNivel nivel={nivelDia.nivel}>{nivelDia.texto}</EstadoNivel>}
-                        />
-                        <Dato
-                            titulo="Entregas"
-                            valor={`${fmt.numero(resumen.realizadas)} de ${fmt.numero(resumen.asignadas)}`}
-                            detalle={`${plural(resumen.pendientes, 'pendiente', 'pendientes')}`}
-                        />
-                        <Dato
-                            titulo="Auxiliares"
-                            valor={fmt.numero(resumen.registros)}
-                            detalle={`${plural(resumen.conNovedad, 'con novedad', 'con novedad')}`}
-                        />
-                        <Dato
-                            titulo="Novedades"
-                            valor={fmt.numero(resumen.devoluciones)}
-                            detalle={`${resumen.devoluciones === 1 ? 'devolución' : 'devoluciones'} · ${plural(resumen.averias, 'avería', 'averías')} · ${plural(resumen.faltantes, 'faltante', 'faltantes')}`}
-                        />
-                    </ul>
+                    {/* Como la hoja "Dashboard Gerencial", en una franja */}
+                    <div className="flex flex-col gap-2">
+                        <Cifras>
+                            <Cifra
+                                etiqueta="Efectividad"
+                                valor={fmt.pct(resumen.cumplimiento)}
+                                detalle={nivelDia && <EstadoNivel nivel={nivelDia.nivel}>{nivelDia.texto}</EstadoNivel>}
+                            />
+                            <Cifra
+                                etiqueta="Entregas"
+                                valor={`${fmt.numero(resumen.realizadas)} de ${fmt.numero(resumen.asignadas)}`}
+                                detalle={resumen.pendientes ? plural(resumen.pendientes, 'pendiente', 'pendientes') : 'Sin pendientes'}
+                            />
+                            <Cifra
+                                etiqueta="Auxiliares"
+                                valor={fmt.numero(resumen.registros)}
+                                detalle={resumen.conNovedad ? plural(resumen.conNovedad, 'con novedad', 'con novedad') : 'Ninguno con novedad'}
+                            />
+                            <Cifra
+                                etiqueta="Incidencias"
+                                valor={fmt.numero(resumen.devoluciones + resumen.averias + resumen.faltantes)}
+                                detalle={
+                                    [
+                                        resumen.devoluciones > 0 && plural(resumen.devoluciones, 'devolución', 'devoluciones'),
+                                        resumen.averias > 0 && plural(resumen.averias, 'avería', 'averías'),
+                                        resumen.faltantes > 0 && plural(resumen.faltantes, 'faltante', 'faltantes'),
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ') || 'Ninguna'
+                                }
+                            />
+                        </Cifras>
+                        <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                            <span>Efectividad, como en el Excel:</span>
+                            {ESCALA.map(({ icono: Icono, clase, rango, texto }) => (
+                                <span key={rango} className="inline-flex items-center gap-1">
+                                    <Icono className={cn('size-3.5 shrink-0', clase)} aria-hidden="true" />
+                                    <span>
+                                        <span className="text-foreground font-semibold">{rango}</span> {texto}
+                                    </span>
+                                </span>
+                            ))}
+                        </p>
+                    </div>
 
                     {informes.map((informe) => (
                         <InformeSede
                             key={informe.id}
                             informe={informe}
+                            unico={informes.length === 1}
                             onAccion={(fila) => setAccion({ informe, fila })}
                             onObservacion={setObservacion}
                         />
                     ))}
 
-                    {porCiudad.length > 0 && (
-                        <Panel titulo="Resumen por ciudad" descripcion="Como la hoja del Excel de la operación" cuerpoClassName="px-0 pb-2">
+                    {porCiudad.length > 1 && (
+                        <Panel titulo="Resumen por ciudad" cuerpoClassName="px-0 pb-2">
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[640px] text-left text-sm">
                                     <caption className="sr-only">Resumen de la jornada por ciudad</caption>
@@ -287,7 +310,21 @@ export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede
     );
 }
 
-function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; onAccion: (f: Fila) => void; onObservacion: (f: Fila) => void }) {
+/**
+ * El informe de una sede: su estado y su cierre arriba; cada auxiliar con sus entregas, novedades, evidencias y acción.
+ * `unico`: es el único de la jornada, así que su efectividad ya está en las cifras de arriba (no se repite).
+ */
+function InformeSede({
+    informe,
+    unico,
+    onAccion,
+    onObservacion,
+}: {
+    informe: Informe;
+    unico: boolean;
+    onAccion: (f: Fila) => void;
+    onObservacion: (f: Fila) => void;
+}) {
     const puede = usePuede();
     const cerrado = informe.estado === 'cerrado';
     const [procesando, setProcesando] = useState(false);
@@ -303,6 +340,128 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
             { estado },
             { preserveScroll: true, onStart: () => setProcesando(true), onFinish: () => setProcesando(false) },
         );
+
+    // Las celdas de cada auxiliar: las mismas en la tabla (desde 1280 px) y en los bloques (debajo)
+    const trabajador = (l: Fila) => (
+        <>
+            <p className="font-semibold break-words">{l.auxiliar}</p>
+            <p className="text-muted-foreground text-xs tabular-nums">{l.cedula ? `C.C. ${l.cedula}` : 'No está en Usuarios'}</p>
+        </>
+    );
+    // La placa y el nombre de la ruta (el Excel dice "RUTA / placa"; aquí se lee la ruta de verdad)
+    const operacion = (l: Fila) => (
+        <>
+            <p className="font-mono text-sm font-semibold">{l.placa ?? 'Sin placa'}</p>
+            {l.ruta && (
+                <p className="text-muted-foreground truncate text-xs" title={l.ruta}>
+                    {l.ruta}
+                </p>
+            )}
+        </>
+    );
+    // Asignadas, realizadas y pendientes (por producto), con las órdenes en que iban
+    const entregas = (l: Fila) => (
+        <div className="tabular-nums">
+            <p className="font-semibold">
+                {l.realizadas} de {l.asignadas}
+            </p>
+            <p className={cn('text-xs', l.pendientes > 0 ? 'text-warning font-medium' : 'text-muted-foreground')}>
+                {l.pendientes === 0 ? 'Sin pendientes' : plural(l.pendientes, 'pendiente', 'pendientes')}
+            </p>
+            {l.ordenes > 0 && <p className="text-muted-foreground text-xs">En {plural(l.ordenes, 'orden', 'órdenes')}</p>}
+        </div>
+    );
+    const efectividad = (l: Fila) => {
+        const nivelFila = semaforo(l.cumplimiento);
+        return nivelFila ? (
+            <EstadoNivel nivel={nivelFila.nivel}>
+                {fmt.pct(l.cumplimiento)}
+                <span className="sr-only">: {nivelFila.texto}</span>
+            </EstadoNivel>
+        ) : (
+            <span>—</span>
+        );
+    };
+    const novedades = (l: Fila) => (
+        <div className="text-xs leading-relaxed">
+            <p className={cn('text-pretty', l.novedades === 'Sin novedad' && 'text-muted-foreground')}>{l.novedades}</p>
+            {l.observacion && (
+                <p className="mt-1 flex items-start gap-1.5">
+                    <MessageCircle className="text-primary mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                    <span>
+                        <span className="sr-only">Observación: </span>
+                        {l.observacion}
+                    </span>
+                </p>
+            )}
+            {!cerrado && puede('informes.editar') && (
+                <button
+                    type="button"
+                    onClick={() => onObservacion(l)}
+                    className="text-primary focus-visible:ring-ring mt-1 inline-flex items-center gap-1 rounded-sm text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                >
+                    <Pencil className="size-3" aria-hidden="true" />
+                    {l.observacion ? 'Editar observación' : 'Agregar observación'}
+                    <span className="sr-only"> de {l.auxiliar}</span>
+                </button>
+            )}
+        </div>
+    );
+    // Averías, devoluciones y faltantes: solo las que hubo
+    const incidencias = (l: Fila) => (
+        <div className="text-xs">
+            {l.averias + l.devoluciones + l.faltantes === 0 ? (
+                <span className="text-muted-foreground">Ninguna</span>
+            ) : (
+                <ul role="list" className="grid gap-0.5">
+                    {l.devoluciones > 0 && <li className="font-semibold">{plural(l.devoluciones, 'devolución', 'devoluciones')}</li>}
+                    {l.averias > 0 && <li className="text-critical font-semibold">{plural(l.averias, 'avería', 'averías')}</li>}
+                    {l.faltantes > 0 && <li className="text-warning font-semibold">{plural(l.faltantes, 'faltante', 'faltantes')}</li>}
+                </ul>
+            )}
+        </div>
+    );
+    const evidencias = (l: Fila) => (
+        <div className="text-xs">
+            {l.pod === true ? (
+                <span className="text-good font-semibold">Sí</span>
+            ) : l.pod === false ? (
+                <span className="text-critical font-semibold">
+                    No
+                    {l.sinEvidencia > 0 && (
+                        <span className="text-muted-foreground block font-normal">{plural(l.sinEvidencia, 'orden sin fotos', 'órdenes sin fotos')}</span>
+                    )}
+                </span>
+            ) : (
+                <span className="text-muted-foreground">Sin auditar</span>
+            )}
+        </div>
+    );
+    const acciones = (l: Fila) => (
+        <div className="text-xs">
+            {l.acciones.length > 0 && (
+                <ul role="list" className="grid gap-1.5">
+                    {l.acciones.map((a) => (
+                        <AccionRegistrada key={a.id} accion={a} editable={!cerrado} />
+                    ))}
+                </ul>
+            )}
+            {!cerrado && l.auxiliarId && puede('seguimiento.registrar') && (
+                <button
+                    type="button"
+                    onClick={() => onAccion(l)}
+                    className="text-primary focus-visible:ring-ring mt-1 inline-flex items-center gap-1 rounded-sm text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
+                >
+                    <Plus className="size-3" aria-hidden="true" />
+                    Registrar acción
+                    <span className="sr-only"> para {l.auxiliar}</span>
+                </button>
+            )}
+            {l.acciones.length === 0 && (cerrado || !l.auxiliarId || !puede('seguimiento.registrar')) && (
+                <span className="text-muted-foreground">Sin acción</span>
+            )}
+        </div>
+    );
 
     return (
         <Panel
@@ -328,12 +487,14 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
             descripcion={
                 <>
                     {[informe.empresa, informe.ciudad].filter(Boolean).join(' · ')}
-                    {cumplimiento !== null && (
+                    {!unico && cumplimiento !== null && (
                         <>
-                            {' · '}Efectividad <strong className="text-foreground">{fmt.pct(cumplimiento)}</strong> (meta{' '}
-                            {fmt.pctEntero(informe.meta)}){nivel && <span className="sr-only">: {nivel.texto}</span>}
+                            {' · '}Efectividad <strong className="text-foreground">{fmt.pct(cumplimiento)}</strong>
+                            {nivel && ` (${nivel.texto.toLowerCase()})`}
                         </>
                     )}
+                    {/* La meta de la sede es un dato aparte: la efectividad se califica con la escala del Excel */}
+                    {' · '}Meta de la sede {fmt.pctEntero(informe.meta)}
                     {cerrado && informe.cerradoPor && <> · Cerrado por {informe.cerradoPor}</>}
                 </>
             }
@@ -375,153 +536,74 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
             {informe.sinAuditar > 0 && !cerrado && (
                 <p className="bg-warning-soft/60 text-warning mx-5 mb-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium">
                     <ClipboardCheck className="size-4" aria-hidden="true" />
-                    {plural(informe.sinAuditar, 'orden aprobada sin auditar', 'órdenes aprobadas sin auditar')}.
-                    {puede('auditoria.ver') && (
-                        <Link href={route('auditoria.index')} className="underline underline-offset-4">
-                            Ir a Auditoría POD
-                        </Link>
-                    )}
+                    {plural(informe.sinAuditar, 'orden aprobada sin auditar', 'órdenes aprobadas sin auditar')}: se auditan en Auditoría POD.
                 </p>
             )}
 
-            <Tabla titulo={`Informe de ${titulo}`} minimo="min-w-[1020px]" columnas={['18%', '11%', '13%', '11%', '19%', '10%', '8%', '15%']}>
-                <thead className="text-muted-foreground border-y">
-                    <tr>
-                        {[
-                            'Trabajador',
-                            'Operación',
-                            'Entregas',
-                            'Efectividad',
-                            'Novedades',
-                            'Incidencias',
-                            'Evidencias',
-                            'Acción / Seguimiento',
-                        ].map((t) => (
-                            <th key={t} scope="col" className={claseTh}>
-                                {t}
-                            </th>
+            {/* Desde 1280 px, la tabla del informe (como su Excel), a sangre dentro de la tarjeta de la sede */}
+            <div className="hidden border-t xl:block">
+                <table className="w-full table-fixed text-left text-sm">
+                    <caption className="sr-only">Informe de {titulo}</caption>
+                    <colgroup>
+                        {['18%', '13%', '11%', '10%', '17%', '9%', '9%', '13%'].map((ancho, i) => (
+                            <col key={i} style={{ width: ancho }} />
                         ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {informe.lineas.map((l) => {
-                        const nivelFila = semaforo(l.cumplimiento);
-                        return (
+                    </colgroup>
+                    <thead className="text-muted-foreground border-b">
+                        <tr>
+                            {['Trabajador', 'Operación', 'Entregas', 'Efectividad', 'Novedades', 'Incidencias', 'Evidencias', 'Acción'].map((t) => (
+                                <th key={t} scope="col" className={claseTh}>
+                                    {t}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {informe.lineas.map((l) => (
                             <tr key={l.id} className="align-top">
                                 <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                    <p className="font-semibold break-words">{l.auxiliar}</p>
-                                    <p className="text-muted-foreground text-xs tabular-nums">
-                                        {l.cedula ? `C.C. ${l.cedula}` : 'No está en Usuarios'}
-                                    </p>
+                                    {trabajador(l)}
                                 </th>
-                                <td className={cn(claseTd, 'text-xs')}>
-                                    <p className="font-semibold">RUTA{l.placa && ` / ${l.placa}`}</p>
-                                </td>
-                                {/* Asignadas, realizadas y pendientes (por producto), con las órdenes en que iban */}
-                                <td className={cn(claseTd, 'tabular-nums')}>
-                                    <p className="font-semibold">
-                                        {l.realizadas} de {l.asignadas}
-                                    </p>
-                                    <p className={cn('text-xs', l.pendientes > 0 ? 'text-warning font-medium' : 'text-muted-foreground')}>
-                                        {l.pendientes === 0 ? 'Sin pendientes' : plural(l.pendientes, 'pendiente', 'pendientes')}
-                                    </p>
-                                    {l.ordenes > 0 && (
-                                        <p className="text-muted-foreground text-[0.7rem]">En {plural(l.ordenes, 'orden', 'órdenes')}</p>
-                                    )}
-                                </td>
-                                <td className={claseTd}>
-                                    {nivelFila ? (
-                                        <EstadoNivel nivel={nivelFila.nivel}>
-                                            {fmt.pct(l.cumplimiento)}
-                                            <span className="sr-only">: {nivelFila.texto}</span>
-                                        </EstadoNivel>
-                                    ) : (
-                                        '—'
-                                    )}
-                                </td>
-                                <td className={cn(claseTd, 'text-xs leading-relaxed')}>
-                                    <p className={cn(l.novedades === 'Sin novedad' && 'text-muted-foreground')}>{l.novedades}</p>
-                                    {l.observacion && (
-                                        <p className="mt-1 flex items-start gap-1.5">
-                                            <MessageCircle className="text-primary mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-                                            <span>
-                                                <span className="sr-only">Observación: </span>
-                                                {l.observacion}
-                                            </span>
-                                        </p>
-                                    )}
-                                    {!cerrado && puede('informes.editar') && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onObservacion(l)}
-                                            className="text-primary focus-visible:ring-ring mt-1 inline-flex items-center gap-1 rounded-sm text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
-                                        >
-                                            <Pencil className="size-3" aria-hidden="true" />
-                                            {l.observacion ? 'Editar observación' : 'Agregar observación'}
-                                            <span className="sr-only"> de {l.auxiliar}</span>
-                                        </button>
-                                    )}
-                                </td>
-                                {/* Averías, devoluciones y faltantes: solo las que hubo */}
-                                <td className={cn(claseTd, 'text-xs')}>
-                                    {l.averias + l.devoluciones + l.faltantes === 0 ? (
-                                        <span className="text-muted-foreground">Ninguna</span>
-                                    ) : (
-                                        <ul role="list" className="grid gap-0.5">
-                                            {l.devoluciones > 0 && (
-                                                <li className="font-semibold">{plural(l.devoluciones, 'devolución', 'devoluciones')}</li>
-                                            )}
-                                            {l.averias > 0 && (
-                                                <li className="text-critical font-semibold">{plural(l.averias, 'avería', 'averías')}</li>
-                                            )}
-                                            {l.faltantes > 0 && (
-                                                <li className="text-warning font-semibold">{plural(l.faltantes, 'faltante', 'faltantes')}</li>
-                                            )}
-                                        </ul>
-                                    )}
-                                </td>
-                                <td className={cn(claseTd, 'text-xs')}>
-                                    {l.pod === true ? (
-                                        <span className="text-good font-semibold">Sí</span>
-                                    ) : l.pod === false ? (
-                                        <span className="text-critical font-semibold">
-                                            No
-                                            {l.sinEvidencia > 0 && (
-                                                <span className="text-muted-foreground block font-normal">
-                                                    {plural(l.sinEvidencia, 'orden sin fotos', 'órdenes sin fotos')}
-                                                </span>
-                                            )}
-                                        </span>
-                                    ) : (
-                                        <span className="text-muted-foreground">Sin auditar</span>
-                                    )}
-                                </td>
-                                <td className={cn(claseTd, 'text-xs')}>
-                                    <ul role="list" className="grid gap-1.5">
-                                        {l.acciones.map((a) => (
-                                            <AccionRegistrada key={a.id} accion={a} editable={!cerrado} />
-                                        ))}
-                                    </ul>
-                                    {!cerrado && l.auxiliarId && puede('seguimiento.registrar') && (
-                                        <button
-                                            type="button"
-                                            onClick={() => onAccion(l)}
-                                            className="text-primary focus-visible:ring-ring mt-1 inline-flex items-center gap-1 rounded-sm text-xs font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden"
-                                        >
-                                            <Plus className="size-3" aria-hidden="true" />
-                                            Registrar acción
-                                            <span className="sr-only"> para {l.auxiliar}</span>
-                                        </button>
-                                    )}
-                                    {l.acciones.length === 0 && (cerrado || !l.auxiliarId || !puede('seguimiento.registrar')) && (
-                                        <span className="text-muted-foreground">Sin acción</span>
-                                    )}
-                                </td>
+                                <td className={claseTd}>{operacion(l)}</td>
+                                <td className={claseTd}>{entregas(l)}</td>
+                                <td className={claseTd}>{efectividad(l)}</td>
+                                <td className={claseTd}>{novedades(l)}</td>
+                                <td className={claseTd}>{incidencias(l)}</td>
+                                <td className={claseTd}>{evidencias(l)}</td>
+                                <td className={claseTd}>{acciones(l)}</td>
                             </tr>
-                        );
-                    })}
-                </tbody>
-            </Tabla>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {/* Debajo de 1280 px, un bloque por auxiliar con cada dato rotulado: nada se desplaza de lado */}
+            <ul role="list" aria-label={`Informe de ${titulo}`} className="divide-y border-t xl:hidden">
+                {informe.lineas.map((l) => (
+                    <li key={l.id} className="grid gap-3 px-5 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">{trabajador(l)}</div>
+                            {efectividad(l)}
+                        </div>
+                        <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+                            {(
+                                [
+                                    ['Operación', operacion(l)],
+                                    ['Entregas', entregas(l)],
+                                    ['Novedades', novedades(l)],
+                                    ['Incidencias', incidencias(l)],
+                                    ['Evidencias', evidencias(l)],
+                                    ['Acción', acciones(l)],
+                                ] as const
+                            ).map(([rotulo, valor]) => (
+                                <div key={rotulo} className="contents">
+                                    <dt className="text-muted-foreground text-xs font-semibold">{rotulo}</dt>
+                                    <dd className="min-w-0">{valor}</dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </li>
+                ))}
+            </ul>
 
             <ObservacionesInforme informe={informe} />
         </Panel>
@@ -555,7 +637,7 @@ function AccionRegistrada({ accion, editable }: { accion: Accion; editable: bool
                         className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm p-0.5 focus-visible:ring-2 focus-visible:outline-hidden"
                     >
                         <Pencil className="size-3.5" aria-hidden="true" />
-                        <span className="sr-only">Modificar {accion.tipoLabel}</span>
+                        <span className="sr-only">Editar {accion.tipoLabel}</span>
                     </button>
                     <button
                         type="button"
@@ -590,7 +672,7 @@ function DialogoModificarAccion({ accion, onCerrar }: { accion: Accion; onCerrar
     };
 
     return (
-        <DialogoFormulario titulo="Modificar la acción" descripcion="Corrige el tipo o el detalle de lo que se registró." onCerrar={onCerrar} onEnviar={enviar} procesando={form.processing} textoEnviar="Guardar cambios">
+        <DialogoFormulario titulo="Editar la acción" descripcion="Corrige el tipo o el detalle de lo que se registró." onCerrar={onCerrar} onEnviar={enviar} procesando={form.processing} textoEnviar="Guardar cambios">
             <Campo id="tipo-accion" etiqueta="Acción" requerido error={form.errors.tipo}>
                 <Selector {...propsCampo('tipo-accion', form.errors.tipo)} valor={form.data.tipo} onCambio={(v) => form.setData('tipo', v)} opciones={tiposAccion} />
             </Campo>

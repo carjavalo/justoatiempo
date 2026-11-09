@@ -55,9 +55,12 @@ class InformeLineaController extends Controller
             'ultima' => $ultima ? Carbon::parse($ultima)->toDateString() : null,
             'anterior' => $anterior ? Carbon::parse($anterior)->toDateString() : null,
             'siguiente' => $siguiente ? Carbon::parse($siguiente)->toDateString() : null,
+            // Con las cuentas del día del tablero y la programación (JornadaLinea::resumenDia): la misma franja, las mismas reglas
             'resumen' => [
                 'lugares' => $lugares->whereNotNull('programacion')->count(),
+                'incompletos' => $lugares->whereNotNull('programacion')->filter(fn ($l) => $l['programadas'] < $l['requeridas'])->count(),
                 'requeridas' => $lugares->sum('requeridas'),
+                'necesarias' => $lugares->sum(fn ($l) => $l['requeridas'] ?: $l['programadas']),
                 'programadas' => $lugares->sum('programadas'),
                 'presentes' => $lugares->sum('presentes'),
                 'tarde' => $lugares->sum('tarde'),

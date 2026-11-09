@@ -155,7 +155,7 @@ const ESTADO = {
 export function EstadoBadge({ nivel, children, className }: { nivel: NivelEstado; children: ReactNode; className?: string }) {
     const { icono: Icono, clase } = ESTADO[nivel];
     return (
-        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-semibold whitespace-nowrap', clase, className)}>
+        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap', clase, className)}>
             <Icono className="size-3.5" aria-hidden="true" />
             {children}
         </span>

@@ -250,6 +250,9 @@ class OperacionLineasTest extends TestCase
             // La jornada más reciente (a la que vuelve el selector de fecha) y el hoy del servidor
             ->where('ultima', today()->toDateString())
             ->where('hoy', today()->toDateString())
+            // Las cuentas del día de la programación y el tablero: el lugar tiene las 2 personas que requiere
+            ->where('resumen.incompletos', 0)
+            ->where('resumen.necesarias', 2)
             ->where('resumen.cobertura', 50)
             ->where('resumen.faltas', 1)
             ->where('resumen.novedades', 1)
