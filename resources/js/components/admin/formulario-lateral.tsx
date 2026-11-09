@@ -2,6 +2,7 @@ import { BotonEnviar } from '@/components/boton-enviar';
 import { ArrowLeft } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 import { type FormEventHandler, type ReactNode, useRef } from 'react';
 
 interface Props {
@@ -17,6 +18,8 @@ interface Props {
     /** Si abrió con lo que se había escrito antes (useBorrador) y cómo empezar de nuevo. */
     recuperado?: boolean;
     onDescartar?: () => void;
+    /** "amplio" para formularios con filas de opciones (los permisos de un rol): caben en una línea. */
+    ancho?: 'normal' | 'amplio';
     children: ReactNode;
 }
 
@@ -24,7 +27,20 @@ interface Props {
  * Formulario en panel lateral: crea o edita sin perder de vista la lista. Se cierra con "Volver", con la X, con Escape
  * o al guardar; lo que se escribió sigue ahí al abrirlo de nuevo (useBorrador).
  */
-export function FormularioLateral({ abierto, onCambio, titulo, descripcion, onEnviar, procesando, textoEnviar, focoAlCerrar, recuperado, onDescartar, children }: Props) {
+export function FormularioLateral({
+    abierto,
+    onCambio,
+    titulo,
+    descripcion,
+    onEnviar,
+    procesando,
+    textoEnviar,
+    focoAlCerrar,
+    recuperado,
+    onDescartar,
+    ancho = 'normal',
+    children,
+}: Props) {
     // Radix devuelve el foco a su "trigger"; aquí el panel se abre por código, así que se recuerda
     // quién tenía el foco al abrir (p. ej. "Nuevo usuario") para devolvérselo al cerrar
     const previo = useRef<HTMLElement | null>(null);
@@ -43,7 +59,7 @@ export function FormularioLateral({ abierto, onCambio, titulo, descripcion, onEn
         <Sheet open={abierto} onOpenChange={onCambio}>
             <SheetContent
                 side="right"
-                className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
+                className={cn('flex w-full flex-col gap-0 p-0', ancho === 'amplio' ? 'sm:max-w-2xl' : 'sm:max-w-lg')}
                 onCloseAutoFocus={(e) => {
                     e.preventDefault();
                     const destino = [focoAlCerrar, previo.current, document.getElementById('contenido')].find((el) => el?.isConnected);

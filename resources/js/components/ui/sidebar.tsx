@@ -166,14 +166,24 @@ const Sidebar = React.forwardRef<
                     id="menu-lateral"
                     data-sidebar="sidebar"
                     data-mobile="true"
-                    // Botón de cierre visible: en lectores táctiles es la única forma de cerrar el menú
-                    className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:top-3 [&>button]:right-3 [&>button]:flex [&>button]:size-8 [&>button]:items-center [&>button]:justify-center [&>button]:text-sidebar-foreground [&>button]:opacity-100 [&>button]:ring-offset-sidebar [&>button]:focus:ring-sidebar-ring"
+                    // Botón de cierre visible: en lectores táctiles es la única forma de cerrar el menú. Sin el borde claro del
+                    // panel (sobre el azul se veía como una línea blanca). Al abrir, el foco cae en el cierre: su anillo se
+                    // dibuja solo si se navega con teclado (con el dedo o el mouse no hace falta señalarlo)
+                    className="w-(--sidebar-width) border-none bg-sidebar p-0 text-sidebar-foreground [&>button]:top-3 [&>button]:right-3 [&>button]:flex [&>button]:size-8 [&>button]:items-center [&>button]:justify-center [&>button]:text-sidebar-foreground [&>button]:opacity-100 [&>button]:ring-offset-sidebar [&>button]:focus-visible:ring-0 [&>button]:focus-visible:ring-sidebar-ring [&>button]:teclado:focus-visible:ring-2"
                     style={
                         {
                             '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
                         } as React.CSSProperties
                     }
                     side={side}
+                    // El botón que lo abre no es el disparador del panel: al cerrar, el foco se devuelve a él (si no, se
+                    // perdía en la página y quien usa teclado volvía a empezar desde arriba)
+                    onCloseAutoFocus={(e) => {
+                        const boton = document.querySelector<HTMLElement>('[aria-controls="menu-lateral"]');
+                        if (!boton) return;
+                        e.preventDefault();
+                        boton.focus();
+                    }}
                 >
                     <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
                     <SheetDescription className="sr-only">Las secciones de la plataforma que tu rol abre.</SheetDescription>

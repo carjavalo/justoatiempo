@@ -2,7 +2,7 @@ import { Campo } from '@/components/admin/campo';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import { contenedorModulo, EncabezadoModulo, EstadoVacio, Iniciales, Paginacion, SinResultados } from '@/components/admin/piezas';
-import { Building2, CalendarClock, CalendarRange, Layers, MapPinned, MoreHorizontal, Pencil, Plus, Trash2, Undo2, UsersRound } from '@/components/iconos';
+import { CalendarClock, CalendarRange, MapPinned, MoreHorizontal, Pencil, Plus, Trash2, Undo2, UsersRound } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
@@ -235,11 +235,14 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
         </Button>
     );
 
-    const tarjetas: { id: string; titulo: string; valor: number; estado?: string; detalle: string }[] = [
-        { id: 'vigentes', titulo: 'Vigentes', valor: resumen.vigentes, estado: 'vigentes', detalle: 'En curso hoy' },
-        { id: 'programadas', titulo: 'Programadas', valor: resumen.programadas, estado: 'programadas', detalle: 'Empiezan más adelante' },
-        { id: 'pronto', titulo: 'Terminan esta semana', valor: resumen.terminanPronto, estado: 'terminan', detalle: 'En los próximos 7 días' },
-        { id: 'sin', titulo: 'Sin asignación', valor: resumen.sinAsignacion, estado: 'sin', detalle: 'Personas activas sin dónde trabajar hoy' },
+    // El estado se elige en un solo lugar, con cuántas hay en cada uno (como en las demás listas)
+    const segmentos: { valor: string; texto: string; total?: number; aviso?: boolean }[] = [
+        { valor: '', texto: 'Vigentes y programadas' },
+        { valor: 'vigentes', texto: 'Vigentes', total: resumen.vigentes },
+        { valor: 'programadas', texto: 'Programadas', total: resumen.programadas },
+        { valor: 'terminan', texto: 'Terminan esta semana', total: resumen.terminanPronto, aviso: resumen.terminanPronto > 0 },
+        { valor: 'sin', texto: 'Personas sin asignación', total: resumen.sinAsignacion },
+        { valor: 'terminadas', texto: 'Terminadas' },
     ];
 
     return (
@@ -249,49 +252,43 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Asignaciones"
-                    descripcion="Dónde presta el servicio cada persona, qué líneas hace allí y por cuánto tiempo. Una persona puede estar en varias empresas a la vez; su carnet muestra las asignaciones vigentes."
+                    descripcion="Dónde presta el servicio cada persona, qué líneas hace allí y por cuánto tiempo. Su carnet muestra las vigentes."
                     accion={puede('asignaciones.crear') && opciones.personas.length > 0 && botonNueva}
                 />
 
-                {/* Resumen: cada cifra filtra la lista */}
-                <ul role="list" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {tarjetas.map((t) => {
-                        const activa = t.estado !== undefined && valores.estado === t.estado;
-                        const contenido = (
-                            <>
-                                <span className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{t.titulo}</span>
-                                <span className={cn('mt-1 text-3xl font-extrabold tabular-nums', t.id === 'pronto' && t.valor > 0 && 'text-warning')}>{t.valor}</span>
-                                <span className="text-muted-foreground mt-0.5 text-xs">{t.detalle}</span>
-                            </>
-                        );
-                        const clase = cn(
-                            'bg-card flex h-full w-full flex-col items-start rounded-2xl border px-4 py-3.5 text-left shadow-[0_1px_2px_rgba(16,24,40,0.04)]',
-                            activa && 'border-primary bg-secondary/60',
-                        );
+                <div role="group" aria-label="Estado de las asignaciones" className="bg-muted flex w-full gap-1 overflow-x-auto rounded-lg p-1 sm:w-fit">
+                    {segmentos.map((s) => {
+                        const elegido = valores.estado === s.valor;
                         return (
-                            <li key={t.id}>
-                                {t.estado ? (
-                                    <button
-                                        type="button"
-                                        aria-pressed={activa}
-                                        onClick={() => cambiar('estado', activa ? '' : t.estado!)}
-                                        className={cn(clase, 'hover:border-primary/40 focus-visible:ring-ring/25 focus-visible:border-ring transition-colors focus-visible:ring-[3px] focus-visible:outline-hidden')}
-                                    >
-                                        {contenido}
-                                    </button>
-                                ) : (
-                                    <div className={clase}>{contenido}</div>
+                            <button
+                                key={s.valor || 'todas'}
+                                type="button"
+                                aria-pressed={elegido}
+                                onClick={() => !elegido && cambiar('estado', s.valor)}
+                                className={cn(
+                                    'focus-visible:ring-ring flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow] focus-visible:ring-2 focus-visible:outline-hidden',
+                                    elegido ? 'bg-background text-foreground shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : 'text-muted-foreground hover:text-foreground',
                                 )}
-                            </li>
+                            >
+                                {s.texto}
+                                {s.total !== undefined && (
+                                    <>
+                                        {' '}
+                                        <span className={cn('tabular-nums', s.aviso ? 'text-warning' : elegido ? 'text-foreground' : 'text-muted-foreground')}>
+                                            {fmt.numero(s.total)}
+                                        </span>
+                                    </>
+                                )}
+                            </button>
                         );
                     })}
-                </ul>
+                </div>
 
                 <BarraFiltros
                     resumen={personas.total ? plural(personas.total, 'persona', 'personas') : 'Ninguna persona coincide con los filtros.'}
                     soloAnunciar={personas.total === 0}
-                    activos={activos}
-                    onLimpiar={limpiar}
+                    activos={activos && (valores.q !== '' || valores.empresa !== '' || valores.linea !== '' || valores.usuario !== '')}
+                    onLimpiar={() => limpiar(['estado'])}
                     idBusqueda="buscar-personas"
                 >
                     <CampoBusqueda id="buscar-personas" etiqueta="Buscar personas" placeholder="Buscar por nombre, correo o cédula" valor={valores.q} onCambio={(v) => cambiar('q', v, { inmediato: false })} />
@@ -310,20 +307,6 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                         className="sm:w-60"
                         opciones={[{ valor: '', texto: 'Todas las líneas' }, ...opciones.lineas.map((l) => ({ valor: String(l.id), texto: l.nombre }))]}
                     />
-                    <FiltroLista
-                        id="filtro-estado"
-                        etiqueta="Estado"
-                        valor={valores.estado}
-                        onCambio={(v) => cambiar('estado', v)}
-                        opciones={[
-                            { valor: '', texto: 'Vigentes y programadas' },
-                            { valor: 'vigentes', texto: 'Solo vigentes' },
-                            { valor: 'programadas', texto: 'Solo programadas' },
-                            { valor: 'terminan', texto: 'Terminan esta semana' },
-                            { valor: 'terminadas', texto: 'Terminadas' },
-                            { valor: 'sin', texto: 'Personas sin asignación' },
-                        ]}
-                    />
                 </BarraFiltros>
 
                 {personas.data.length === 0 ? (
@@ -338,7 +321,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                         />
                     )
                 ) : (
-                    <ul role="list" className="grid gap-4">
+                    <ul role="list" className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
                         {personas.data.map((p) => (
                             <TarjetaPersona
                                 key={p.id}
@@ -608,8 +591,8 @@ function TarjetaPersona({
     const titulo = `persona-${p.id}`;
     return (
         <li>
-            <article aria-labelledby={titulo} className={cn('bg-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]', !p.activo && 'opacity-75')}>
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+            <article aria-labelledby={titulo} className={cn(!p.activo && 'opacity-75')}>
+                <header className="bg-muted/30 flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                     <div className="flex min-w-0 items-center gap-3">
                         {p.foto ? (
                             <img src={p.foto} alt="" loading="lazy" className="bg-muted size-11 shrink-0 rounded-xl object-cover object-[50%_20%]" />
@@ -636,12 +619,12 @@ function TarjetaPersona({
                 </header>
 
                 {p.asignaciones.length === 0 ? (
-                    <p className="text-muted-foreground flex items-center gap-2 px-5 py-4 text-sm">
+                    <p className="text-muted-foreground flex items-center gap-2 border-t px-5 py-4 text-sm">
                         <UsersRound className="size-4" aria-hidden="true" />
                         Hoy no tiene dónde prestar el servicio.
                     </p>
                 ) : (
-                    <ul role="list" className="divide-y">
+                    <ul role="list" className="divide-y border-t">
                         {p.asignaciones.map((a) => (
                             <FilaAsignacion key={a.id} persona={p} asignacion={a} onEditar={onEditar} onTerminar={onTerminar} onEliminar={onEliminar} />
                         ))}
@@ -683,9 +666,6 @@ function FilaAsignacion({
     return (
         <li className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_auto] md:items-center">
             <div className="flex min-w-0 items-start gap-3">
-                <span className="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
-                    {a.empresa ? <Building2 className="size-5" aria-hidden="true" /> : <Layers className="size-5" aria-hidden="true" />}
-                </span>
                 <div className="min-w-0">
                     <p className="truncate font-semibold" title={lugar}>
                         {lugar}

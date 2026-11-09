@@ -12,7 +12,7 @@ export function EncabezadoModulo({ titulo, descripcion, accion }: { titulo: stri
         <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
                 <h1 className="text-2xl font-extrabold tracking-tight md:text-[1.75rem]">{titulo}</h1>
-                <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{descripcion}</p>
+                <p className="text-muted-foreground mt-1 max-w-prose text-sm text-pretty">{descripcion}</p>
             </div>
             {accion}
         </div>

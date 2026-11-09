@@ -162,7 +162,7 @@ function SubirArchivo() {
                     onDragLeave={() => setArrastrando(false)}
                     onDrop={soltar}
                     className={cn(
-                        'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors',
+                        'bg-card flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors',
                         'peer-focus-visible:border-ring peer-focus-visible:ring-ring/25 peer-focus-visible:border-solid peer-focus-visible:ring-[3px]',
                         'hover:border-primary/50 hover:bg-secondary/40',
                         arrastrando && 'border-brand-coral bg-brand-coral-soft/40',
@@ -177,14 +177,12 @@ function SubirArchivo() {
                         </>
                     ) : (
                         <>
-                            <span className="bg-secondary text-primary flex size-14 items-center justify-center rounded-2xl">
-                                <UploadCloud className="size-7" aria-hidden="true" />
-                            </span>
-                            <span className="text-base font-bold">
+                            <UploadCloud className="text-primary size-9" aria-hidden="true" />
+                            <span className="text-base font-bold text-balance">
                                 Arrastra aquí el Excel del personal o{' '}
                                 <span className="text-primary underline underline-offset-4">elige el archivo</span>
                             </span>
-                            <span id="archivo-ayuda" className="text-muted-foreground text-xs">
+                            <span id="archivo-ayuda" className="text-muted-foreground text-xs text-pretty">
                                 Excel (.xlsx, .xls) o CSV · máximo 5 MB. Antes de importar verás qué pasará con cada persona.
                             </span>
                         </>

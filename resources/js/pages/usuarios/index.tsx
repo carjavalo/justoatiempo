@@ -16,7 +16,7 @@ import {
     SinResultados,
     Tabla,
 } from '@/components/admin/piezas';
-import { CalendarRange, FileSpreadsheet, IdCard, LockKeyhole, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
+import { CalendarRange, ChevronDown, FileSpreadsheet, IdCard, LockKeyhole, Plus, Sparkles, UsersRound, X } from '@/components/iconos';
 import { PasswordInput } from '@/components/password-input';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
@@ -171,6 +171,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
     const [origen, setOrigen] = useState<HTMLElement | null>(null);
     const [verContrasena, setVerContrasena] = useState(false);
     const [generada, setGenerada] = useState(false);
+    const [verFiltros, setVerFiltros] = useState(false);
     const form = useForm(VACIO);
     const borrador = useBorrador('usuarios', form, ['password', 'restablecer', 'foto', 'quitar_foto', 'arl', 'quitar_arl']);
 
@@ -257,6 +258,108 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
         </div>
     );
 
+    // Lo de cada persona: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). El estado solo se marca si está
+    // inactiva: con todos activos, una columna de "Activo" no dice nada
+    const persona = (u: FilaUsuario) => (
+        <div className="flex items-center gap-3">
+            {u.foto ? (
+                // Decorativa: el nombre va al lado
+                <img src={u.foto} alt="" loading="lazy" className="bg-muted size-9 shrink-0 rounded-xl object-cover object-[50%_20%]" />
+            ) : (
+                <Iniciales texto={u.nombre} className={u.esUsted ? 'bg-brand-coral text-brand-coral-foreground' : undefined} />
+            )}
+            <div className="min-w-0">
+                <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold">
+                    <span className="truncate" title={u.nombre}>
+                        {u.nombre}
+                    </span>
+                    {u.esUsted && <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">Tú</span>}
+                    {!u.activo && <EstadoBadge activo={false} />}
+                </p>
+                <p className="text-muted-foreground truncate text-xs" title={u.email ?? undefined}>
+                    {u.acceso ? (u.email ?? `C.C. ${u.cedula}`) : u.cedula ? `C.C. ${u.cedula} · solo carnet` : 'Solo carnet'}
+                </p>
+            </div>
+        </div>
+    );
+    const rol = (u: FilaUsuario) => (
+        <>
+            <p className="truncate" title={u.rolNombre}>
+                {u.rolNombre}
+            </p>
+            {u.cargo && u.cargo !== u.rolNombre && (
+                <p className="text-muted-foreground truncate text-xs" title={u.cargo}>
+                    {u.cargo}
+                </p>
+            )}
+        </>
+    );
+    const donde = (u: FilaUsuario) =>
+        u.asignaciones.length === 0 ? (
+            <span className="text-muted-foreground text-xs">Sin asignación</span>
+        ) : (
+            <>
+                <p className="text-foreground truncate" title={u.asignaciones.map((a) => a.lugar).join(' / ')}>
+                    {u.asignaciones[0].lugar}
+                </p>
+                {u.asignaciones.length > 1 && (
+                    <p className="text-muted-foreground text-xs">
+                        y {u.asignaciones.length - 1 === 1 ? 'otra asignación' : `${u.asignaciones.length - 1} asignaciones más`}
+                    </p>
+                )}
+            </>
+        );
+    const lineasDe = (u: FilaUsuario) => {
+        const nombres = [...new Set(u.asignaciones.flatMap((a) => a.lineas))];
+        return nombres.length === 0 ? (
+            <span className="text-muted-foreground text-xs">{u.todasLasLineas ? 'Todas (su rol las ve todas)' : 'Ninguna'}</span>
+        ) : (
+            <p className="line-clamp-2 text-xs leading-relaxed" title={nombres.join(', ')}>
+                {nombres.join(', ')}
+            </p>
+        );
+    };
+    // Cómo entra: con su código inicial (aún sin contraseña), cuándo entró por última vez, nunca, o sin acceso
+    const acceso = (u: FilaUsuario) =>
+        !u.acceso ? (
+            <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                <LockKeyhole className="size-3.5" aria-hidden="true" />
+                Sin acceso
+            </span>
+        ) : u.contrasenaInicial ? (
+            <CodigoInicial nombre={u.nombre} codigo={u.codigoInicial} />
+        ) : u.ultimoAcceso ? (
+            <span>
+                Entró{' '}
+                <time dateTime={u.ultimoAcceso} title={fechaHoraCompleta.format(new Date(u.ultimoAcceso))}>
+                    {haceCuanto(u.ultimoAcceso)}
+                </time>
+            </span>
+        ) : (
+            <span className="text-muted-foreground">Nunca ha ingresado</span>
+        );
+    const accionesDe = (u: FilaUsuario) => (
+        <AccionesFila
+            nombre={u.nombre}
+            activo={u.activo}
+            // Nadie se desactiva a sí mismo, ni toca a quien tiene más permisos que él
+            urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
+            onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
+            urlEliminar={!u.esUsted && u.editable && puede('usuarios.eliminar') ? route('usuarios.destroy', u.id) : undefined}
+            consecuencia={
+                u.acceso
+                    ? 'Perderá el acceso de inmediato, incluso si tiene la sesión abierta, y su carnet dejará de estar vigente. Podrás activarla de nuevo cuando quieras.'
+                    : 'Su carnet dejará de estar vigente: quien escanee el QR lo verá como no vigente. Podrás activarla de nuevo cuando quieras.'
+            }
+            enlaces={[
+                { texto: 'Ver carnet', href: route('usuarios.carnet', u.id), icono: IdCard },
+                ...(puede('asignaciones.ver') ? [{ texto: 'Asignaciones', href: route('asignaciones.index', { usuario: u.id }), icono: CalendarRange }] : []),
+            ]}
+        />
+    );
+    // En el teléfono, los filtros que no son la búsqueda van plegados (se cuentan los que están puestos)
+    const filtrosPuestos = [valores.rol, valores.linea, valores.estado, valores.acceso].filter(Boolean).length;
+
     type CampoChip = 'empresa' | 'sede' | 'sucursal';
     const chips: { campo: CampoChip; texto: string }[] = [
         contexto.empresa && { campo: 'empresa' as const, texto: `Empresa: ${contexto.empresa}` },
@@ -272,7 +375,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Usuarios"
-                    descripcion="Todo el personal, con su rol, su carnet y su ARL. Entrar a la plataforma es opcional: los auxiliares y operarios pueden tener solo su carnet. Dónde presta el servicio se maneja en Asignaciones."
+                    descripcion="Todo el personal, con su rol, su carnet y su ARL. Entrar a la plataforma es opcional: hay quien solo tiene su carnet."
                     accion={total > 0 && acciones}
                 />
 
@@ -303,6 +406,17 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                 valor={valores.q}
                                 onCambio={(v) => cambiar('q', v, { inmediato: false })}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setVerFiltros((v) => !v)}
+                                aria-expanded={verFiltros}
+                                aria-controls="filtros-usuarios"
+                                className="border-input bg-card focus-visible:border-ring focus-visible:ring-ring/25 flex h-10 items-center justify-between rounded-lg border px-3 text-sm font-medium focus-visible:ring-[3px] focus-visible:outline-hidden sm:hidden"
+                            >
+                                {filtrosPuestos ? `Filtros (${filtrosPuestos})` : 'Más filtros'}
+                                <ChevronDown className={cn('size-4 transition-transform', verFiltros && 'rotate-180')} aria-hidden="true" />
+                            </button>
+                            <div id="filtros-usuarios" className={cn('flex flex-col gap-2.5 sm:contents', !verFiltros && 'hidden')}>
                             <FiltroLista
                                 id="filtro-rol"
                                 etiqueta="Rol"
@@ -344,6 +458,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                                     { valor: 'codigo', texto: 'Con código inicial por entregar' },
                                 ]}
                             />
+                            </div>
                             {chips.map((c) => (
                                 <span
                                     key={c.campo}
@@ -369,154 +484,78 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                         {usuarios.data.length === 0 ? (
                             <SinResultados texto="Ningún usuario coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[980px]" columnas={['26%', '17%', '16%', '16.5%', '9%', '11%', '3.5rem']}>
-                                <thead className="text-muted-foreground border-b">
-                                    <tr>
-                                        <th scope="col" className={claseTh}>
-                                            Usuario
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Rol
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Dónde presta el servicio
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Líneas
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Estado
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Último ingreso
-                                        </th>
-                                        <th scope="col" className={cn(claseTh, 'w-14')}>
-                                            <span className="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
+                            <>
+                                {/* Desde 1024 px, la tabla; debajo, un bloque por persona (nada se desplaza de lado) */}
+                                <div className="hidden lg:block">
+                                    <Tabla titulo="Usuarios de la plataforma" minimo="min-w-[900px]" columnas={['29%', '18%', '18%', '18%', '13%', '3.5rem']}>
+                                        <thead className="text-muted-foreground border-b">
+                                            <tr>
+                                                <th scope="col" className={claseTh}>
+                                                    Usuario
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Rol
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Dónde presta el servicio
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Líneas
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Acceso
+                                                </th>
+                                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                                    <span className="sr-only">Acciones</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {usuarios.data.map((u) => (
+                                                <tr key={u.id} className={cn('hover:bg-muted/40 transition-colors', !u.activo && 'text-muted-foreground')}>
+                                                    <th scope="row" className={cn(claseTd, 'font-normal')}>
+                                                        {persona(u)}
+                                                    </th>
+                                                    <td className={claseTd}>{rol(u)}</td>
+                                                    <td className={claseTd}>{donde(u)}</td>
+                                                    <td className={claseTd}>{lineasDe(u)}</td>
+                                                    <td className={cn(claseTd, 'text-xs')}>{acceso(u)}</td>
+                                                    <td className={cn(claseTd, 'text-right')}>{accionesDe(u)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Tabla>
+                                </div>
+                                <ul
+                                    role="list"
+                                    aria-label="Usuarios de la plataforma"
+                                    className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden"
+                                >
                                     {usuarios.data.map((u) => (
-                                        <tr key={u.id} className={cn('hover:bg-muted/40 transition-colors', !u.activo && 'text-muted-foreground')}>
-                                            <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                                <div className="flex items-center gap-3">
-                                                    {u.foto ? (
-                                                        // Decorativa: el nombre va al lado
-                                                        <img
-                                                            src={u.foto}
-                                                            alt=""
-                                                            loading="lazy"
-                                                            className="bg-muted size-9 shrink-0 rounded-xl object-cover object-[50%_20%]"
-                                                        />
-                                                    ) : (
-                                                        <Iniciales
-                                                            texto={u.nombre}
-                                                            className={u.esUsted ? 'bg-brand-coral text-brand-coral-foreground' : undefined}
-                                                        />
-                                                    )}
-                                                    <div className="min-w-0">
-                                                        <p className="text-foreground flex items-center gap-2 font-semibold">
-                                                            <span className="truncate" title={u.nombre}>
-                                                                {u.nombre}
-                                                            </span>
-                                                            {u.esUsted && (
-                                                                <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[0.68rem] font-semibold">
-                                                                    Tú
-                                                                </span>
-                                                            )}
-                                                        </p>
-                                                        <p className="text-muted-foreground truncate text-xs" title={u.email ?? undefined}>
-                                                            {u.acceso
-                                                                ? (u.email ?? `C.C. ${u.cedula}`)
-                                                                : u.cedula
-                                                                  ? `C.C. ${u.cedula} · solo carnet`
-                                                                  : 'Solo carnet'}
-                                                        </p>
+                                        <li key={u.id} className={cn('grid gap-3 px-4 py-4 sm:px-5', !u.activo && 'text-muted-foreground')}>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">{persona(u)}</div>
+                                                <div className="-mt-1 -mr-1">{accionesDe(u)}</div>
+                                            </div>
+                                            <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+                                                {(
+                                                    [
+                                                        ['Rol', rol(u)],
+                                                        ['Dónde', donde(u)],
+                                                        ['Líneas', lineasDe(u)],
+                                                        ['Acceso', <span className="text-xs">{acceso(u)}</span>],
+                                                    ] as const
+                                                ).map(([rotulo, valor]) => (
+                                                    <div key={rotulo} className="contents">
+                                                        <dt className="text-muted-foreground text-xs font-semibold">{rotulo}</dt>
+                                                        <dd className="min-w-0">{valor}</dd>
                                                     </div>
-                                                </div>
-                                            </th>
-                                            <td className={claseTd}>
-                                                <p className="truncate" title={u.rolNombre}>
-                                                    {u.rolNombre}
-                                                </p>
-                                                {u.cargo && u.cargo !== u.rolNombre && (
-                                                    <p className="text-muted-foreground truncate text-xs" title={u.cargo}>
-                                                        {u.cargo}
-                                                    </p>
-                                                )}
-                                            </td>
-                                            <td className={claseTd}>
-                                                {u.asignaciones.length === 0 ? (
-                                                    <span className="text-muted-foreground text-xs">Sin asignación</span>
-                                                ) : (
-                                                    <>
-                                                        <p className="text-foreground truncate" title={u.asignaciones.map((a) => a.lugar).join(' / ')}>
-                                                            {u.asignaciones[0].lugar}
-                                                        </p>
-                                                        {u.asignaciones.length > 1 && (
-                                                            <p className="text-muted-foreground text-xs">y {u.asignaciones.length - 1 === 1 ? 'otra asignación' : `${u.asignaciones.length - 1} asignaciones más`}</p>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </td>
-                                            <td className={claseTd}>
-                                                {(() => {
-                                                    const nombres = [...new Set(u.asignaciones.flatMap((a) => a.lineas))];
-                                                    return nombres.length === 0 ? (
-                                                        <span className="text-muted-foreground text-xs">{u.todasLasLineas ? 'Todas (su rol las ve todas)' : 'Ninguna'}</span>
-                                                    ) : (
-                                                        <p className="line-clamp-2 text-xs leading-relaxed" title={nombres.join(', ')}>
-                                                            {nombres.join(', ')}
-                                                        </p>
-                                                    );
-                                                })()}
-                                            </td>
-                                            <td className={claseTd}>
-                                                <EstadoBadge activo={u.activo} />
-                                            </td>
-                                            <td className={cn(claseTd, 'text-xs')}>
-                                                {!u.acceso ? (
-                                                    <span className="text-muted-foreground inline-flex items-center gap-1.5">
-                                                        <LockKeyhole className="size-3.5" aria-hidden="true" />
-                                                        Sin acceso
-                                                    </span>
-                                                ) : u.contrasenaInicial ? (
-                                                    <CodigoInicial nombre={u.nombre} codigo={u.codigoInicial} />
-                                                ) : u.ultimoAcceso ? (
-                                                    <time
-                                                        dateTime={u.ultimoAcceso}
-                                                        title={fechaHoraCompleta.format(new Date(u.ultimoAcceso))}
-                                                        className="inline-block first-letter:uppercase"
-                                                    >
-                                                        {haceCuanto(u.ultimoAcceso)}
-                                                    </time>
-                                                ) : (
-                                                    <span className="text-muted-foreground">Nunca ha ingresado</span>
-                                                )}
-                                            </td>
-                                            <td className={cn(claseTd, 'text-right')}>
-                                                <AccionesFila
-                                                    nombre={u.nombre}
-                                                    activo={u.activo}
-                                                    // Nadie se desactiva a sí mismo, ni toca a quien tiene más permisos que él
-                                                    urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
-                                                    onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
-                                                    urlEliminar={!u.esUsted && u.editable && puede('usuarios.eliminar') ? route('usuarios.destroy', u.id) : undefined}
-                                                    consecuencia={
-                                                        u.acceso
-                                                            ? 'Perderá el acceso de inmediato, incluso si tiene la sesión abierta, y su carnet dejará de estar vigente. Podrás activarla de nuevo cuando quieras.'
-                                                            : 'Su carnet dejará de estar vigente: quien escanee el QR lo verá como no vigente. Podrás activarla de nuevo cuando quieras.'
-                                                    }
-                                                    enlaces={[
-                                                        { texto: 'Ver carnet', href: route('usuarios.carnet', u.id), icono: IdCard },
-                                                        ...(puede('asignaciones.ver') ? [{ texto: 'Asignaciones', href: route('asignaciones.index', { usuario: u.id }), icono: CalendarRange }] : []),
-                                                    ]}
-                                                />
-                                            </td>
-                                        </tr>
+                                                ))}
+                                            </dl>
+                                        </li>
                                     ))}
-                                </tbody>
-                            </Tabla>
+                                </ul>
+                            </>
                         )}
 
                         <Paginacion pagina={usuarios} nombre="usuarios" />

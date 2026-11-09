@@ -2,7 +2,7 @@ import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
 import { BarraFiltros, CampoBusqueda, FiltroLista, useFiltros } from '@/components/admin/filtros';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
-import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Iniciales, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
+import { claseTd, claseTh, ConteoEnlace, contenedorModulo, EncabezadoModulo, EstadoBadge, EstadoVacio, Paginacion, SinResultados, Tabla } from '@/components/admin/piezas';
 import { Hammer, Lock, Plus, ShieldCheck, UserCheck } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { Selector } from '@/components/selector';
@@ -73,6 +73,8 @@ interface Props {
 const VACIO = { nombre: '', descripcion: '', permisos: [] as string[], alcance: 'asignacion' };
 const ORDEN_CAMPOS = ['nombre', 'descripcion', 'alcance', 'permisos'];
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+/** Con pocos roles caben todos a la vista: buscar y filtrar sobra. */
+const POCOS_ROLES = 8;
 
 /** Módulos que se usan desde el tablero de la línea: darlos incluye ver el tablero. */
 const DESDE_EL_TABLERO = ['cargas', 'auditoria', 'informes', 'seguimiento', 'programacion'];
@@ -167,6 +169,62 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
     const nombreAlcance = (valor: string) => alcances.find((a) => a.valor === valor)?.label ?? valor;
     const totalPermisos = catalogo.reduce((n, g) => n + Object.values(g.modulos).reduce((m, mod) => m + Object.keys(mod.acciones).length, 0), 1);
 
+    // Lo de cada rol: lo mismo en la tabla (desde 1024 px) y en los bloques (debajo). Solo se marca lo que distingue:
+    // "Base" cuando también hay roles propios, y el estado solo si está inactivo
+    const marcarBase = roles.data.some((r) => r.base) && roles.data.some((r) => !r.base);
+    const rolDe = (r: FilaRol) => (
+        <div className="min-w-0">
+            <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                <span className="break-words">{r.nombre}</span>
+                {marcarBase && r.base && (
+                    <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">Base</span>
+                )}
+                {!r.activo && <EstadoBadge activo={false} />}
+            </p>
+            {r.descripcion && <p className="text-muted-foreground mt-0.5 text-xs text-pretty">{r.descripcion}</p>}
+        </div>
+    );
+    const veDe = (r: FilaRol, completo = false) =>
+        r.resumen === 'Acceso total' ? (
+            <span className="bg-brand-navy-deep inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-white">
+                <ShieldCheck className="size-3.5" aria-hidden="true" />
+                Acceso total
+            </span>
+        ) : (
+            <p className={cn('text-xs leading-relaxed text-pretty', !completo && 'line-clamp-2')} title={completo ? undefined : r.resumen}>
+                {r.resumen}
+            </p>
+        );
+    const usuariosDe = (r: FilaRol) => (
+        <ConteoEnlace
+            n={r.usuarios}
+            uno="usuario"
+            varios="usuarios"
+            ninguno="Ninguno"
+            de={r.nombre}
+            href={puede('usuarios.ver') ? route('usuarios.index', { rol: r.id }) : undefined}
+        />
+    );
+    const accionesDe = (r: FilaRol) => (
+        <AccionesFila
+            nombre={r.nombre}
+            activo={r.activo}
+            // Los roles base siempre están disponibles; nadie toca un rol con más permisos que el suyo
+            urlEstado={!r.base && r.editable && puede('roles.estado') ? route('roles.estado', r.id) : undefined}
+            onEditar={r.editable && puede('roles.editar') ? (boton) => abrir(r, boton) : undefined}
+            urlEliminar={!r.base && r.editable && puede('roles.eliminar') ? route('roles.destroy', r.id) : undefined}
+            consecuencia={`Ya no se ofrecerá al crear usuarios. ${
+                r.usuarios === 0
+                    ? 'Nadie lo tiene asignado.'
+                    : r.usuarios === 1
+                      ? 'La persona que lo tiene lo conserva, con los mismos permisos.'
+                      : `Las ${r.usuarios} personas que lo tienen lo conservan, con los mismos permisos.`
+            } Puedes volver a activarlo cuando quieras.`}
+        />
+    );
+    // Los filtros aparecen cuando hay muchos roles (o si ya hay uno puesto, para poder quitarlo)
+    const conFiltros = total > POCOS_ROLES || activos;
+
     const botonNuevo = (texto: string) => (
         <Button onClick={() => abrir(null)} className="h-10 rounded-lg px-4 font-semibold">
             <Plus className="size-4" aria-hidden="true" />
@@ -181,7 +239,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Roles"
-                    descripcion="Los roles dentro de la empresa (auxiliar, conductor, supervisor…). En cada uno decides qué módulos ve quien lo tenga, qué puede hacer en cada uno y cuánto ve de la operación."
+                    descripcion="Qué ve y qué puede hacer cada rol de la empresa (auxiliar, conductor, supervisor…) y cuánto ve de la operación."
                     accion={total > 0 && puede('roles.crear') && botonNuevo('Nuevo rol')}
                 />
 
@@ -194,130 +252,117 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                     />
                 ) : (
                     <>
-                        <BarraFiltros
-                            resumen={roles.total ? plural(roles.total, 'rol', 'roles') : 'Ningún rol coincide con los filtros.'}
-                            soloAnunciar={roles.total === 0}
-                            activos={activos}
-                            onLimpiar={limpiar}
-                            idBusqueda="buscar-roles"
-                        >
-                            <CampoBusqueda id="buscar-roles" etiqueta="Buscar roles" placeholder="Buscar por nombre" valor={valores.q} onCambio={(v) => cambiar('q', v, { inmediato: false })} />
-                            <FiltroLista
-                                id="filtro-alcance"
-                                etiqueta="Qué ve de la operación"
-                                valor={valores.alcance}
-                                onCambio={(v) => cambiar('alcance', v)}
-                                opciones={[{ valor: '', texto: 'Cualquier alcance' }, ...alcances.map((a) => ({ valor: a.valor, texto: a.label }))]}
-                            />
-                            <FiltroLista
-                                id="filtro-estado"
-                                etiqueta="Estado"
-                                valor={valores.estado}
-                                onCambio={(v) => cambiar('estado', v)}
-                                opciones={[
-                                    { valor: '', texto: 'Activos e inactivos' },
-                                    { valor: 'activos', texto: 'Solo activos' },
-                                    { valor: 'inactivos', texto: 'Solo inactivos' },
-                                ]}
-                            />
-                        </BarraFiltros>
+                        {conFiltros && (
+                            <BarraFiltros
+                                resumen={roles.total ? plural(roles.total, 'rol', 'roles') : 'Ningún rol coincide con los filtros.'}
+                                soloAnunciar={roles.total === 0}
+                                activos={activos}
+                                onLimpiar={limpiar}
+                                idBusqueda="buscar-roles"
+                            >
+                                <CampoBusqueda
+                                    id="buscar-roles"
+                                    etiqueta="Buscar roles"
+                                    placeholder="Buscar por nombre"
+                                    valor={valores.q}
+                                    onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                                />
+                                <FiltroLista
+                                    id="filtro-alcance"
+                                    etiqueta="Qué ve de la operación"
+                                    valor={valores.alcance}
+                                    onCambio={(v) => cambiar('alcance', v)}
+                                    opciones={[{ valor: '', texto: 'Cualquier alcance' }, ...alcances.map((a) => ({ valor: a.valor, texto: a.label }))]}
+                                />
+                                <FiltroLista
+                                    id="filtro-estado"
+                                    etiqueta="Estado"
+                                    valor={valores.estado}
+                                    onCambio={(v) => cambiar('estado', v)}
+                                    opciones={[
+                                        { valor: '', texto: 'Activos e inactivos' },
+                                        { valor: 'activos', texto: 'Solo activos' },
+                                        { valor: 'inactivos', texto: 'Solo inactivos' },
+                                    ]}
+                                />
+                            </BarraFiltros>
+                        )}
 
                         {roles.data.length === 0 ? (
                             <SinResultados texto="Ningún rol coincide con los filtros." />
                         ) : (
-                            <Tabla titulo="Roles de la empresa" minimo="min-w-[860px]" columnas={['30%', '28%', '14%', '11%', '11%', '3.5rem']}>
-                                <thead className="text-muted-foreground border-b">
-                                    <tr>
-                                        <th scope="col" className={claseTh}>
-                                            Rol
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Qué puede ver
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Alcance
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Usuarios
-                                        </th>
-                                        <th scope="col" className={claseTh}>
-                                            Estado
-                                        </th>
-                                        <th scope="col" className={cn(claseTh, 'w-14')}>
-                                            <span className="sr-only">Acciones</span>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
+                            <>
+                                <div className="hidden lg:block">
+                                    <Tabla titulo="Roles de la empresa" minimo="min-w-[720px]" columnas={['36%', '34%', '15%', '15%', '3.5rem']}>
+                                        <thead className="text-muted-foreground border-b">
+                                            <tr>
+                                                <th scope="col" className={claseTh}>
+                                                    Rol
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Qué puede ver
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Alcance
+                                                </th>
+                                                <th scope="col" className={claseTh}>
+                                                    Usuarios
+                                                </th>
+                                                <th scope="col" className={cn(claseTh, 'w-14')}>
+                                                    <span className="sr-only">Acciones</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {roles.data.map((r) => (
+                                                <tr key={r.id} className={cn('hover:bg-muted/40 transition-colors', !r.activo && 'text-muted-foreground')}>
+                                                    <th scope="row" className={cn(claseTd, 'font-normal')}>
+                                                        {rolDe(r)}
+                                                    </th>
+                                                    <td className={claseTd}>{veDe(r)}</td>
+                                                    <td className={cn(claseTd, 'text-xs')}>{nombreAlcance(r.alcance)}</td>
+                                                    <td className={claseTd}>{usuariosDe(r)}</td>
+                                                    <td className={cn(claseTd, 'text-right')}>{accionesDe(r)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </Tabla>
+                                </div>
+                                <ul
+                                    role="list"
+                                    aria-label="Roles de la empresa"
+                                    className="bg-card divide-y overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] lg:hidden"
+                                >
                                     {roles.data.map((r) => (
-                                        <tr key={r.id} className={cn('hover:bg-muted/40 transition-colors', !r.activo && 'text-muted-foreground')}>
-                                            <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                                <div className="flex items-center gap-3">
-                                                    <Iniciales texto={r.nombre} />
-                                                    <div className="min-w-0">
-                                                        <p className="text-foreground flex items-center gap-2 font-semibold">
-                                                            <span className="truncate" title={r.nombre}>
-                                                                {r.nombre}
-                                                            </span>
-                                                            {r.base && (
-                                                                <span className="bg-secondary text-secondary-foreground shrink-0 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold">
-                                                                    Base
-                                                                </span>
-                                                            )}
-                                                        </p>
-                                                        <p className="text-muted-foreground truncate text-xs" title={r.descripcion ?? undefined}>
-                                                            {r.descripcion ?? 'Sin descripción'}
-                                                        </p>
+                                        <li key={r.id} className={cn('grid gap-3 px-4 py-4 sm:px-5', !r.activo && 'text-muted-foreground')}>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">{rolDe(r)}</div>
+                                                <div className="-mt-1 -mr-1">{accionesDe(r)}</div>
+                                            </div>
+                                            <dl className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2 text-sm">
+                                                {(
+                                                    [
+                                                        ['Qué puede ver', veDe(r, true)],
+                                                        ['Alcance', <span className="text-xs">{nombreAlcance(r.alcance)}</span>],
+                                                        ['Usuarios', usuariosDe(r)],
+                                                    ] as const
+                                                ).map(([rotulo, valor]) => (
+                                                    <div key={rotulo} className="contents">
+                                                        <dt className="text-muted-foreground text-xs font-semibold">{rotulo}</dt>
+                                                        <dd className="min-w-0">{valor}</dd>
                                                     </div>
-                                                </div>
-                                            </th>
-                                            <td className={claseTd}>
-                                                {r.resumen === 'Acceso total' ? (
-                                                    <span className="bg-brand-navy-deep inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold text-white">
-                                                        <ShieldCheck className="size-3.5" aria-hidden="true" />
-                                                        Acceso total
-                                                    </span>
-                                                ) : (
-                                                    <p className="line-clamp-2 text-xs leading-relaxed" title={r.resumen}>
-                                                        {r.resumen}
-                                                    </p>
-                                                )}
-                                            </td>
-                                            <td className={cn(claseTd, 'text-xs')}>{nombreAlcance(r.alcance)}</td>
-                                            <td className={claseTd}>
-                                                <ConteoEnlace
-                                                    n={r.usuarios}
-                                                    uno="usuario"
-                                                    varios="usuarios"
-                                                    ninguno="Ninguno"
-                                                    de={r.nombre}
-                                                    href={puede('usuarios.ver') ? route('usuarios.index', { rol: r.id }) : undefined}
-                                                />
-                                            </td>
-                                            <td className={claseTd}>
-                                                <EstadoBadge activo={r.activo} />
-                                            </td>
-                                            <td className={cn(claseTd, 'text-right')}>
-                                                <AccionesFila
-                                                    nombre={r.nombre}
-                                                    activo={r.activo}
-                                                    // Los roles base siempre están disponibles; nadie toca un rol con más permisos que el suyo
-                                                    urlEstado={!r.base && r.editable && puede('roles.estado') ? route('roles.estado', r.id) : undefined}
-                                                    onEditar={r.editable && puede('roles.editar') ? (boton) => abrir(r, boton) : undefined}
-                                                    urlEliminar={!r.base && r.editable && puede('roles.eliminar') ? route('roles.destroy', r.id) : undefined}
-                                                    consecuencia={`Ya no se ofrecerá al crear usuarios. ${
-                                                        r.usuarios === 0
-                                                            ? 'Nadie lo tiene asignado.'
-                                                            : r.usuarios === 1
-                                                              ? 'La persona que lo tiene lo conserva, con los mismos permisos.'
-                                                              : `Las ${r.usuarios} personas que lo tienen lo conservan, con los mismos permisos.`
-                                                    } Puedes volver a activarlo cuando quieras.`}
-                                                />
-                                            </td>
-                                        </tr>
+                                                ))}
+                                            </dl>
+                                        </li>
                                     ))}
-                                </tbody>
-                            </Tabla>
+                                </ul>
+                                {marcarBase && (
+                                    <p className="text-muted-foreground text-xs text-pretty">
+                                        Los roles <span className="text-foreground font-semibold">Base</span> vienen con la plataforma: no se desactivan ni se
+                                        eliminan.
+                                    </p>
+                                )}
+                            </>
                         )}
 
                         <Paginacion pagina={roles} nombre="roles" />
@@ -339,6 +384,7 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                 onEnviar={guardar}
                 procesando={form.processing}
                 textoEnviar={editando ? 'Guardar cambios' : 'Crear rol'}
+                ancho="amplio"
                 recuperado={borrador.recuperado}
                 onDescartar={borrador.descartar}
                 focoAlCerrar={origen}
@@ -486,63 +532,68 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                             <InputError id="permisos-error" message={form.errors.permisos} />
 
                             {catalogo.map((grupo) => (
-                                <fieldset key={grupo.clave} className="mt-2 grid gap-2">
-                                    <legend className="text-muted-foreground mb-1 text-[0.72rem] font-semibold tracking-wide uppercase">{grupo.titulo}</legend>
-                                    {Object.entries(grupo.modulos).map(([clave, modulo]) => {
-                                        const activo = form.data.permisos.includes(`${clave}.ver`);
-                                        return (
-                                            <fieldset
-                                                key={clave}
-                                                aria-describedby={`modulo-${clave}`}
-                                                className={cn('rounded-xl border px-3.5 py-3 transition-colors', activo && 'border-primary/40 bg-secondary/40')}
-                                            >
-                                                <legend className="sr-only">{modulo.titulo}</legend>
-                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1" aria-hidden="true">
-                                                    <span className="text-sm font-semibold">{modulo.titulo}</span>
-                                                    {modulo.pendiente && (
-                                                        <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold">
-                                                            <Hammer className="size-3" aria-hidden="true" />
-                                                            En construcción
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p id={`modulo-${clave}`} className="text-muted-foreground mt-0.5 text-xs">
-                                                    {modulo.descripcion}
-                                                    {modulo.pendiente && <span className="sr-only"> En construcción.</span>}
-                                                </p>
-                                                <ul role="list" className="mt-2.5 flex flex-wrap gap-x-4 gap-y-2">
-                                                    {Object.entries(modulo.acciones).map(([accion, texto]) => {
-                                                        const permiso = `${clave}.${accion}`;
-                                                        const id = `permiso-${clave}-${accion}`;
-                                                        const disponible = puedeDar(permiso) && aplica(form.data.alcance, clave);
-                                                        return (
-                                                            <li key={accion} className="flex items-center gap-2">
-                                                                <Checkbox
-                                                                    id={id}
-                                                                    checked={form.data.permisos.includes(permiso)}
-                                                                    disabled={!disponible}
-                                                                    onCheckedChange={(v) => alternar(clave, accion, v === true)}
-                                                                    aria-invalid={form.errors.permisos ? true : undefined}
-                                                                />
-                                                                <label
-                                                                    htmlFor={id}
-                                                                    className={cn('text-sm', disponible ? 'cursor-pointer' : 'text-muted-foreground')}
-                                                                    title={disponible ? undefined : motivoNoDisponible(permiso, clave)}
-                                                                >
-                                                                    {texto}
-                                                                    <span className="sr-only">
-                                                                        {' '}
-                                                                        {modulo.titulo}
-                                                                        {!disponible && ` (${motivoNoDisponible(permiso, clave).toLowerCase()})`}
-                                                                    </span>
-                                                                </label>
-                                                            </li>
-                                                        );
-                                                    })}
-                                                </ul>
-                                            </fieldset>
-                                        );
-                                    })}
+                                <fieldset key={grupo.clave} className="mt-3">
+                                    <legend className="mb-2 text-sm font-semibold">{grupo.titulo}</legend>
+                                    <div className="bg-card divide-y overflow-hidden rounded-xl border">
+                                        {Object.entries(grupo.modulos).map(([clave, modulo]) => {
+                                            const activo = form.data.permisos.includes(`${clave}.ver`);
+                                            return (
+                                                <fieldset
+                                                    key={clave}
+                                                    aria-describedby={`modulo-${clave}`}
+                                                    className={cn('px-4 py-3 transition-colors', activo && 'bg-secondary dark:bg-primary/10')}
+                                                >
+                                                    <legend className="sr-only">{modulo.titulo}</legend>
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1" aria-hidden="true">
+                                                        <span className="text-sm font-semibold">{modulo.titulo}</span>
+                                                        {modulo.pendiente && (
+                                                            <span className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+                                                                <Hammer className="size-3" aria-hidden="true" />
+                                                                En construcción
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p id={`modulo-${clave}`} className="text-muted-foreground mt-0.5 text-xs text-pretty">
+                                                        {modulo.descripcion}
+                                                        {modulo.pendiente && <span className="sr-only"> En construcción.</span>}
+                                                    </p>
+                                                    <ul role="list" className="mt-2.5 flex flex-wrap gap-x-5 gap-y-2">
+                                                        {Object.entries(modulo.acciones).map(([accion, texto]) => {
+                                                            const permiso = `${clave}.${accion}`;
+                                                            const id = `permiso-${clave}-${accion}`;
+                                                            const disponible = puedeDar(permiso) && aplica(form.data.alcance, clave);
+                                                            return (
+                                                                <li key={accion} className="flex items-center gap-2">
+                                                                    <Checkbox
+                                                                        id={id}
+                                                                        checked={form.data.permisos.includes(permiso)}
+                                                                        disabled={!disponible}
+                                                                        onCheckedChange={(v) => alternar(clave, accion, v === true)}
+                                                                        aria-invalid={form.errors.permisos ? true : undefined}
+                                                                    />
+                                                                    <label
+                                                                        htmlFor={id}
+                                                                        className={cn(
+                                                                            'text-sm',
+                                                                            disponible ? 'cursor-pointer' : 'text-muted-foreground',
+                                                                        )}
+                                                                        title={disponible ? undefined : motivoNoDisponible(permiso, clave)}
+                                                                    >
+                                                                        {texto}
+                                                                        <span className="sr-only">
+                                                                            {' '}
+                                                                            {modulo.titulo}
+                                                                            {!disponible && ` (${motivoNoDisponible(permiso, clave).toLowerCase()})`}
+                                                                        </span>
+                                                                    </label>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                </fieldset>
+                                            );
+                                        })}
+                                    </div>
                                 </fieldset>
                             ))}
                         </div>
