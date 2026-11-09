@@ -1,11 +1,13 @@
 import { fmt } from '@/lib/formato';
-import { ChevronDown } from '@/components/iconos';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Panel, Segmentado, Vacio } from './piezas';
+import { Panel, Segmentado, TablaGrafica, useTooltipDescartable, Vacio } from './piezas';
 import { type PuntoTendencia } from './tipos';
 
 type Vista = 'efectividad' | 'volumen';
+
+/** Con menos jornadas no hay evolución que ver: una línea entre uno o dos puntos no dice nada. */
+const MINIMO_JORNADAS = 3;
 
 const ejes = {
     tick: { fill: 'var(--chart-ink)', fontSize: 11 },
@@ -69,103 +71,47 @@ function TooltipTendencia({ active, payload, meta }: { active?: boolean; payload
     );
 }
 
-/** Tabla equivalente a la gráfica: alternativa textual completa (WCAG 1.1.1). */
-function TablaDatos({ datos, meta }: { datos: PuntoTendencia[]; meta: number }) {
-    const [abierta, setAbierta] = useState(false);
-    return (
-        <div className="mt-3 border-t pt-3">
-            <button
-                type="button"
-                onClick={() => setAbierta((a) => !a)}
-                aria-expanded={abierta}
-                aria-controls="tabla-tendencia"
-                className="text-primary flex items-center gap-1 text-xs font-semibold hover:underline"
-            >
-                <ChevronDown className={abierta ? 'size-4 rotate-180 transition-transform' : 'size-4 transition-transform'} aria-hidden="true" />
-                {abierta ? 'Ocultar los datos de la gráfica' : 'Ver los datos de la gráfica'}
-            </button>
-            <div
-                id="tabla-tendencia"
-                hidden={!abierta}
-                className="relative mt-3 max-h-72 overflow-auto rounded-lg border focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25"
-                tabIndex={0}
-                role="region"
-                aria-label="Datos de la gráfica, desplazable"
-            >
-                <table className="w-full text-left text-xs">
-                    <caption className="sr-only">Efectividad y volumen por jornada; meta {fmt.pctEntero(meta)}</caption>
-                    <thead className="bg-muted text-muted-foreground sticky top-0">
-                        <tr>
-                            <th scope="col" className="px-3 py-2 font-semibold">
-                                Fecha
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-right font-semibold">
-                                Efectividad
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-right font-semibold">
-                                Aprobadas
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-right font-semibold">
-                                Rechazadas
-                            </th>
-                            <th scope="col" className="px-3 py-2 text-right font-semibold">
-                                Asignadas
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {datos.map((d) => (
-                            <tr key={d.fecha}>
-                                <th scope="row" className="px-3 py-1.5 text-left font-medium whitespace-nowrap">
-                                    {fmt.fechaMedia(d.fecha)}
-                                </th>
-                                <td className="tabular px-3 py-1.5 text-right font-semibold">{fmt.pct(d.efectividad)}</td>
-                                <td className="tabular px-3 py-1.5 text-right">{fmt.numero(d.aprobadas)}</td>
-                                <td className="tabular px-3 py-1.5 text-right">{fmt.numero(d.rechazadas)}</td>
-                                <td className="tabular px-3 py-1.5 text-right">{fmt.numero(d.asignadas)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
 /** Evolución diaria: efectividad vs. meta, o volumen aprobadas/rechazadas. Un solo eje por gráfica. */
 export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; meta: number }) {
     const [vista, setVista] = useState<Vista>('efectividad');
-    // Escape oculta el tooltip (WCAG 1.4.13); se vuelve a mostrar al mover el puntero o las flechas
-    const [tooltipOculto, setTooltipOculto] = useState(false);
+    const tooltip = useTooltipDescartable();
     const minimo = Math.max(0, Math.floor((Math.min(...datos.map((d) => d.efectividad), meta) - 5) / 5) * 5);
     const muchos = datos.length > 20;
 
     const efectividades = datos.map((d) => d.efectividad);
+    const enMeta = datos.filter((d) => d.efectividad >= meta).length;
     const resumen =
         datos.length > 0
-            ? `${datos.length} jornadas del ${fmt.fechaMedia(datos[0].fecha)} al ${fmt.fechaMedia(datos[datos.length - 1].fecha)}. ` +
+            ? `${datos.length} ${datos.length === 1 ? 'jornada' : 'jornadas'} del ${fmt.fechaMedia(datos[0].fecha)} al ${fmt.fechaMedia(datos[datos.length - 1].fecha)}. ` +
               `Efectividad entre ${fmt.pct(Math.min(...efectividades))} y ${fmt.pct(Math.max(...efectividades))}; meta ${fmt.pctEntero(meta)}. ` +
-              `${datos.filter((d) => d.efectividad >= meta).length} jornadas en meta.`
+              `${enMeta} ${enMeta === 1 ? 'jornada' : 'jornadas'} en meta.`
             : '';
+    const conGrafica = datos.length >= MINIMO_JORNADAS;
 
     return (
         <Panel
+            nivel={3}
             titulo="Evolución diaria"
-            descripcion={vista === 'efectividad' ? 'Efectividad por jornada frente a la meta' : 'Entregas aprobadas y rechazadas por jornada'}
+            descripcion={
+                !conGrafica ? undefined : vista === 'efectividad' ? 'Efectividad por jornada frente a la meta' : 'Entregas aprobadas y rechazadas por jornada'
+            }
             acciones={
-                <Segmentado<Vista>
-                    etiqueta="Tipo de gráfica"
-                    valor={vista}
-                    onChange={setVista}
-                    opciones={[
-                        { valor: 'efectividad', texto: 'Efectividad' },
-                        { valor: 'volumen', texto: 'Volumen' },
-                    ]}
-                />
+                conGrafica && (
+                    <Segmentado<Vista>
+                        etiqueta="Tipo de gráfica"
+                        valor={vista}
+                        onChange={setVista}
+                        opciones={[
+                            { valor: 'efectividad', texto: 'Efectividad' },
+                            { valor: 'volumen', texto: 'Volumen' },
+                        ]}
+                    />
+                )
             }
         >
-            {datos.length === 0 ? (
-                <Vacio>No hay jornadas en el periodo seleccionado.</Vacio>
+            {!conGrafica ? (
+                // Cuántas jornadas hay ya lo dice la tarjeta de entregas
+                <Vacio>La evolución se ve desde {MINIMO_JORNADAS} jornadas.</Vacio>
             ) : (
                 <>
                     <div className="mb-3">
@@ -182,14 +128,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                             />
                         )}
                     </div>
-                    <div
-                        className="h-72"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Escape') setTooltipOculto(true);
-                            else if (e.key.startsWith('Arrow')) setTooltipOculto(false);
-                        }}
-                        onMouseMove={() => tooltipOculto && setTooltipOculto(false)}
-                    >
+                    <div className="h-72" {...tooltip.manejadores}>
                         <ResponsiveContainer width="100%" height="100%">
                             {vista === 'efectividad' ? (
                                 <LineChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} title="Efectividad diaria frente a la meta" desc={resumen}>
@@ -204,7 +143,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                                         label={{ value: `Meta ${fmt.pctEntero(meta)}`, position: 'insideBottomLeft', fill: 'var(--muted-foreground)', fontSize: 11, fontWeight: 600 }}
                                     />
                                     <Tooltip
-                                        active={tooltipOculto ? false : undefined}
+                                        active={tooltip.oculto ? false : undefined}
                                         content={<TooltipTendencia meta={meta} />}
                                         cursor={{ stroke: 'var(--chart-axis)', strokeWidth: 1 }}
                                         wrapperStyle={{ outline: 'none' }}
@@ -237,7 +176,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                                     <XAxis dataKey="fecha" tickFormatter={fmt.fechaCorta} {...ejes} minTickGap={24} />
                                     <YAxis allowDecimals={false} {...ejes} axisLine={false} width={48} />
                                     <Tooltip
-                                        active={tooltipOculto ? false : undefined}
+                                        active={tooltip.oculto ? false : undefined}
                                         content={<TooltipTendencia meta={meta} />}
                                         cursor={{ fill: 'var(--muted)', opacity: 0.7 }}
                                         wrapperStyle={{ outline: 'none' }}
@@ -248,7 +187,21 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                             )}
                         </ResponsiveContainer>
                     </div>
-                    <TablaDatos datos={datos} meta={meta} />
+                    <TablaGrafica
+                        id="tabla-tendencia"
+                        resumen={`Efectividad y volumen por jornada; meta ${fmt.pctEntero(meta)}`}
+                        columnas={[
+                            { texto: 'Fecha' },
+                            { texto: 'Efectividad', numero: true, destacada: true },
+                            { texto: 'Aprobadas', numero: true },
+                            { texto: 'Rechazadas', numero: true },
+                            { texto: 'Asignadas', numero: true },
+                        ]}
+                        filas={datos.map((d) => ({
+                            clave: d.fecha,
+                            celdas: [fmt.fechaMedia(d.fecha), fmt.pct(d.efectividad), fmt.numero(d.aprobadas), fmt.numero(d.rechazadas), fmt.numero(d.asignadas)],
+                        }))}
+                    />
                 </>
             )}
         </Panel>

@@ -142,7 +142,7 @@ export default function Seguimiento({ filtros, periodo, sedes, personas, tiposAc
                 <Tabla titulo="Desempeño por persona" minimo="min-w-[980px]" columnas={['26%', '8%', '12%', '13%', '10%', '10%', '21%']}>
                     <thead className="text-muted-foreground border-b">
                         <tr>
-                            {['Persona', 'Jornadas', 'Entregas', 'Cumplimiento', 'Sin evidencias', 'Protocolo', 'Acciones del periodo'].map((t) => (
+                            {['Persona', 'Jornadas', 'Entregas', 'Efectividad', 'Sin evidencias', 'Protocolo', 'Acciones del periodo'].map((t) => (
                                 <th key={t} scope="col" className={claseTh}>
                                     {t}
                                 </th>
@@ -337,7 +337,7 @@ function DetallePersona({ persona, tiposAccion }: { persona: Persona; tiposAccio
                                             {a.descripcion && <p className="break-words">{a.descripcion}</p>}
                                             <p className="text-muted-foreground text-xs">
                                                 {fmt.fechaMedia(a.fecha)}
-                                                {a.efectividad !== null && ` · cumplimiento del día ${fmt.pct(a.efectividad)}`}
+                                                {a.efectividad !== null && ` · efectividad del día ${fmt.pct(a.efectividad)}`}
                                                 {a.registradaPor && ` · ${a.registradaPor}`}
                                             </p>
                                         </div>

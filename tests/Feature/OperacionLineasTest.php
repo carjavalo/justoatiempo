@@ -224,9 +224,11 @@ class OperacionLineasTest extends TestCase
         // El tablero de la línea muestra la operación de hoy y la novedad sin cerrar
         $this->get('/lineas/aseo-general')->assertInertia(fn (Assert $p) => $p
             ->where('hoy.presentes', 1)
+            ->where('hoy.faltas', 1)
             ->where('hoy.cobertura', 50)
-            ->where('novedades.abiertas', 1)
-            ->where('novedades.graves', 1));
+            ->where('novedades.sinCerrar', 1)
+            ->where('novedades.graves', 1)
+            ->where('novedades.recientes.0.tipo', 'Inasistencia'));
 
         $respuesta = $this->get('/lineas/aseo-general/informe/descargar?desde='.today()->toDateString().'&hasta='.today()->toDateString());
         $respuesta->assertOk();
@@ -250,6 +252,73 @@ class OperacionLineasTest extends TestCase
         $this->actingAs($sinLinea)->get('/lineas/aseo-general/programacion')
             ->assertForbidden()
             ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Esta herramienta es de las líneas de servicio: aún no trabajas en ninguna.'));
+    }
+
+    public function test_hoy_dice_lo_mismo_en_el_tablero_que_en_el_inicio_con_las_ausencias_y_lo_que_falta_registrar(): void
+    {
+        $eva = User::factory()->sinAcceso()->create(['name' => 'Eva Paz', 'cedula' => '1004', 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id]);
+        $programacion = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 3]);
+        $programacion->asignaciones()->create(['user_id' => $this->ana->id, 'asistencia' => EstadoAsistencia::Asistio]);
+        $programacion->asignaciones()->create(['user_id' => $this->luis->id, 'asistencia' => EstadoAsistencia::Permiso]);
+        $programacion->asignaciones()->create(['user_id' => $eva->id]);
+        // Un lugar con menos personas de las que pidió el cliente
+        Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $this->planta->id, 'personas_requeridas' => 2]);
+        NovedadLinea::create(['linea_servicio_id' => $this->aseo->id, 'fecha' => today(), 'empresa_id' => $this->bodegas->id, 'tipo' => 'Faltante', 'gravedad' => 'leve', 'descripcion' => 'Sin guantes.', 'estado' => 'en_seguimiento']);
+
+        $admin = User::factory()->admin()->create();
+        $tablero = $this->actingAs($admin)->get('/lineas/aseo-general')->viewData('page')['props'];
+        $inicio = collect($this->get('/panel')->viewData('page')['props']['lineas'])->firstWhere('slug', 'aseo-general');
+
+        // La ausencia justificada se cuenta aparte de las faltas; quien no tiene registro no es una falta
+        $this->assertEquals([
+            'lugares' => 2, 'incompletos' => 1, 'requeridas' => 5, 'necesarias' => 5, 'programadas' => 3,
+            'presentes' => 1, 'faltas' => 0, 'justificadas' => 1, 'sinRegistrar' => 1, 'cobertura' => 20,
+            'href' => '/lineas/aseo-general/programacion',
+        ], $tablero['hoy']);
+        $this->assertEquals($inicio['hoy'], $tablero['hoy']);
+        // "Sin cerrar": las abiertas y las que están en seguimiento
+        $this->assertEquals(['sinCerrar' => 1, 'graves' => 0, 'href' => '/lineas/aseo-general/novedades'], $inicio['novedades']);
+        $this->assertEquals($inicio['novedades'], collect($tablero['novedades'])->except('recientes')->all());
+    }
+
+    public function test_mientras_la_linea_no_se_ha_programado_el_tablero_dice_que_falta_para_operarla(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->actingAs($admin)->get('/lineas/aseo-general')->assertInertia(fn (Assert $p) => $p
+            ->where('primerosPasos.empresas', 1)
+            ->where('primerosPasos.personas', fn ($n) => $n >= 2)
+            ->where('primerosPasos.marcaEmpresas', true)
+            // Las asignaciones de esta línea (ahí se crean) y su programación
+            ->where('primerosPasos.asignaciones', "/asignaciones?linea={$this->aseo->id}")
+            ->where('primerosPasos.programacion', '/lineas/aseo-general/programacion')
+            ->where('cobertura', []));
+
+        // Con la primera programación la guía se va y aparece la cobertura de los 14 días anteriores (hoy va en "Hoy")
+        $ayer = Programacion::create(['fecha' => today()->subDay(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 2]);
+        $ayer->asignaciones()->create(['user_id' => $this->ana->id, 'asistencia' => EstadoAsistencia::Asistio]);
+        // Un día programado sin ninguna asistencia registrada no se califica (como en el informe)
+        $antier = Programacion::create(['fecha' => today()->subDays(2), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 2]);
+        $antier->asignaciones()->create(['user_id' => $this->ana->id]);
+        $this->get('/lineas/aseo-general')->assertInertia(fn (Assert $p) => $p
+            ->where('primerosPasos', null)
+            ->has('cobertura', 14)
+            ->where('cobertura.0', ['fecha' => today()->subDays(14)->toDateString(), 'programado' => false, 'cobertura' => null])
+            ->where('cobertura.12', ['fecha' => today()->subDays(2)->toDateString(), 'programado' => true, 'cobertura' => null])
+            ->where('cobertura.13', ['fecha' => today()->subDay()->toDateString(), 'programado' => true, 'cobertura' => 50])
+            ->where('hoy.lugares', 0));
+    }
+
+    public function test_a_quien_trabaja_en_una_sede_no_le_sale_la_guia_si_la_linea_ya_se_programa_en_su_empresa(): void
+    {
+        // Luis trabaja en la Planta Yumbo; la línea se programa en "toda la empresa" y allí tiene su turno
+        $programacion = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 1]);
+        $programacion->asignaciones()->create(['user_id' => $this->luis->id]);
+        $supervisor = User::factory()->coordinador()->create(['linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $this->planta->id]);
+        $programacion->asignaciones()->create(['user_id' => $supervisor->id]);
+
+        $this->actingAs($supervisor)->get('/lineas/aseo-general')->assertInertia(fn (Assert $p) => $p
+            ->where('primerosPasos', null)
+            ->has('misTurnos', 1));
     }
 
     public function test_cada_persona_ve_sus_turnos_en_el_tablero(): void

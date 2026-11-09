@@ -94,7 +94,7 @@ export function MenuLateral({ grupos }: { grupos: GrupoMenu[] }) {
                                 <SidebarGroupLabel
                                     id={`grupo-menu-${g}`}
                                     // Contraído, el título se oculta: que no tape la parte baja del ícono anterior
-                                    className="text-sidebar-foreground/80 text-[0.68rem] font-semibold tracking-[0.12em] uppercase group-data-[collapsible=icon]:pointer-events-none"
+                                    className="text-sidebar-foreground/80 text-[0.6875rem] font-semibold tracking-[0.12em] uppercase group-data-[collapsible=icon]:pointer-events-none"
                                 >
                                     {grupo.titulo}
                                 </SidebarGroupLabel>

@@ -90,7 +90,7 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                         </h2>
                         <ul role="list" className="grid grid-cols-2 gap-3 md:grid-cols-4">
                             <Dato
-                                titulo="Cumplimiento"
+                                titulo="Efectividad"
                                 valor={fmt.pct(resumen.cumplimiento)}
                                 detalle={nivel && <EstadoNivel nivel={nivel.nivel}>{nivel.texto}</EstadoNivel>}
                             />
@@ -123,7 +123,7 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                                             Entregas
                                         </th>
                                         <th scope="col" className={claseTh}>
-                                            Cumplimiento
+                                            Efectividad
                                         </th>
                                     </tr>
                                 </thead>
@@ -181,7 +181,9 @@ export default function MisEntregas({ jornadas, resumen, fecha, ordenes }: Props
                                 cuerpoClassName="px-0 pb-0"
                             >
                                 {ordenes.length === 0 ? (
-                                    <Vacio>Sin órdenes en esta jornada.</Vacio>
+                                    <div className="px-5 pb-5">
+                                        <Vacio>Sin órdenes en esta jornada.</Vacio>
+                                    </div>
                                 ) : (
                                     <ul role="list" aria-label="Órdenes de la jornada" className="divide-y border-t">
                                         {ordenes.map((o) => {

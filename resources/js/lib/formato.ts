@@ -47,6 +47,12 @@ export function variacion(actual: number | null, previo: number | null, modo: 'p
 
 export type NivelEstado = 'good' | 'warning' | 'critical';
 
+/** "Buenos días", "Buenas tardes" o "Buenas noches", según la hora de quien mira. */
+export function saludo(): string {
+    const hora = new Date().getHours();
+    return hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+
 /** Semáforo del Excel de la operación: 100 % completa, 80 a 99 % revisar pendientes, menos de 80 % seguimiento inmediato. */
 export function semaforo(cumplimiento: number | null): { nivel: NivelEstado; texto: string } | null {
     if (cumplimiento === null) return null;

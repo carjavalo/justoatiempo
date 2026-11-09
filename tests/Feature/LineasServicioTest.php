@@ -123,7 +123,6 @@ class LineasServicioTest extends TestCase
 
         $this->actingAs($this->admin)->get('/lineas/aseo-general')
             ->assertInertia(fn (Assert $p) => $p->component('lineas/linea')
-                ->where('puedeEmpresas', true)
                 ->where('puedeUsuarios', true)
                 ->has('empresas', 1)
                 ->where('empresas.0.nombre', 'Bodegas del Valle')
@@ -190,11 +189,11 @@ class LineasServicioTest extends TestCase
 
         $deDitransa = User::factory()->coordinador()->create(['empresa_id' => $tugo->empresa_id]);
         $this->actingAs($deDitransa)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->has('acciones', 0)->where('pendientes.ultimaCarga', null));
+            ->assertInertia(fn (Assert $p) => $p->has('acciones', 0)->where('dia.cargas', null));
 
-        // El personal propio sí ve las acciones generales y la última carga
+        // El personal propio sí ve las acciones generales y las cargas de Drivin (que mezclan empresas)
         $this->actingAs(User::factory()->coordinador()->create())->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->has('acciones', 1)->whereNot('pendientes.ultimaCarga', null));
+            ->assertInertia(fn (Assert $p) => $p->has('acciones', 1)->where('dia.cargas.href', '/cargas'));
     }
 
     public function test_el_personal_propio_con_sucursal_propia_ve_toda_la_linea(): void

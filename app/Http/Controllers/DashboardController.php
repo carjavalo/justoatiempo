@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\EstadoCarga;
-use App\Enums\EstadoInforme;
 use App\Enums\TipoAccion;
 use App\Models\AccionDesempeno;
 use App\Models\Carga;
@@ -14,6 +12,7 @@ use App\Models\Parametro;
 use App\Models\Sede;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
+use App\Support\DiaLogistica;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -99,8 +98,8 @@ class DashboardController extends Controller
             'porSede' => $esAuxiliar ? [] : $this->porSede($base($desde, $hasta)),
             'ranking' => $this->ranking($base($desde, $hasta), $desde, $hasta, $limitarAcciones ? $this->informesDe($ubicacion) : null),
             'protocolo' => $this->protocolo($base($desde, $hasta)),
-            // La última carga de Drivin solo la ve quien puede abrir Cargas
-            'pendientes' => $esAuxiliar ? null : $this->pendientes($ubicacion, $user->puede('cargas.ver')),
+            // Arriba, el día de la línea (el mismo de su tarjeta en el inicio): no depende del periodo ni de la sede
+            'dia' => (new DiaLogistica($user))->todo(),
             'acciones' => $this->accionesRecientes($auxiliarId, $ubicacion, $limitarAcciones),
         ]);
     }
@@ -121,6 +120,7 @@ class DashboardController extends Controller
                 SUM(a.cumple_protocolo) as cumplen,
                 SUM(a.sin_evidencia) as sin_evidencia,
                 SUM(ordenes.estado = 'aprobada' AND a.id IS NULL) as sin_auditar,
+                COUNT(DISTINCT ordenes.id) as ordenes,
                 COUNT(DISTINCT ordenes.auxiliar_id) as auxiliares,
                 COUNT(DISTINCT ordenes.fecha_operacion) as jornadas
             ")
@@ -131,7 +131,9 @@ class DashboardController extends Controller
         $auditadas = (int) $r->auditadas;
 
         return [
+            // Las entregas son los productos; cada orden (un pedido de Drivin) trae uno o varios
             'asignadas' => $asignadas,
+            'ordenes' => (int) $r->ordenes,
             'aprobadas' => $aprobadas,
             'rechazadas' => (int) $r->rechazadas,
             'efectividad' => ConsolidadorInforme::efectividad($aprobadas, $asignadas),
@@ -299,37 +301,6 @@ class DashboardController extends Controller
                 ['clave' => 'destapado', 'nombre' => 'Producto destapado', 'detalle' => 'mín. 4 fotos o nota firmada', 'cumplimiento' => $pct($r->destapado)],
                 ['clave' => 'remesa', 'nombre' => 'Remesa firmada', 'detalle' => 'factura o remesa', 'cumplimiento' => $pct($r->remesa)],
             ],
-        ];
-    }
-
-    /**
-     * @param  list<int>  $sedes
-     * @param  bool  $verCarga  la última carga de Drivin mezcla empresas: solo para el personal propio
-     */
-    private function pendientes(Closure $ubicacion, bool $verCarga): array
-    {
-        return [
-            'informes' => $ubicacion(InformeDiario::query())
-                ->with(['sede:id,nombre,color', 'sucursal:id,nombre'])
-                ->where('estado', '<>', EstadoInforme::Cerrado)
-                ->orderByDesc('fecha_operacion')
-                ->limit(6)
-                ->get()
-                ->map(fn (InformeDiario $i) => [
-                    'id' => $i->id,
-                    'fecha' => $i->fecha_operacion->toDateString(),
-                    'sede' => $i->sede?->nombre,
-                    'color' => $i->sede?->color,
-                    'sucursal' => $i->sucursal?->nombre,
-                    'estado' => $i->estado->value,
-                    'estadoLabel' => $i->estado->label(),
-                    'efectividad' => (float) $i->efectividad,
-                    'asignadas' => $i->total_asignadas,
-                    'sinAuditar' => $i->ordenes()->where('estado', 'aprobada')->whereDoesntHave('auditoria')->count(),
-                ]),
-            'ultimaCarga' => $verCarga
-                ? Carga::where('estado', '<>', EstadoCarga::Anulada)->latest('id')->first(['id', 'archivo_nombre', 'fecha_operacion', 'total_filas', 'estado', 'procesado_en'])
-                : null,
         ];
     }
 

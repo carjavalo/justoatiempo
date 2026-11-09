@@ -19,7 +19,11 @@ export function MotivosRechazo({ motivos }: { motivos: MotivoRechazo[] }) {
     const mayor = Math.max(1, ...visibles.map((m) => m.total));
 
     return (
-        <Panel titulo="Motivos de rechazo" descripcion={total ? `${fmt.numero(total)} entregas no efectuadas en el periodo` : undefined}>
+        <Panel
+            nivel={3}
+            titulo="Motivos de rechazo"
+            descripcion={total ? `${fmt.numero(total)} ${total === 1 ? 'entrega no efectuada' : 'entregas no efectuadas'} en el periodo` : undefined}
+        >
             {total === 0 ? (
                 <Vacio>Sin rechazos: todas las entregas fueron aprobadas.</Vacio>
             ) : (
@@ -30,9 +34,14 @@ export function MotivosRechazo({ motivos }: { motivos: MotivoRechazo[] }) {
                             <li key={m.motivo} className="group">
                                 <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[0.8rem]">
                                     <span className={cn('break-words', i === 0 ? 'font-semibold' : 'text-foreground/85')}>{m.motivo}</span>
+                                    {/* El punto separa la cantidad del porcentaje: "3 · 100,0 %" no se lee como 3100 */}
                                     <span className="tabular shrink-0">
                                         <span className="font-bold">{fmt.numero(m.total)}</span>
-                                        <span className="text-muted-foreground ml-1.5 inline-block w-11 text-right">{fmt.pct(pct)}</span>
+                                        <span className="text-muted-foreground">
+                                            <span aria-hidden="true"> · </span>
+                                            <span className="sr-only">, </span>
+                                            {fmt.pct(pct)}
+                                        </span>
                                     </span>
                                 </div>
                                 <div className="bg-muted h-2 overflow-hidden rounded-full">
@@ -53,7 +62,7 @@ export function MotivosRechazo({ motivos }: { motivos: MotivoRechazo[] }) {
 /** Efectividad por sede (TuGo, Sodimac…) frente a su propia meta pactada. */
 export function EfectividadPorSede({ sedes }: { sedes: EfectividadSede[] }) {
     return (
-        <Panel titulo="Efectividad por sede" descripcion="Cada barra frente a la meta pactada con la sede">
+        <Panel nivel={3} titulo="Efectividad por sede" descripcion="Cada barra frente a la meta pactada con la sede">
             {sedes.length === 0 ? (
                 <Vacio>Sin operación en el periodo.</Vacio>
             ) : (
@@ -90,6 +99,7 @@ export function CumplimientoProtocolo({ protocolo }: { protocolo: Protocolo }) {
 
     return (
         <Panel
+            nivel={3}
             titulo="Protocolo de evidencias (POD)"
             descripcion={protocolo.auditadas ? `${fmt.numero(protocolo.auditadas)} órdenes auditadas en el periodo · meta ${META_POD} % por componente` : undefined}
         >

@@ -400,6 +400,6 @@ body::-webkit-scrollbar-track {
 
 .recharts-surface:focus-visible {
     outline: 2px solid var(--ring);
-    outline-offset: 4px;
+    outline-offset: 0;
     border-radius: 6px;
 }

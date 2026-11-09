@@ -171,15 +171,15 @@ class SolicitudesContactoTest extends TestCase
         $this->assertNull($vieja->atendida_en);
     }
 
-    public function test_el_panel_avisa_cuantas_solicitudes_faltan_por_atender()
+    public function test_cuantas_solicitudes_faltan_por_atender_se_dice_una_sola_vez_en_el_menu()
     {
         $admin = User::factory()->admin()->create();
         SolicitudContacto::create([...collect($this->datos())->except(['autoriza_datos', 'sitio_web'])->all()]);
         SolicitudContacto::create([...collect($this->datos())->except(['autoriza_datos', 'sitio_web'])->all(), 'atendida' => true]);
 
         $this->actingAs($admin)->get('/panel')->assertInertia(fn (Assert $p) => $p
-            // En el inicio, lo que pide atención; en el menú, el contador
-            ->where('pendientes', fn ($p) => collect($p)->firstWhere('clave', 'solicitudes')['texto'] === '1 solicitud de cotización sin atender')
+            // El contador va en el menú, en "Solicitudes" (a la vista en todas las páginas); el inicio no lo repite
+            ->where('pendientes', fn ($p) => ! collect($p)->contains('clave', 'solicitudes'))
             ->where('menu', fn ($menu) => collect($menu)->flatMap(fn ($g) => $g['items'])->firstWhere('titulo', 'Solicitudes')['contador'] === 1));
     }
 }

@@ -206,7 +206,7 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                     {/* Como la hoja "Dashboard Gerencial" */}
                     <ul role="list" aria-label="Resumen de la jornada" className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Dato
-                            titulo="Cumplimiento"
+                            titulo="Efectividad"
                             valor={fmt.pct(resumen.cumplimiento)}
                             detalle={nivelDia && <EstadoNivel nivel={nivelDia.nivel}>{nivelDia.texto}</EstadoNivel>}
                         />
@@ -243,7 +243,7 @@ export default function Informes({ fecha, anterior, siguiente, sede, sedes, info
                                     <caption className="sr-only">Resumen de la jornada por ciudad</caption>
                                     <thead className="text-muted-foreground border-y">
                                         <tr>
-                                            {['Ciudad', 'Auxiliares', 'Asignadas', 'Realizadas', 'Pendientes', 'Con novedad', 'Cumplimiento'].map(
+                                            {['Ciudad', 'Auxiliares', 'Asignadas', 'Realizadas', 'Pendientes', 'Con novedad', 'Efectividad'].map(
                                                 (t) => (
                                                     <th key={t} scope="col" className={claseTh}>
                                                         {t}
@@ -331,7 +331,7 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
                     {[informe.empresa, informe.ciudad].filter(Boolean).join(' · ')}
                     {cumplimiento !== null && (
                         <>
-                            {' · '}Cumplimiento <strong className="text-foreground">{fmt.pct(cumplimiento)}</strong> (meta{' '}
+                            {' · '}Efectividad <strong className="text-foreground">{fmt.pct(cumplimiento)}</strong> (meta{' '}
                             {fmt.pctEntero(informe.meta)}){nivel && <span className="sr-only">: {nivel.texto}</span>}
                         </>
                     )}
@@ -392,7 +392,7 @@ function InformeSede({ informe, onAccion, onObservacion }: { informe: Informe; o
                             'Trabajador',
                             'Operación',
                             'Entregas',
-                            'Cumplimiento',
+                            'Efectividad',
                             'Novedades',
                             'Incidencias',
                             'Evidencias',
@@ -667,13 +667,13 @@ function DialogoAccion({
 
     const porQue =
         fila.sugerencia === 'felicitacion'
-            ? `Cumplimiento del ${fmt.pct(fila.cumplimiento)} y sin novedades.`
+            ? `Efectividad del ${fmt.pct(fila.cumplimiento)} y sin novedades.`
             : fila.sugerencia === 'llamado_atencion'
-              ? `Cumplimiento por debajo del ${fmt.pctEntero(umbrales.llamado)}.`
+              ? `Efectividad por debajo del ${fmt.pctEntero(umbrales.llamado)}.`
               : fila.sugerencia === 'retroalimentacion'
                 ? fila.novedades && fila.novedades !== 'Sin novedad'
                     ? `Novedades del día: ${fila.novedades}.`
-                    : `Cumplimiento del ${fmt.pct(fila.cumplimiento)}, por debajo del ${fmt.pctEntero(umbrales.felicitacion)} de la felicitación.`
+                    : `Efectividad del ${fmt.pct(fila.cumplimiento)}, por debajo del ${fmt.pctEntero(umbrales.felicitacion)} de la felicitación.`
                 : null;
 
     return (

@@ -51,6 +51,9 @@ function recordarModo(modo: Modo | null) {
     }
 }
 
+/** El ejemplo del primer campo, según el teclado que abre: cédula, correo o cualquiera de los dos (en un computador). */
+const EJEMPLO = { numeric: 'Ej.: 1144123456', email: 'Ej.: nombre@correo.com', text: 'Ej.: 1144123456 o nombre@correo.com' } as const;
+
 /** Un correo: lleva @. */
 const esCorreo = (texto: string) => texto.includes('@');
 
@@ -239,6 +242,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                             spellCheck={false}
                             autoFocus={!correo}
                             autoComplete="username"
+                            placeholder={EJEMPLO[teclado]}
                             value={data.email}
                             onChange={(e) => escribir('email', e.target.value)}
                             className={cn('h-11 rounded-lg pl-9', conBotonTeclado && 'pr-12')}
@@ -280,6 +284,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                             required
                             autoFocus={!!correo}
                             autoComplete="current-password"
+                            placeholder="Escribe tu contraseña"
                             value={data.password}
                             onChange={(e) => escribir('password', e.target.value)}
                             onKeyDown={revisarMayusculas}

@@ -72,6 +72,7 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
 
     return (
         <Panel
+            nivel={3}
             titulo="Ranking de auxiliares"
             descripcion={
                 <>
@@ -88,7 +89,8 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
             cuerpoClassName="px-0 pb-2"
             acciones={
                 filas.length > 1 && (
-                    <label className="bg-card border-input focus-within:ring-ring flex h-8 items-center gap-2 rounded-lg border px-2.5 focus-within:ring-2">
+                    // Un campo: borde y halo de 3 px, como los demás campos
+                    <label className="bg-card border-input focus-within:border-ring focus-within:ring-ring/25 flex h-8 items-center gap-2 rounded-lg border px-2.5 transition-[border-color,box-shadow] focus-within:ring-[3px]">
                         <Search className="text-muted-foreground size-3.5" aria-hidden="true" />
                         <span className="sr-only">Buscar auxiliar por nombre o cédula</span>
                         <input
@@ -103,7 +105,7 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
             }
         >
             {filas.length === 0 ? (
-                <div className="px-5 pb-3">
+                <div className="px-5 pb-5">
                     <Vacio>Sin entregas asignadas en el periodo.</Vacio>
                 </div>
             ) : (
@@ -117,7 +119,7 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
                     >
                         <table id="tabla-ranking" className="w-full min-w-[860px] text-left text-sm">
                             <caption className="sr-only">Ranking de auxiliares del periodo, meta {fmt.pctEntero(meta)}</caption>
-                            <thead className="text-muted-foreground border-y text-[0.72rem] tracking-wide uppercase">
+                            <thead className="text-muted-foreground border-y text-xs">
                                 <tr>
                                     <th scope="col" className="w-10 py-2.5 pl-5 font-semibold">
                                         <span aria-hidden="true">#</span>
@@ -144,9 +146,13 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {mostradas.map((f, i) => {
+                                {mostradas.map((f) => {
                                     const nivel = nivelFrenteAMeta(f.efectividad, meta)!;
-                                    const puesto = orden.col === 'efectividad' && !orden.asc && !busqueda ? i + 1 : null;
+                                    // Empates: la misma efectividad comparte puesto (1, 1, 3…)
+                                    const puesto =
+                                        orden.col === 'efectividad' && !orden.asc && !busqueda
+                                            ? ordenadas.findIndex((o) => o.efectividad === f.efectividad) + 1
+                                            : null;
                                     return (
                                         <tr key={f.id} className="hover:bg-muted/40 transition-colors">
                                             <td className="text-muted-foreground tabular py-3 pl-5 text-xs font-bold">
@@ -249,7 +255,7 @@ export function RankingAuxiliares({ filas, meta }: { filas: FilaRanking[]; meta:
                                 onClick={() => setTodos((t) => !t)}
                                 aria-expanded={todos}
                                 aria-controls="tabla-ranking"
-                                className="text-primary text-xs font-semibold hover:underline"
+                                className="text-primary focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-hidden text-xs font-semibold hover:underline"
                             >
                                 {todos ? 'Ver menos' : `Ver los ${ordenadas.length} auxiliares`}
                             </button>

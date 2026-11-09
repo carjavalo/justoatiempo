@@ -1,8 +1,10 @@
 import { EstadoBadge } from '@/components/admin/piezas';
-import { Dato, EstadoBadge as EstadoNivel, Panel, Vacio } from '@/components/dashboard/piezas';
-import { AlertTriangle, Building2, CalendarClock, UsersRound } from '@/components/iconos';
-import { MarcoLinea } from '@/components/linea/marco-linea';
-import { fmt, semaforo } from '@/lib/formato';
+import { EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
+import { ArrowRight, Check } from '@/components/iconos';
+import { type DiaLinea, type EnPantalla, fechaDia, FranjaHoy, pasosLinea, plural, sinRepetir } from '@/components/linea/dia';
+import { type DiaCobertura, GraficaCobertura, MINIMO_DIAS } from '@/components/linea/grafica-cobertura';
+import { MarcoLinea, useYaEnPantalla } from '@/components/linea/marco-linea';
+import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 
@@ -15,23 +17,8 @@ interface Empresa {
     personas: number;
 }
 
-interface Hoy {
-    fecha: string;
-    lugares: number;
-    requeridas: number;
-    programadas: number;
-    presentes: number;
-    faltas: number;
-    sinRegistrar: number;
-    cobertura: number | null;
-    /** Cobertura de cada uno de los últimos 14 días (null: sin programación). */
-    tendencia: { fecha: string; cobertura: number | null }[];
-}
-
-interface Novedades {
-    abiertas: number;
-    enSeguimiento: number;
-    graves: number;
+/** Las novedades sin cerrar: cuántas, cuántas graves y las más urgentes (las graves primero). */
+type Novedades = NonNullable<DiaLinea['novedades']> & {
     recientes: {
         id: number;
         fecha: string;
@@ -41,241 +28,281 @@ interface Novedades {
         persona: string | null;
         estado: string;
     }[];
+};
+
+/** Mientras la línea nunca se ha programado: lo que ya está y quién da cada paso que falta. */
+interface PrimerosPasos {
+    /** Empresas activas que la reciben y personas asignadas, en lo que ve. */
+    empresas: number;
+    personas: number;
+    /** Si su rol marca la línea en el formulario de la empresa. */
+    marcaEmpresas: boolean;
+    /** A dónde ir, si su rol lo hace: las asignaciones de la línea y su programación. */
+    asignaciones: string | null;
+    programacion: string | null;
 }
 
-interface Props {
-    linea: { id: number; slug: string; nombre: string; descripcion: string | null; icono: string | null };
+interface Props extends DiaLinea {
+    linea: { id: number; slug: string; nombre: string; icono: string | null };
     empresas: Empresa[];
     /** Personas activas de la línea por rol de la empresa ("Conductor", "Auxiliar operativo"…). */
     personal: { rol: string; total: number }[];
-    /** Si su rol edita empresas (para asignarles la línea) y ve los usuarios. */
-    puedeEmpresas: boolean;
+    /** Si su rol ve los usuarios (la lista de las personas de la línea). */
     puedeUsuarios: boolean;
-    /** La operación de hoy (si su rol ve la programación). */
-    hoy: Hoy | null;
-    /** Las novedades sin cerrar (si su rol las ve). */
+    /** Null cuando la línea ya opera. */
+    primerosPasos: PrimerosPasos | null;
+    /** La cobertura de cada uno de los días anteriores a hoy (si su rol ve la programación). */
+    cobertura: DiaCobertura[];
     novedades: Novedades | null;
     /** Sus propios turnos: la última semana y las dos que vienen. */
     misTurnos: { id: number; fecha: string; lugar: string; turno: string | null; asistencia: string | null }[];
 }
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 const claseEnlace =
     'text-primary focus-visible:ring-ring rounded-sm font-semibold underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-hidden';
-
-const GRAVEDAD = { ninguna: 'bg-good', leve: 'bg-warning', grave: 'bg-critical' } as const;
+const claseFranja =
+    'bg-border grid gap-px overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10 dark:bg-white/10';
 
 /**
- * Tablero de una línea sin Drivin: la operación de hoy (programación y asistencia), sus novedades sin cerrar, a quién
- * se le presta (empresas, sedes y sucursales) y con qué personal.
+ * Tablero de una línea sin Drivin. Arriba, el día en el orden en que pasa (programación, asistencia y novedades), lo
+ * mismo que su tarjeta en el inicio; luego sus turnos, las novedades por resolver y la cobertura de los días anteriores;
+ * al final, en una franja, a qué empresas se presta y con qué personal. Mientras la línea no se ha programado nunca,
+ * en su lugar va lo que falta para operarla.
  */
-export default function Linea({ linea, empresas, personal, puedeEmpresas, puedeUsuarios, hoy, novedades, misTurnos }: Props) {
-    const totalPersonas = personal.reduce((suma, p) => suma + p.total, 0);
+export default function Linea({ linea, empresas, personal, puedeUsuarios, primerosPasos, hoy, cobertura, novedades, misTurnos }: Props) {
+    const yaEnPantalla = useYaEnPantalla(linea.slug);
+    // Sin programación nunca no hay día que mostrar: la guía dice qué falta
+    const pasos = primerosPasos ? [] : pasosLinea({ hoy, novedades }, { yaEnPantalla });
+    const porResolver = novedades && novedades.recientes.length > 0 ? novedades : null;
+    const verCobertura = cobertura.filter((d) => d.cobertura !== null).length >= MINIMO_DIAS;
 
     return (
         <MarcoLinea slug={linea.slug} nombre={linea.nombre} icono={linea.icono} titulo={linea.nombre} seccion="tablero" pestanas>
-            {linea.descripcion && <p className="text-muted-foreground -mt-2 max-w-3xl text-sm leading-relaxed md:text-base">{linea.descripcion}</p>}
+            {primerosPasos && <GuiaPrimerosPasos pasos={primerosPasos} linea={linea.nombre} yaEnPantalla={yaEnPantalla} />}
 
-            {hoy && <OperacionHoy hoy={hoy} slug={linea.slug} />}
+            {pasos.length > 0 && <FranjaHoy pasos={pasos} />}
 
             {misTurnos.length > 0 && <MisTurnos turnos={misTurnos} />}
 
-            <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                <div className="flex flex-col gap-5">
-                    {novedades && <NovedadesPendientes novedades={novedades} slug={linea.slug} />}
-
-                    {/* Empresas que reciben la línea */}
-                    <section aria-labelledby="titulo-empresas" className="bg-card rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-                        <header className="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-4">
-                            <h2 id="titulo-empresas" className="flex items-center gap-2 text-base font-bold">
-                                <Building2 className="text-primary size-5" aria-hidden="true" />
-                                Empresas
-                            </h2>
-                            {puedeEmpresas && (
-                                <Link href={route('empresas.index')} className={`${claseEnlace} text-sm`}>
-                                    Asignar empresas
-                                </Link>
-                            )}
-                        </header>
-                        {empresas.length === 0 ? (
-                            <p className="text-muted-foreground px-5 py-8 text-sm">
-                                Ninguna empresa recibe esta línea todavía.
-                                {puedeEmpresas && ' Márcala en el formulario de la empresa, en «Líneas de servicio que recibe».'}
-                            </p>
-                        ) : (
-                            <ul role="list" className="divide-y">
-                                {empresas.map((e) => (
-                                    <li key={e.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                                        <div className="min-w-0">
-                                            <p className="truncate font-semibold">{e.nombre}</p>
-                                            <p className="text-muted-foreground text-xs">
-                                                {plural(e.sedes, 'sede', 'sedes')} · {plural(e.sucursales, 'sucursal', 'sucursales')} ·{' '}
-                                                {plural(e.personas, 'persona', 'personas')} en esta línea
-                                            </p>
-                                        </div>
-                                        <EstadoBadge activo={e.activo} femenino />
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
+            {(porResolver || verCobertura) && (
+                <div className={cn('grid items-start gap-5', porResolver && verCobertura && 'xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]')}>
+                    {porResolver && <NovedadesSinCerrar novedades={porResolver} conTotal={!!primerosPasos} />}
+                    {verCobertura && <GraficaCobertura dias={cobertura} />}
                 </div>
+            )}
 
-                {/* Personal de la línea */}
-                <section aria-labelledby="titulo-personal" className="bg-card rounded-2xl border p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <h2 id="titulo-personal" className="flex items-center gap-2 text-base font-bold">
-                            <UsersRound className="text-primary size-5" aria-hidden="true" />
-                            Personal
-                        </h2>
-                        {puedeUsuarios && totalPersonas > 0 && (
-                            <Link href={route('usuarios.index', { linea: linea.id })} className={`${claseEnlace} text-sm`}>
-                                Ver personas
-                            </Link>
-                        )}
-                    </div>
-                    {personal.length === 0 && <p className="text-muted-foreground mt-3 text-sm">Aún no hay personas activas en esta línea.</p>}
-                    <dl className="mt-4 grid grid-cols-2 gap-3 empty:hidden">
-                        {personal.map((p) => (
-                            <div key={p.rol} className="bg-muted/60 rounded-xl px-4 py-3">
-                                <dt className="text-muted-foreground truncate text-xs" title={p.rol}>
-                                    {p.rol}
-                                </dt>
-                                <dd className="text-2xl font-extrabold tabular-nums">{p.total}</dd>
-                            </div>
-                        ))}
-                    </dl>
-                </section>
-            </div>
+            {/* Mientras no opera, las empresas y el personal ya están en los pasos de la guía */}
+            {!primerosPasos && (
+                <EmpresasYPersonal
+                    empresas={empresas}
+                    personal={personal}
+                    verPersonas={puedeUsuarios ? route('usuarios.index', { linea: linea.id }) : null}
+                />
+            )}
         </MarcoLinea>
     );
 }
 
-function OperacionHoy({ hoy, slug }: { hoy: Hoy; slug: string }) {
-    const registrada = hoy.programadas > hoy.sinRegistrar;
-    const nivel = registrada ? semaforo(hoy.cobertura) : null;
-    const conDatos = hoy.tendencia.filter((d) => d.cobertura !== null);
+/**
+ * Lo que falta para operar la línea, en orden: que una empresa la reciba, asignarle personas y programarla. Cada paso
+ * dice si está listo o quién lo da; el siguiente lleva a donde se hace (salvo que ese destino ya esté en el menú o en
+ * las pestañas: entonces el paso dice dónde). Desaparece con la primera programación.
+ */
+function GuiaPrimerosPasos({ pasos, linea, yaEnPantalla }: { pasos: PrimerosPasos; linea: string; yaEnPantalla: EnPantalla }) {
+    const enlace = sinRepetir(yaEnPantalla);
+    const lista = [
+        {
+            clave: 'empresas',
+            titulo: 'Una empresa recibe la línea',
+            listo: pasos.empresas > 0,
+            hecho: plural(pasos.empresas, 'empresa la recibe', 'empresas la reciben'),
+            // Asignar a alguien de una empresa a la línea también hace que esa empresa la reciba
+            falta: pasos.marcaEmpresas
+                ? `En Empresas, abre la empresa y marca «${linea}» en «Líneas de servicio que recibe».`
+                : pasos.asignaciones
+                  ? 'Queda lista al asignar a alguien de una empresa a esta línea, en Asignaciones.'
+                  : 'La marca quien administra las empresas, en el formulario de cada una.',
+            href: pasos.marcaEmpresas ? route('empresas.index', undefined, false) : pasos.asignaciones,
+            accion: pasos.marcaEmpresas ? 'Abrir Empresas' : 'Abrir las asignaciones de la línea',
+        },
+        {
+            clave: 'personas',
+            titulo: 'Personas asignadas a la línea',
+            listo: pasos.personas > 0,
+            hecho: plural(pasos.personas, 'persona asignada', 'personas asignadas'),
+            falta: pasos.asignaciones
+                ? 'En Asignaciones, di dónde trabaja cada persona (empresa, sede o sucursal) y marca esta línea.'
+                : 'Las asigna quien administra las asignaciones.',
+            href: pasos.asignaciones,
+            accion: 'Abrir las asignaciones de la línea',
+        },
+        {
+            clave: 'programacion',
+            titulo: 'La primera programación',
+            listo: false,
+            hecho: '',
+            falta: pasos.programacion ? 'En Programación, elige el día, los lugares y quiénes van.' : 'La hace quien coordina la línea.',
+            href: pasos.programacion,
+            accion: 'Abrir Programación',
+        },
+    ];
+    const siguiente = lista.findIndex((p) => !p.listo);
+    const faltan = lista.filter((p) => !p.listo).length;
 
     return (
-        <section aria-labelledby="titulo-hoy" className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 id="titulo-hoy" className="flex items-center gap-2 text-base font-bold">
-                    <CalendarClock className="text-primary size-5" aria-hidden="true" />
-                    Hoy, {fmt.fechaLarga(hoy.fecha)}
+        <section
+            aria-labelledby="titulo-primeros-pasos"
+            className="bg-card rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)] dark:border-white/10"
+        >
+            <header className="px-5 pt-5 pb-4">
+                <h2 id="titulo-primeros-pasos" className="text-lg font-extrabold tracking-tight">
+                    {faltan === 1 ? 'Falta un paso para operar la línea' : `Faltan ${faltan} pasos para operar la línea`}
                 </h2>
-                <Link href={route('programacion.index', slug)} className={`${claseEnlace} text-sm`}>
-                    {hoy.lugares ? 'Ver la programación' : 'Programar el día'}
-                </Link>
-            </div>
-            {hoy.lugares === 0 ? (
-                <p className="bg-card text-muted-foreground rounded-2xl border px-5 py-4 text-sm">Hoy aún no hay programación.</p>
-            ) : (
-                <ul role="list" className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <Dato
-                        titulo="Cobertura"
-                        valor={registrada ? fmt.pct(hoy.cobertura) : '—'}
-                        detalle={nivel ? <EstadoNivel nivel={nivel.nivel}>{nivel.texto}</EstadoNivel> : 'Sin asistencia registrada'}
-                    />
-                    <Dato
-                        titulo="Asistieron"
-                        valor={`${hoy.presentes} de ${hoy.requeridas || hoy.programadas}`}
-                        detalle={plural(hoy.lugares, 'lugar programado', 'lugares programados')}
-                    />
-                    <Dato titulo="No asistieron" valor={String(hoy.faltas)} detalle={hoy.faltas ? 'Sin justificar' : 'Ninguna falta'} />
-                    <Dato
-                        titulo="Sin registrar"
-                        valor={String(hoy.sinRegistrar)}
-                        detalle={hoy.sinRegistrar ? 'Falta su asistencia' : 'Asistencia al día'}
-                    />
-                </ul>
-            )}
-
-            {conDatos.length > 1 && (
-                <Panel titulo="Cobertura de los últimos 14 días" descripcion="Personas que asistieron frente a las requeridas, cada día">
-                    <ol role="list" className="flex h-28 items-end gap-1.5">
-                        {hoy.tendencia.map((d) => {
-                            const nivelDia = semaforo(d.cobertura);
-                            const texto = `${fmt.fechaCorta(d.fecha)}: ${d.cobertura === null ? 'sin programación' : fmt.pct(d.cobertura)}`;
-                            return (
-                                <li key={d.fecha} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={texto}>
-                                    <span className="sr-only">{texto}</span>
-                                    {d.cobertura === null ? (
-                                        <span
-                                            className="border-muted-foreground/40 h-1 w-full rounded-full border border-dashed"
-                                            aria-hidden="true"
-                                        />
-                                    ) : (
-                                        <span
-                                            className={cn(
-                                                'w-full rounded-t-[4px]',
-                                                nivelDia?.nivel === 'good'
-                                                    ? 'bg-primary'
-                                                    : nivelDia?.nivel === 'warning'
-                                                      ? 'bg-warning'
-                                                      : 'bg-critical',
-                                            )}
-                                            style={{ height: `${Math.max(4, d.cobertura)}%` }}
-                                            aria-hidden="true"
-                                        />
+                <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
+                    Con la primera programación, aquí verás cada día la programación, la asistencia y las novedades.
+                </p>
+            </header>
+            <ol role="list" className="divide-y border-t">
+                {lista.map((p, i) => {
+                    const esSiguiente = i === siguiente;
+                    const href = esSiguiente ? enlace(p.href) : null;
+                    return (
+                        <li
+                            key={p.clave}
+                            aria-current={esSiguiente ? 'step' : undefined}
+                            className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-x-4 gap-y-2 px-5 py-4 sm:grid-cols-[2rem_minmax(0,1fr)_auto] sm:items-center"
+                        >
+                            <span
+                                className={cn(
+                                    'flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums',
+                                    p.listo
+                                        ? 'bg-good-soft text-good'
+                                        : esSiguiente
+                                          ? 'bg-primary text-primary-foreground'
+                                          : 'bg-muted text-muted-foreground',
+                                )}
+                                aria-hidden="true"
+                            >
+                                {p.listo ? <Check className="size-4" /> : i + 1}
+                            </span>
+                            <div className="min-w-0">
+                                <p className={cn('font-semibold', !p.listo && !esSiguiente && 'text-muted-foreground')}>
+                                    <span className="sr-only">{`Paso ${i + 1}, ${p.listo ? 'listo' : esSiguiente ? 'el siguiente' : 'después'}: `}</span>
+                                    {p.titulo}
+                                </p>
+                                <p className="text-muted-foreground mt-0.5 text-sm text-pretty">{p.listo ? p.hecho : p.falta}</p>
+                            </div>
+                            {href && (
+                                <Link
+                                    href={href}
+                                    className={cn(
+                                        claseEnlace,
+                                        'col-start-2 inline-flex items-center gap-1 justify-self-start text-sm sm:col-start-3',
                                     )}
-                                    <span className="text-muted-foreground text-[0.62rem] tabular-nums" aria-hidden="true">
-                                        {fmt.diaSemana(d.fecha).slice(0, 2)}
-                                    </span>
-                                </li>
-                            );
-                        })}
-                    </ol>
-                </Panel>
-            )}
+                                >
+                                    {p.accion}
+                                    <ArrowRight className="size-4" aria-hidden="true" />
+                                </Link>
+                            )}
+                        </li>
+                    );
+                })}
+            </ol>
         </section>
     );
 }
 
-function NovedadesPendientes({ novedades, slug }: { novedades: Novedades; slug: string }) {
-    const pendientes = novedades.abiertas + novedades.enSeguimiento;
+/**
+ * Las novedades sin cerrar más urgentes, cada una con su gravedad en texto. Cuántas son ya lo dice "Hoy"; solo sin
+ * "Hoy" (mientras la línea no opera) lo dice aquí.
+ */
+function NovedadesSinCerrar({ novedades, conTotal }: { novedades: Novedades; conTotal: boolean }) {
+    const { sinCerrar, recientes } = novedades;
+    const parcial = sinCerrar > recientes.length;
 
     return (
         <Panel
-            titulo={
-                <span className="flex items-center gap-2">
-                    <AlertTriangle className="text-primary size-5" aria-hidden="true" />
-                    Novedades sin cerrar
-                </span>
-            }
-            descripcion={
-                pendientes
-                    ? `${plural(novedades.abiertas, 'abierta', 'abiertas')} · ${novedades.enSeguimiento} en seguimiento${novedades.graves ? ` · ${plural(novedades.graves, 'grave', 'graves')}` : ''}`
-                    : 'Todas las novedades están cerradas'
-            }
-            acciones={
-                <Link href={route('novedades.index', slug)} className={`${claseEnlace} text-sm`}>
-                    Ver novedades
-                </Link>
-            }
+            titulo="Novedades sin cerrar"
+            descripcion={parcial ? `Las ${recientes.length} más urgentes${conTotal ? ` de ${fmt.numero(sinCerrar)}` : ''}` : undefined}
             cuerpoClassName="px-0 pb-0"
         >
-            {novedades.recientes.length === 0 ? (
-                <Vacio>Sin novedades pendientes.</Vacio>
-            ) : (
-                <ul role="list" className="divide-y border-t">
-                    {novedades.recientes.map((n) => (
-                        <li key={n.id} className="flex items-start gap-3 px-5 py-3">
-                            <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', GRAVEDAD[n.gravedad])} aria-hidden="true" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-semibold">
-                                    {n.tipo}
-                                    {n.persona && <span className="text-muted-foreground font-normal"> · {n.persona}</span>}
-                                </p>
-                                <p className="text-muted-foreground truncate text-xs">
-                                    {fmt.fechaMedia(n.fecha)} · {n.lugar} · {n.estado === 'abierta' ? 'Abierta' : 'En seguimiento'}
-                                    {n.gravedad === 'grave' && ' · Grave'}
-                                </p>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <ul role="list" className="divide-y border-t">
+                {recientes.map((n) => (
+                    <li key={n.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold">
+                                {n.tipo}
+                                {n.persona && <span className="text-muted-foreground font-normal"> · {n.persona}</span>}
+                            </p>
+                            <p className="text-muted-foreground text-xs text-pretty">
+                                {fechaDia(n.fecha)} · {n.lugar} · {n.estado === 'abierta' ? 'Abierta' : 'En seguimiento'}
+                            </p>
+                        </div>
+                        {n.gravedad !== 'ninguna' && (
+                            <EstadoNivel nivel={n.gravedad === 'grave' ? 'critical' : 'warning'} className="shrink-0">
+                                {n.gravedad === 'grave' ? 'Grave' : 'Leve'}
+                            </EstadoNivel>
+                        )}
+                    </li>
+                ))}
+            </ul>
         </Panel>
+    );
+}
+
+/** A qué empresas se presta la línea y con qué personal: lo que cambia poco, al final y en una franja. */
+function EmpresasYPersonal({ empresas, personal, verPersonas }: { empresas: Empresa[]; personal: Props['personal']; verPersonas: string | null }) {
+    return (
+        <section aria-labelledby="titulo-empresas-personal" className="flex flex-col gap-3">
+            <h2 id="titulo-empresas-personal" className="text-lg font-extrabold tracking-tight">
+                Empresas y personal
+            </h2>
+            <div className={cn(claseFranja, 'md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]')}>
+                <div className="bg-card px-5 py-4">
+                    <h3 className="text-muted-foreground text-xs font-semibold">Empresas que reciben la línea</h3>
+                    {empresas.length === 0 ? (
+                        <p className="text-muted-foreground mt-2 text-sm">Ninguna en este momento.</p>
+                    ) : (
+                        <ul role="list" className="mt-1 divide-y">
+                            {empresas.map((e) => (
+                                <li key={e.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
+                                    <div className="min-w-0">
+                                        <p className="font-semibold">{e.nombre}</p>
+                                        <p className="text-muted-foreground text-xs">
+                                            {plural(e.sedes, 'sede', 'sedes')} · {plural(e.sucursales, 'sucursal', 'sucursales')} ·{' '}
+                                            {plural(e.personas, 'persona', 'personas')} en esta línea
+                                        </p>
+                                    </div>
+                                    {/* Solo se dice cuando no está activa: lo normal no se anuncia */}
+                                    {!e.activo && <EstadoBadge activo={false} femenino />}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                <div className="bg-card px-5 py-4">
+                    <h3 className="text-muted-foreground text-xs font-semibold">Personal con asignación vigente</h3>
+                    {personal.length === 0 ? (
+                        <p className="text-muted-foreground mt-2 text-sm">Nadie tiene hoy una asignación en esta línea.</p>
+                    ) : (
+                        <ul role="list" className="mt-1 divide-y">
+                            {personal.map((p) => (
+                                <li key={p.rol} className="flex items-baseline justify-between gap-3 py-2.5 text-sm">
+                                    <span className="min-w-0">{p.rol}</span>
+                                    <span className="font-semibold tabular-nums">{fmt.numero(p.total)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {verPersonas && personal.length > 0 && (
+                        <Link href={verPersonas} className={cn(claseEnlace, 'mt-2 inline-flex items-center gap-1 text-sm')}>
+                            Ver las personas de la línea
+                            <ArrowRight className="size-4" aria-hidden="true" />
+                        </Link>
+                    )}
+                </div>
+            </div>
+        </section>
     );
 }
 
@@ -287,7 +314,7 @@ function MisTurnos({ turnos }: { turnos: Props['misTurnos'] }) {
                     <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
                         <div className="min-w-0">
                             <p className="font-semibold first-letter:uppercase">{fmt.fechaLarga(t.fecha)}</p>
-                            <p className="text-muted-foreground truncate text-xs">
+                            <p className="text-muted-foreground text-xs text-pretty">
                                 {t.lugar}
                                 {t.turno && ` · ${t.turno}`}
                             </p>

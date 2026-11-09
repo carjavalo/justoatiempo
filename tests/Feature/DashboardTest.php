@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\EstadoInforme;
 use App\Enums\EstadoOrden;
 use App\Models\AuditoriaPod;
 use App\Models\Carga;
@@ -10,6 +11,7 @@ use App\Models\Sede;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -93,8 +95,56 @@ class DashboardTest extends TestCase
                 ->where('kpis.efectividad', 62.5)
                 ->has('ranking', 1)
                 ->where('ranking.0.nombre', 'Juan Fernando Plaza')
-                ->where('pendientes', null)
+                // Arriba, solo su propia jornada: ni cargas, ni auditoría, ni informes de la sede
+                ->where('dia.jornada.propia', true)
+                ->where('dia.jornada.fecha', '2026-10-02')
+                ->where('dia.cargas', null)
+                ->where('dia.porAuditar', null)
+                ->where('dia.informes', null)
             );
+    }
+
+    public function test_arriba_va_el_dia_de_la_linea_con_lo_que_falta_por_cerrar()
+    {
+        $this->travelTo(Carbon::parse('2026-11-06 08:00'));
+        $coordinador = User::factory()->coordinador()->create();
+        $informe = app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->sede->id, null);
+        // Una de las 6 aprobadas ya tiene su auditoría
+        AuditoriaPod::create(['orden_id' => Orden::where('codigo_orden', 'PDVT1')->value('id'), 'foto_fachada' => true, 'fotos_sellado' => 4, 'fotos_destapado' => 4, 'foto_remesa' => true, 'auditado_en' => now()]);
+
+        $this->actingAs($coordinador)->get('/lineas/logisticos?periodo=7')->assertInertia(fn (Assert $page) => $page
+            // El día no depende del periodo elegido: la jornada del 2 de octubre tiene 35 días y lo dice
+            ->where('dia.jornada.fecha', '2026-10-02')
+            ->where('dia.jornada.dias', 35)
+            ->where('dia.jornada.reciente', false)
+            ->where('dia.porAuditar', ['ordenes' => 5, 'href' => '/auditoria?fecha=2026-10-02'])
+            ->where('dia.informes', ['sinCerrar' => 1, 'desde' => '2026-10-02', 'href' => '/informes?fecha=2026-10-02'])
+            // Las entregas son productos; las órdenes, los pedidos que los traen (aquí, uno por orden)
+            ->where('kpis.asignadas', 9)
+            ->where('kpis.ordenes', 9)
+        );
+
+        // Con el informe cerrado ya no hay nada por auditar ni por cerrar
+        $informe->update(['estado' => EstadoInforme::Cerrado]);
+        $this->get('/lineas/logisticos')->assertInertia(fn (Assert $page) => $page
+            ->where('dia.porAuditar.ordenes', 0)
+            ->where('dia.informes.sinCerrar', 0)
+        );
+    }
+
+    public function test_la_antiguedad_de_la_jornada_se_cuenta_con_la_fecha_de_colombia()
+    {
+        app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->sede->id, null);
+        $coordinador = User::factory()->coordinador()->create();
+
+        // Sábado 3 de octubre, 8 p. m. en Colombia (ya domingo 4 en UTC): la jornada del viernes es la de ayer
+        $this->travelTo(Carbon::parse('2026-10-04 01:00:00', 'UTC'));
+        $this->actingAs($coordinador)->get('/lineas/logisticos')->assertInertia(fn (Assert $page) => $page
+            ->where('dia.jornada.dias', 1)
+            ->where('dia.jornada.reciente', true)
+            // El informe del día anterior ya cuenta como sin cerrar; el de "hoy" no existe todavía
+            ->where('dia.informes.sinCerrar', 1)
+        );
     }
 
     public function test_los_modulos_respetan_los_roles()

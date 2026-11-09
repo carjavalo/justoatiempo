@@ -5,6 +5,8 @@ import { type TipoIcono } from '@/components/iconos';
 import { SinDato, Variacion } from './piezas';
 import { type DashboardProps, type Kpis } from './tipos';
 
+const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
+
 /** Indicador principal: efectividad global frente a la meta (RF-06). */
 export function HeroEfectividad({
     kpis,
@@ -19,21 +21,26 @@ export function HeroEfectividad({
 }) {
     const nivel = nivelFrenteAMeta(kpis.asignadas ? kpis.efectividad : null, meta);
     const brecha = kpis.efectividad - meta;
+    const cambio = variacion(kpis.asignadas ? kpis.efectividad : null, previos.asignadas ? previos.efectividad : null, 'puntos');
     const EstadoIcono = nivel === 'good' ? CheckCircle2 : nivel === 'warning' ? AlertTriangle : XCircle;
     const estadoTexto = nivel === 'good' ? 'En meta' : nivel === 'warning' ? 'Cerca de la meta' : 'Bajo la meta';
 
     return (
-        <section aria-labelledby="titulo-efectividad" className="from-brand-navy-deep via-brand-navy relative isolate flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br to-[#2a4f8f] p-6 text-white shadow-lg shadow-[#12244a]/20">
+        // En oscuro, el azul baja a los tonos de la marca de ese modo: no es la superficie más brillante de una página grafito
+        <section
+            aria-labelledby="titulo-efectividad"
+            className="from-brand-navy-deep via-brand-navy dark:via-brand-navy-deep dark:to-brand-navy relative isolate flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br to-[#2a4f8f] p-6 text-white shadow-lg shadow-[#12244a]/20 dark:shadow-none dark:ring-1 dark:ring-white/10"
+        >
             {/* Textura de marca: trama de puntos que se desvanece hacia la izquierda */}
             <div
-                className="pointer-events-none absolute inset-0 -z-10 opacity-[0.09] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(to_left,black,transparent_70%)]"
+                className="pointer-events-none absolute inset-0 -z-10 opacity-[0.09] [background-image:radial-gradient(white_1px,transparent_1px)] [background-size:18px_18px] [mask-image:linear-gradient(to_left,black,transparent_70%)] dark:opacity-[0.05]"
                 aria-hidden="true"
             />
 
             <div className="flex items-center justify-between gap-3">
-                <h2 id="titulo-efectividad" className="text-sm font-semibold text-white/80">
+                <h3 id="titulo-efectividad" className="text-sm font-semibold text-white/80">
                     {titulo}
-                </h2>
+                </h3>
                 {nivel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/12 px-2.5 py-1 text-[0.72rem] font-semibold ring-1 ring-white/15">
                         <EstadoIcono className={cn('size-3.5', nivel === 'good' ? 'text-[#6ee7a0]' : nivel === 'warning' ? 'text-[#fcd27a]' : 'text-[#ffb4ad]')} aria-hidden="true" />
@@ -45,15 +52,18 @@ export function HeroEfectividad({
             <div className="mt-3 flex items-end gap-3">
                 <span className="text-[3.4rem] leading-none font-extrabold tracking-tight">{kpis.asignadas ? fmt.pct(kpis.efectividad) : <SinDato />}</span>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/75">
-                <Variacion
-                    valor={variacion(kpis.asignadas ? kpis.efectividad : null, previos.asignadas ? previos.efectividad : null, 'puntos')}
-                    sufijo=" pts"
-                    className="[&.text-critical]:text-[#ffb4ad] [&.text-good]:text-[#6ee7a0] [&.text-muted-foreground]:text-white/60"
-                />
-                {/* El lector ya recibe este contexto dentro de la variación */}
-                <span aria-hidden="true">vs. periodo anterior</span>
-            </div>
+            {/* Sin periodo anterior no hay fila: la página lo dice una vez, junto a las fechas */}
+            {cambio !== null && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/75">
+                    <Variacion
+                        valor={cambio}
+                        sufijo=" pts"
+                        className="[&.text-critical]:text-[#ffb4ad] [&.text-good]:text-[#6ee7a0] [&.text-muted-foreground]:text-white/60"
+                    />
+                    {/* El lector ya recibe este contexto dentro de la variación */}
+                    <span aria-hidden="true">vs. periodo anterior</span>
+                </div>
+            )}
 
             {/* La barra de la meta queda anclada al pie cuando el héroe se estira a la altura de los indicadores */}
             <div className="mt-auto pt-8">
@@ -91,6 +101,7 @@ function Tile({
     mejorSiSube = true,
     sufijo = '%',
     tono = 'navy',
+    comparar,
 }: {
     icono: TipoIcono;
     titulo: string;
@@ -100,13 +111,14 @@ function Tile({
     mejorSiSube?: boolean;
     sufijo?: string;
     tono?: 'navy' | 'coral' | 'steel';
+    comparar: boolean;
 }) {
     return (
-        <div className="bg-card group flex flex-col rounded-2xl border p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-shadow hover:shadow-md">
+        <div className="bg-card flex flex-col rounded-2xl border p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:p-5">
             {/* Orden de lectura: título, valor, detalle y variación; visualmente la fila del ícono va arriba */}
-            <h3 className="text-muted-foreground mt-4 text-[0.8rem] font-medium">{titulo}</h3>
+            <h3 className="text-muted-foreground mt-4 text-[0.8rem] font-medium text-pretty">{titulo}</h3>
             <p className="mt-0.5 text-[1.75rem] leading-tight font-extrabold tracking-tight">{valor}</p>
-            <p className="text-muted-foreground mt-1 text-xs">{detalle}</p>
+            <p className="text-muted-foreground mt-1 text-xs text-pretty">{detalle}</p>
             <div className="order-first flex items-start justify-between">
                 <span
                     className={cn(
@@ -118,30 +130,33 @@ function Tile({
                 >
                     <Icono className="size-5" aria-hidden="true" />
                 </span>
-                <Variacion valor={variacionValor} mejorSiSube={mejorSiSube} sufijo={sufijo} />
+                <Variacion valor={variacionValor} mejorSiSube={mejorSiSube} sufijo={sufijo} siNoHay={comparar ? 'sin comparativo' : undefined} />
             </div>
         </div>
     );
 }
 
-export function TilesKpi({ kpis, previos, vista }: { kpis: Kpis; previos: Kpis; vista: DashboardProps['vista'] }) {
+/** `comparar`: hay periodo anterior; si no, ninguna tarjeta muestra variación (la página lo dice una vez). */
+export function TilesKpi({ kpis, previos, vista, comparar }: { kpis: Kpis; previos: Kpis; vista: DashboardProps['vista']; comparar: boolean }) {
+    // Las entregas son productos y las órdenes, los pedidos de Drivin que los traen: se dice una vez, en la primera
+    const entregas = `Productos de ${plural(kpis.ordenes, 'orden', 'órdenes')} · ${plural(kpis.jornadas, 'jornada', 'jornadas')}`;
     return (
-        <section aria-labelledby="titulo-kpis" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <h2 id="titulo-kpis" className="sr-only">
-                Indicadores del periodo
-            </h2>
+        // Dos por fila también en el teléfono: cuatro cifras cortas no necesitan una columna cada una
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <Tile
                 icono={Truck}
                 titulo="Entregas asignadas"
                 valor={fmt.numero(kpis.asignadas)}
-                detalle={vista === 'gerencial' ? `${kpis.jornadas} jornadas · ${kpis.auxiliares} auxiliares` : `${kpis.jornadas} ${kpis.jornadas === 1 ? 'jornada' : 'jornadas'} en el periodo`}
+                detalle={vista === 'gerencial' ? `${entregas} · ${plural(kpis.auxiliares, 'auxiliar', 'auxiliares')}` : entregas}
+                comparar={comparar}
                 variacionValor={variacion(kpis.asignadas, previos.asignadas)}
             />
             <Tile
                 icono={PackageCheck}
                 titulo="Entregas aprobadas"
                 valor={fmt.numero(kpis.aprobadas)}
-                detalle={`${fmt.numero(kpis.faltantes)} con faltantes · ${fmt.numero(kpis.averias)} averías`}
+                detalle={`${fmt.numero(kpis.faltantes)} con faltantes · ${plural(kpis.averias, 'avería', 'averías')}`}
+                comparar={comparar}
                 variacionValor={variacion(kpis.aprobadas, previos.aprobadas)}
             />
             <Tile
@@ -149,6 +164,7 @@ export function TilesKpi({ kpis, previos, vista }: { kpis: Kpis; previos: Kpis; 
                 titulo="Devoluciones"
                 valor={fmt.numero(kpis.devoluciones)}
                 detalle="Rechazadas que regresan a bodega"
+                comparar={comparar}
                 variacionValor={variacion(kpis.devoluciones, previos.devoluciones)}
                 mejorSiSube={false}
                 tono="coral"
@@ -157,11 +173,12 @@ export function TilesKpi({ kpis, previos, vista }: { kpis: Kpis; previos: Kpis; 
                 icono={ClipboardCheck}
                 titulo="Cumplimiento protocolo POD"
                 valor={kpis.cumplimientoPod === null ? <SinDato /> : fmt.pct(kpis.cumplimientoPod)}
-                detalle={`${fmt.numero(kpis.sinEvidencia)} ${kpis.sinEvidencia === 1 ? 'orden' : 'órdenes'} sin evidencia`}
+                detalle={kpis.auditadas ? `${plural(kpis.sinEvidencia, 'orden', 'órdenes')} sin evidencia` : 'Ninguna orden auditada'}
+                comparar={comparar}
                 variacionValor={variacion(kpis.cumplimientoPod, previos.cumplimientoPod, 'puntos')}
                 sufijo=" pts"
                 tono="steel"
             />
-        </section>
+        </div>
     );
 }

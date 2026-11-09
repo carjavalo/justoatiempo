@@ -83,10 +83,10 @@ class JornadaLinea
     }
 
     /**
-     * El resumen de un día sin cargar personas ni novedades (para el inicio): lugares, requeridas, programadas,
-     * presentes, sin registrar y la cobertura.
+     * El resumen de un día sin cargar personas ni novedades (el inicio y el tablero de la línea, en "Hoy"): lugares,
+     * personas programadas frente a las necesarias, la asistencia (presentes, ausencias y sin registrar) y la cobertura.
      *
-     * @return array{lugares: int, requeridas: int, programadas: int, presentes: int, sinRegistrar: int, cobertura: float|null}
+     * @return array{lugares: int, incompletos: int, requeridas: int, necesarias: int, programadas: int, presentes: int, faltas: int, justificadas: int, sinRegistrar: int, cobertura: float|null}
      */
     public function resumenDia(OperacionLinea $op, Carbon $dia): array
     {
@@ -95,18 +95,30 @@ class JornadaLinea
             ->whereDate('fecha', $dia)
             ->with('asignaciones:id,programacion_id,asistencia')
             ->get(['id', 'personas_requeridas'])
-            ->map(fn (Programacion $p) => [
-                'requeridas' => $p->personas_requeridas,
-                'programadas' => $p->asignaciones->count(),
-                'presentes' => $p->asignaciones->filter(fn ($a) => $a->asistencia?->presente())->count(),
-                'sinRegistrar' => $p->asignaciones->whereNull('asistencia')->count(),
-            ]);
+            ->map(function (Programacion $p) {
+                $estados = $p->asignaciones->pluck('asistencia')->filter();
+
+                return [
+                    'requeridas' => $p->personas_requeridas,
+                    'programadas' => $p->asignaciones->count(),
+                    'presentes' => $estados->filter(fn (EstadoAsistencia $e) => $e->presente())->count(),
+                    'faltas' => $estados->filter(fn (EstadoAsistencia $e) => $e === EstadoAsistencia::Falta)->count(),
+                    'justificadas' => $estados->filter(fn (EstadoAsistencia $e) => $e->justificada())->count(),
+                    'sinRegistrar' => $p->asignaciones->whereNull('asistencia')->count(),
+                ];
+            });
 
         return [
             'lugares' => $lugares->count(),
+            // Lugares con menos personas programadas de las que pidió el cliente
+            'incompletos' => $lugares->filter(fn ($l) => $l['programadas'] < $l['requeridas'])->count(),
             'requeridas' => $lugares->sum('requeridas'),
+            // Las que hacen falta, como las cuenta la cobertura: las requeridas (o las programadas, si no se dijo cuántas)
+            'necesarias' => $lugares->sum(fn ($l) => $l['requeridas'] ?: $l['programadas']),
             'programadas' => $lugares->sum('programadas'),
             'presentes' => $lugares->sum('presentes'),
+            'faltas' => $lugares->sum('faltas'),
+            'justificadas' => $lugares->sum('justificadas'),
             'sinRegistrar' => $lugares->sum('sinRegistrar'),
             'cobertura' => self::cobertura($lugares),
         ];

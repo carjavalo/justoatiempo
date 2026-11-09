@@ -22,8 +22,8 @@ class ParametroController extends Controller
 {
     /** clave => [etiqueta, ayuda, mínimo, máximo] de los valores numéricos editables. */
     private const NUMEROS = [
-        'umbral_felicitacion' => ['Felicitación desde', 'Con este cumplimiento (o más) y sin novedades, el informe sugiere felicitar.', 50, 100],
-        'umbral_llamado_atencion' => ['Llamado de atención por debajo de', 'Con un cumplimiento menor, el informe sugiere un llamado de atención.', 0, 100],
+        'umbral_felicitacion' => ['Felicitación desde', 'Con esta efectividad (o más) y sin novedades, el informe sugiere felicitar.', 50, 100],
+        'umbral_llamado_atencion' => ['Llamado de atención por debajo de', 'Con una efectividad menor, el informe sugiere un llamado de atención.', 0, 100],
         'meta_efectividad_global' => ['Meta de las sedes nuevas', 'La meta con la que se crea una sede si no se pacta otra con el cliente.', 1, 100],
     ];
 

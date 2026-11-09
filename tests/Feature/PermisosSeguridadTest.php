@@ -150,14 +150,18 @@ class PermisosSeguridadTest extends TestCase
             ->assertInertia(fn (Assert $p) => $p->where('mensaje', 'Tu rol solo ve tu propia información: esta sección no está disponible.'));
     }
 
-    public function test_el_tablero_solo_muestra_la_ultima_carga_a_quien_abre_cargas(): void
+    public function test_el_tablero_solo_muestra_las_cargas_a_quien_abre_cargas(): void
     {
-        Carga::create(['archivo_nombre' => 'preliquidacion.xlsx', 'archivo_path' => 'cargas/x.xlsx', 'archivo_hash' => str_repeat('a', 64), 'estado' => 'procesada', 'total_filas' => 3, 'procesado_en' => now(), 'cargado_por' => $this->admin->id]);
+        Carga::create(['archivo_nombre' => 'preliquidacion.xlsx', 'archivo_path' => 'cargas/x.xlsx', 'archivo_hash' => str_repeat('a', 64), 'estado' => 'en_revision', 'total_filas' => 3, 'cargado_por' => $this->admin->id]);
         $soloTablero = User::factory()->create(['rol_id' => $this->rol(['tablero.ver'], Permisos::ALCANCE_ASIGNACION, 'Solo tablero')->id]);
 
-        $this->actingAs($soloTablero)->get('/lineas/logisticos')->assertInertia(fn (Assert $p) => $p->where('pendientes.ultimaCarga', null));
+        // Sin "Cargas", ni cuántas esperan confirmación, ni Auditoría POD, ni informes
+        $this->actingAs($soloTablero)->get('/lineas/logisticos')->assertInertia(fn (Assert $p) => $p
+            ->where('dia.cargas', null)
+            ->where('dia.porAuditar', null)
+            ->where('dia.informes', null));
         $this->actingAs($this->admin)->get('/lineas/logisticos')
-            ->assertInertia(fn (Assert $p) => $p->where('pendientes.ultimaCarga.archivo_nombre', 'preliquidacion.xlsx'));
+            ->assertInertia(fn (Assert $p) => $p->where('dia.cargas', ['porConfirmar' => 1, 'href' => '/cargas']));
     }
 
     public function test_ver_todas_las_lineas_incluye_su_tablero(): void

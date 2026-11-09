@@ -10,14 +10,16 @@ import {
     type TipoIcono,
     UploadCloud,
 } from '@/components/iconos';
+import { type EnPantalla } from '@/components/linea/dia';
 import { usePuede } from '@/hooks/use-puede';
 import AppLayout from '@/layouts/app-layout';
+import { saludo } from '@/lib/formato';
 import { iconoLinea } from '@/lib/iconos-linea';
 import { SERVICIOS } from '@/lib/portafolio';
 import { ANCHO_PLATAFORMA, cn } from '@/lib/utils';
 import { type SharedData, type Volver } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { type ReactNode } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 
 export type SeccionLinea = 'tablero' | 'programacion' | 'novedades' | 'informe' | 'cargas' | 'auditoria' | 'trazabilidad' | 'informes' | 'seguimiento' | 'entregas';
 
@@ -90,6 +92,31 @@ const PESTANAS: {
     },
 ];
 
+/** Las pestañas de su tipo de línea; con menú lateral, sin el tablero (la opción de la línea en el menú ya lleva a él). */
+function pestanasDe(slug: string, conMenu: boolean) {
+    const esLogistica = slug === LINEA_LOGISTICA;
+    return PESTANAS.filter((p) => (p.en === 'todas' || p.en === (esLogistica ? 'logistica' : 'otras')) && !(conMenu && p.id === 'tablero'));
+}
+
+/** De esas, las que su rol abre ("Mis entregas", solo para quien tiene entregas a su nombre). Con una sola no se muestran. */
+function abiertas(pestanas: typeof PESTANAS, puede: (permiso: string) => boolean, conEntregas: boolean) {
+    return pestanas.filter((p) => puede(p.permiso) && (p.id !== 'entregas' || conEntregas));
+}
+
+/**
+ * Los destinos que la página de una pestaña ya ofrece: las pestañas que se ven (con una sola no se muestran) y las
+ * opciones del menú lateral. Un enlace del contenido a uno de ellos lo repetiría.
+ */
+export function useYaEnPantalla(slug: string): EnPantalla {
+    const { auth, menu } = usePage<SharedData>().props;
+    const puede = usePuede();
+    const visibles = abiertas(pestanasDe(slug, !!menu), puede, !!auth.user.entregas);
+    return {
+        pestanas: visibles.length > 1 ? visibles.map((p) => new URL(p.href(slug)).pathname) : [],
+        menu: (menu ?? []).flatMap((g) => g.items.map((i) => i.href)),
+    };
+}
+
 interface Props {
     slug: string;
     /** Nombre guardado en la base de datos; si no llega, el del portafolio. */
@@ -107,8 +134,6 @@ interface Props {
     paginaDeLaPestana?: boolean;
     /** Muestra las pestañas de las herramientas de la línea que el rol permite (si son más de una). */
     pestanas?: boolean;
-    /** Texto pequeño sobre el nombre de la línea. */
-    antetitulo?: string;
     /** Controles a la derecha del encabezado (filtros de la página). */
     acciones?: ReactNode;
     /** Espaciado extra del contenido. El ancho no se cambia: es el de toda la plataforma. */
@@ -128,7 +153,6 @@ export function MarcoLinea({
     seccion,
     paginaDeLaPestana = true,
     pestanas = false,
-    antetitulo = 'Línea de servicio',
     acciones,
     className,
     children,
@@ -137,12 +161,12 @@ export function MarcoLinea({
     const puede = usePuede();
     const Icono = iconoLinea({ icono, slug });
     const nombreLinea = nombre ?? SERVICIOS.find((s) => s.id === slug)?.nombre ?? 'Línea de servicio';
-    const esLogistica = slug === LINEA_LOGISTICA;
-    // Con menú lateral, la opción de la línea ya lleva a su tablero: no se repite como pestaña
-    const deLaLinea = PESTANAS.filter((p) => (p.en === 'todas' || p.en === (esLogistica ? 'logistica' : 'otras')) && !(menu && p.id === 'tablero'));
+    const deLaLinea = pestanasDe(slug, !!menu);
     const pestana = deLaLinea.find((p) => p.id === seccion);
     // Para quien trabaja en esta línea, la línea es su inicio: sus pestañas ya son la navegación
     const esInicio = auth.user.inicio.url === new URL(route('lineas.show', slug)).pathname;
+    // En su tablero, a quien tiene la línea como inicio se le saluda bajo el nombre (nunca como antetítulo)
+    const bienvenida = esInicio && seccion === 'tablero' ? `${saludo()}, ${auth.user.name.split(' ')[0]}` : null;
     // Una página interna vuelve a su pestaña; una pestaña, al inicio (si no lo es ya)
     const volver: Volver | false | undefined = !paginaDeLaPestana
         ? pestana
@@ -152,9 +176,9 @@ export function MarcoLinea({
           ? false
           : undefined;
     // Solo las herramientas que su rol abre; con una sola, no hay entre qué cambiar
-    // "Mis entregas" solo para quien tiene entregas a su nombre
-    const pestanasVisibles = deLaLinea.filter((p) => puede(p.permiso) && (p.id !== 'entregas' || auth.user.entregas));
+    const pestanasVisibles = abiertas(deLaLinea, puede, !!auth.user.entregas);
     const verPestanas = pestanas && paginaDeLaPestana && pestanasVisibles.length > 1;
+    const desborde = useDesborde(verPestanas);
 
     return (
         <AppLayout volver={volver}>
@@ -167,10 +191,8 @@ export function MarcoLinea({
                             <Icono className="text-brand-coral-on-dark size-8" aria-hidden="true" />
                         </span>
                         <div className="min-w-0">
-                            <p className="text-brand-coral-ink text-xs font-bold tracking-[0.14em] uppercase">{antetitulo}</p>
-                            <h1 className="mt-0.5 text-2xl leading-tight font-extrabold tracking-tight text-balance md:text-[1.75rem]">
-                                {nombreLinea}
-                            </h1>
+                            <h1 className="text-2xl leading-tight font-extrabold tracking-tight text-balance md:text-[1.75rem]">{nombreLinea}</h1>
+                            {bienvenida && <p className="text-muted-foreground mt-0.5 text-sm">{bienvenida}</p>}
                         </div>
                     </div>
                     {acciones}
@@ -178,7 +200,13 @@ export function MarcoLinea({
 
                 {verPestanas && (
                     <nav aria-label={`Herramientas de ${nombreLinea}`} className="-mt-1 border-b">
-                        <ul role="list" className="-mb-px flex gap-1 overflow-x-auto">
+                        {/* Si no caben (en el teléfono), el borde que sigue se desvanece: hay más pestañas al desplazar */}
+                        <ul
+                            ref={desborde.ref}
+                            role="list"
+                            className="-mb-px flex gap-1 overflow-x-auto [mask-image:var(--desvanecido,none)] focus-within:[mask-image:none]"
+                            style={desborde.estilo}
+                        >
                             {pestanasVisibles.map(({ id, texto, icono: IconoPestana, href }) => {
                                 const activa = id === seccion;
                                 return (
@@ -210,4 +238,39 @@ export function MarcoLinea({
             </div>
         </AppLayout>
     );
+}
+
+const DESVANECIDO = '2.5rem';
+
+/** Si la lista de pestañas tiene más a la izquierda o a la derecha, su borde se desvanece (máscara, sin cubrir nada). */
+function useDesborde(activo: boolean) {
+    const ref = useRef<HTMLUListElement>(null);
+    const [lados, setLados] = useState({ izq: false, der: false });
+
+    useEffect(() => {
+        const lista = ref.current;
+        if (!activo || !lista) return;
+        const medir = () => {
+            const izq = lista.scrollLeft > 1;
+            const der = lista.scrollLeft + lista.clientWidth < lista.scrollWidth - 1;
+            setLados((antes) => (antes.izq === izq && antes.der === der ? antes : { izq, der }));
+        };
+        medir();
+        lista.addEventListener('scroll', medir, { passive: true });
+        const observador = new ResizeObserver(medir);
+        observador.observe(lista);
+        return () => {
+            lista.removeEventListener('scroll', medir);
+            observador.disconnect();
+        };
+    }, [activo]);
+
+    const { izq, der } = lados;
+    const mascara =
+        izq || der
+            ? `linear-gradient(to right, ${izq ? 'transparent' : 'black'}, black ${DESVANECIDO}, black calc(100% - ${DESVANECIDO}), ${der ? 'transparent' : 'black'})`
+            : undefined;
+    const estilo = mascara ? ({ '--desvanecido': mascara } as CSSProperties) : undefined;
+
+    return { ref, estilo };
 }

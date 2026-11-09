@@ -153,7 +153,7 @@ function Umbrales({ valores, campos, editable }: { valores: Props['valores']; ca
             id="titulo-umbrales"
             icono={Award}
             titulo="Informe diario y seguimiento"
-            descripcion="Con el cumplimiento de cada persona en el día, el informe sugiere la acción a registrar. Quien la registra siempre puede elegir otra."
+            descripcion="Con la efectividad de cada persona en el día, el informe sugiere la acción a registrar. Quien la registra siempre puede elegir otra."
         >
             <form onSubmit={enviar} noValidate className="bg-card grid gap-6 rounded-2xl border p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:p-6">
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">

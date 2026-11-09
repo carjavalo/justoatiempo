@@ -74,7 +74,7 @@ class ExportadorInforme
     {
         $hoja->setTitle('Informe Diario');
         $encabezados = ['Fecha operación', 'Cliente', 'Trabajador', 'Ciudad', 'Operación / Servicio', 'Entregas asignadas', 'Entregas realizadas',
-            'Entregas pendientes', 'Cumplimiento %', 'Novedades', 'Averías', 'Devoluciones', 'Faltantes', 'POD / Evidencia', 'Estado', 'Acción / Seguimiento'];
+            'Entregas pendientes', 'Efectividad %', 'Novedades', 'Averías', 'Devoluciones', 'Faltantes', 'POD / Evidencia', 'Estado', 'Acción / Seguimiento'];
         // La hora del informe (Parámetros): "INFORME DIARIO DE OPERACIONES — 10:00 A. M."
         $hora = rescue(fn () => Carbon::createFromFormat('H:i', (string) Parametro::valor('hora_corte_informe', '10:00')), Carbon::createFromTime(10), false);
         $this->titulo($hoja, 'INFORME DIARIO DE OPERACIONES — '.$hora->format('g:i').($hora->hour < 12 ? ' A. M.' : ' P. M.'), 'Seguimiento de la operación realizada '.$this->periodo($desde, $hasta).' — todos los clientes', count($encabezados));
@@ -87,7 +87,7 @@ class ExportadorInforme
                 $f['asignadas'], $f['realizadas'], $f['pendientes'], $f['cumplimiento'], $f['novedades'],
                 $f['averias'], $f['devoluciones'], $f['faltantes'], $f['pod'], $f['estado'], $f['accion'],
             ], null, "A{$r}", true);
-            // Semáforo del cumplimiento: 100 % completa, 80-99 % revisar pendientes, menos de 80 % seguimiento inmediato
+            // Semáforo de la efectividad: 100 % completa, 80-99 % revisar pendientes, menos de 80 % seguimiento inmediato
             if ($f['cumplimiento'] !== null) {
                 $hoja->getStyle("I{$r}")->getFont()->getColor()->setRGB($f['cumplimiento'] >= 1 ? '1E7A46' : ($f['cumplimiento'] >= 0.8 ? 'A86400' : 'B42318'));
             }
@@ -144,7 +144,7 @@ class ExportadorInforme
     private function resumenPorCiudad(Worksheet $hoja, Collection $filas): void
     {
         $hoja->setTitle('Resumen por ciudad');
-        $encabezados = ['Fecha operación', 'Ciudad', 'Registros / trabajadores', 'Entregas asignadas', 'Entregas realizadas', 'Pendientes', 'Registros con novedad', 'Cumplimiento promedio'];
+        $encabezados = ['Fecha operación', 'Ciudad', 'Registros / trabajadores', 'Entregas asignadas', 'Entregas realizadas', 'Pendientes', 'Registros con novedad', 'Efectividad promedio'];
         $this->titulo($hoja, 'RESUMEN CONSOLIDADO DE OPERACIONES POR CIUDAD', null, count($encabezados));
         $this->encabezados($hoja, $encabezados, 3);
 
@@ -180,7 +180,7 @@ class ExportadorInforme
             ['Entregas asignadas', $asignadas],
             ['Entregas realizadas', $realizadas],
             ['Entregas pendientes', $filas->sum('pendientes')],
-            ['Cumplimiento general', $asignadas ? $realizadas / $asignadas : null],
+            ['Efectividad general', $asignadas ? $realizadas / $asignadas : null],
             ['Registros con novedad', $filas->filter(fn ($f) => ! str_starts_with($f['novedades'], 'Sin novedad'))->count()],
             ['Averías', $filas->sum('averias')],
             ['Devoluciones', $filas->sum('devoluciones')],

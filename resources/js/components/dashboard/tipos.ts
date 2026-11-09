@@ -1,5 +1,10 @@
+import { type DiaLogistica } from '@/components/linea/dia';
+
 export interface Kpis {
+    /** Entregas: los productos. */
     asignadas: number;
+    /** Las órdenes (pedidos de Drivin) que traen esas entregas. */
+    ordenes: number;
     aprobadas: number;
     rechazadas: number;
     efectividad: number;
@@ -65,31 +70,6 @@ export interface Protocolo {
     componentes: ComponenteProtocolo[];
 }
 
-export interface InformePendiente {
-    id: number;
-    fecha: string;
-    sede: string | null;
-    color: string | null;
-    sucursal: string | null;
-    estado: 'borrador' | 'seguimiento' | 'cerrado';
-    estadoLabel: string;
-    efectividad: number;
-    asignadas: number;
-    sinAuditar: number;
-}
-
-export interface Pendientes {
-    informes: InformePendiente[];
-    ultimaCarga: {
-        id: number;
-        archivo_nombre: string;
-        fecha_operacion: string;
-        total_filas: number;
-        estado: string;
-        procesado_en: string | null;
-    } | null;
-}
-
 export interface AccionReciente {
     id: number;
     fecha: string;
@@ -113,6 +93,7 @@ export interface DashboardProps {
     porSede: EfectividadSede[];
     ranking: FilaRanking[];
     protocolo: Protocolo;
-    pendientes: Pendientes | null;
+    /** El día de la línea (el mismo de su tarjeta en el inicio): no depende del periodo ni de la sede. */
+    dia: DiaLogistica;
     acciones: AccionReciente[];
 }

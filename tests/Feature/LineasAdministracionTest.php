@@ -76,7 +76,7 @@ class LineasAdministracionTest extends TestCase
         // Sale en el panel, tiene su página y se le asignan personas (la empresa pasa a recibirla)
         $this->actingAs($this->admin)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 8)->where('lineas.7.icono', 'seguridad'));
         $this->actingAs($this->admin)->get('/lineas/vigilancia-y-porteria')->assertOk()
-            ->assertInertia(fn (Assert $p) => $p->component('lineas/linea')->where('linea.descripcion', 'Control de acceso y rondas.'));
+            ->assertInertia(fn (Assert $p) => $p->component('lineas/linea')->where('linea.nombre', 'Vigilancia y portería'));
         $empresa = $this->empresa();
         $ana = User::factory()->create(['linea_servicio_id' => null]);
         $this->actingAs($this->admin)->post('/asignaciones', [
