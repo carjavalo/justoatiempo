@@ -1,0 +1,1 @@
+import{j as r}from"./app-Gm2S27DB.js";import{c as a}from"./logo-marca-BY9UZ6w0.js";import{X as e}from"./xcircle-BgNEXgny.js";function o({message:t,className:s="",...i}){return t?r.jsxs("p",{...i,className:a("text-critical flex items-start gap-1.5 text-sm",s),children:[r.jsx(e,{className:"mt-0.5 size-4","aria-hidden":"true"}),r.jsx("span",{children:t})]}):null}export{o as I};

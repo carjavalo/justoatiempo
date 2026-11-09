@@ -113,7 +113,10 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
         return (
             <div className="min-w-0">
                 <p className="text-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="font-mono font-semibold tracking-wide">{v.placa}</span>
+                    {/* La placa se ve como placa: es como la reconoce la operación en la calle y en Drivin */}
+                    <span className="bg-background border-foreground/70 inline-flex rounded-md border-[1.5px] px-1.5 py-px font-mono text-sm font-bold tracking-[0.12em]">
+                        {v.placa}
+                    </span>
                     {!v.activo && <EstadoBadge activo={false} />}
                 </p>
                 {detalle && <p className="text-muted-foreground mt-0.5 text-xs text-pretty">{detalle}</p>}

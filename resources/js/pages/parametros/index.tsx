@@ -2,9 +2,9 @@ import { AccionesFila } from '@/components/admin/acciones';
 import { Campo } from '@/components/admin/campo';
 import { FormularioLateral } from '@/components/admin/formulario-lateral';
 import { OpcionesRadio } from '@/components/admin/opciones-radio';
-import { claseTd, claseTh, contenedorModulo, EncabezadoModulo, EstadoBadge, Tabla } from '@/components/admin/piezas';
+import { contenedorModulo, EncabezadoModulo, EstadoBadge } from '@/components/admin/piezas';
 import { BotonEnviar } from '@/components/boton-enviar';
-import { Award, ClipboardCheck, PackageX, Plus, type TipoIcono } from '@/components/iconos';
+import { Plus } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePuede } from '@/hooks/use-puede';
@@ -51,10 +51,15 @@ interface Props {
     novedades: Novedad[];
 }
 
-const SEVERIDADES: { valor: Severidad; texto: string; ayuda: string; clase: string }[] = [
-    { valor: 'ninguna', texto: 'Sin falta', ayuda: 'Una entrega bien hecha o una nota informativa.', clase: 'bg-good-soft text-good' },
-    { valor: 'leve', texto: 'Leve', ayuda: 'Falta una foto, pero la entrega se puede respaldar.', clase: 'bg-warning-soft text-warning' },
-    { valor: 'grave', texto: 'Grave', ayuda: 'Sin la evidencia la entrega no se puede respaldar.', clase: 'bg-critical-soft text-critical' },
+const SEVERIDADES: { valor: Severidad; texto: string; ayuda: string; marca: string }[] = [
+    { valor: 'ninguna', texto: 'Sin falta', ayuda: 'Una entrega bien hecha o una nota informativa.', marca: 'bg-good' },
+    { valor: 'leve', texto: 'Leve', ayuda: 'Falta una foto, pero la entrega se puede respaldar.', marca: 'bg-warning' },
+    { valor: 'grave', texto: 'Grave', ayuda: 'Sin la evidencia la entrega no se puede respaldar.', marca: 'bg-critical' },
+];
+/** Los motivos según de quién depende el rechazo (los mismos ejemplos del formulario). */
+const RESPONSABLES = [
+    { imputable: false, texto: 'Dependen del cliente u otro', ayuda: 'Cliente ausente, dirección errada, reprogramación…' },
+    { imputable: true, texto: 'Dependen de la operación', ayuda: 'Producto averiado, no alcanzó el tiempo en ruta…' },
 ];
 
 const numero = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 });
@@ -87,14 +92,12 @@ export default function Parametros({ valores, campos, motivos, novedades }: Prop
 
 function Seccion({
     id,
-    icono: Icono,
     titulo,
     descripcion,
     accion,
     children,
 }: {
     id: string;
-    icono: TipoIcono;
     titulo: string;
     descripcion: string;
     accion?: ReactNode;
@@ -103,21 +106,38 @@ function Seccion({
     return (
         <section aria-labelledby={id} className="flex flex-col gap-4">
             <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                    <span className="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
-                        <Icono className="size-5" />
-                    </span>
-                    <div className="min-w-0">
-                        <h2 id={id} className="text-lg font-extrabold tracking-tight">
-                            {titulo}
-                        </h2>
-                        <p className="text-muted-foreground max-w-2xl text-sm">{descripcion}</p>
-                    </div>
+                <div className="min-w-0">
+                    <h2 id={id} className="text-lg font-extrabold tracking-tight">
+                        {titulo}
+                    </h2>
+                    <p className="text-muted-foreground max-w-xl text-sm text-pretty">{descripcion}</p>
                 </div>
                 {accion}
             </div>
             {children}
         </section>
+    );
+}
+
+/** Un catálogo en una sola lista, con un encabezado por grupo (solo los que tienen algo). */
+function ListaAgrupada({ grupos }: { grupos: { clave: string; titulo: ReactNode; ayuda: string; filas: ReactNode[] }[] }) {
+    const conFilas = grupos.filter((g) => g.filas.length > 0);
+    return (
+        <div className="bg-card overflow-hidden rounded-2xl border shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+            {conFilas.map((g, i) => (
+                <section key={g.clave} aria-labelledby={`grupo-${g.clave}`} className={cn(i > 0 && 'border-t')}>
+                    <div className="bg-muted/50 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-b px-4 py-2.5 sm:px-5">
+                        <h3 id={`grupo-${g.clave}`} className="flex items-center gap-2 text-sm font-semibold">
+                            {g.titulo}
+                        </h3>
+                        <p className="text-muted-foreground text-xs">{g.ayuda}</p>
+                    </div>
+                    <ul role="list" className="divide-y">
+                        {g.filas}
+                    </ul>
+                </section>
+            ))}
+        </div>
     );
 }
 
@@ -151,7 +171,6 @@ function Umbrales({ valores, campos, editable }: { valores: Props['valores']; ca
     return (
         <Seccion
             id="titulo-umbrales"
-            icono={Award}
             titulo="Informe diario y seguimiento"
             descripcion="Con la efectividad de cada persona en el día, el informe sugiere la acción a registrar. Quien la registra siempre puede elegir otra."
         >
@@ -199,7 +218,7 @@ function Umbrales({ valores, campos, editable }: { valores: Props['valores']; ca
                 </div>
 
                 {/* Lo que sugerirá el informe con los valores escritos */}
-                <div className="bg-muted/40 grid gap-2 rounded-xl border p-4 text-sm sm:grid-cols-3" aria-live="polite">
+                <div className="grid gap-2 border-t pt-5 text-sm sm:grid-cols-3" aria-live="polite">
                     {coherente ? (
                         <>
                             <Regla clase="bg-good" titulo="Felicitación">
@@ -301,128 +320,95 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
         <>
             <Seccion
                 id="titulo-motivos"
-                icono={PackageX}
                 titulo="Motivos de rechazo"
                 descripcion="Los motivos de devolución como llegan en la preliquidación de Drivin. Al cargarla, cada orden rechazada se clasifica con el suyo; uno inactivo ya no se reconoce (la orden guarda solo el texto)."
                 accion={botonNuevo('Nuevo motivo', () => abrirMotivo(null))}
             >
-                <Tabla titulo="Motivos de rechazo" minimo="min-w-[640px]" columnas={['44%', '22%', '14%', '12%', '3.5rem']}>
-                    <thead className="text-muted-foreground border-b">
-                        <tr>
-                            <th scope="col" className={claseTh}>
-                                Motivo
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Responsable
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Órdenes
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Estado
-                            </th>
-                            <th scope="col" className={cn(claseTh, 'w-14')}>
-                                <span className="sr-only">Acciones</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {motivos.map((m) => (
-                            <tr key={m.id} className={cn('hover:bg-muted/40 transition-colors', !m.activo && 'text-muted-foreground')}>
-                                <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                    <p className={cn('truncate font-semibold', m.activo && 'text-foreground')} title={m.nombre}>
-                                        {m.nombre}
+                {/* Agrupados por de quién depende: el responsable no se repite en cada fila */}
+                <ListaAgrupada
+                    grupos={RESPONSABLES.map((r) => ({
+                        clave: r.imputable ? 'operacion' : 'cliente',
+                        titulo: r.texto,
+                        ayuda: r.ayuda,
+                        filas: motivos
+                            .filter((m) => m.imputable === r.imputable)
+                            .map((m) => (
+                                <li
+                                    key={m.id}
+                                    className={cn(
+                                        'flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5',
+                                        !m.activo && 'text-muted-foreground',
+                                    )}
+                                >
+                                    <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className={cn('font-semibold break-words', m.activo && 'text-foreground')}>{m.nombre}</span>
+                                        {!m.activo && <EstadoBadge activo={false} />}
                                     </p>
-                                </th>
-                                <td className={claseTd}>{m.imputable ? 'La operación' : 'El cliente u otro'}</td>
-                                <td className={cn(claseTd, 'tabular-nums')}>
-                                    {m.usos ? fmt.numero(m.usos) : <span className="text-muted-foreground text-xs">Ninguna</span>}
-                                </td>
-                                <td className={claseTd}>
-                                    <EstadoBadge activo={m.activo} />
-                                </td>
-                                <td className={cn(claseTd, 'text-right')}>
-                                    <AccionesFila
-                                        nombre={`el motivo ${m.nombre}`}
-                                        activo={m.activo}
-                                        urlEstado={editable ? route('parametros.motivos.estado', m.id) : undefined}
-                                        onEditar={editable ? (boton) => abrirMotivo(m, boton) : undefined}
-                                        urlEliminar={editable && !m.usos ? route('parametros.motivos.destroy', m.id) : undefined}
-                                        consecuencia="Las próximas cargas de Drivin ya no lo reconocen: esas órdenes guardan solo el texto del motivo. Las órdenes ya cargadas lo conservan."
-                                    />
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </Tabla>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {/* Con órdenes no se elimina: el número dice por qué */}
+                                        {m.usos > 0 && (
+                                            <span className="text-muted-foreground text-xs tabular-nums">
+                                                {fmt.numero(m.usos)} {m.usos === 1 ? 'orden' : 'órdenes'}
+                                            </span>
+                                        )}
+                                        <AccionesFila
+                                            nombre={`el motivo ${m.nombre}`}
+                                            activo={m.activo}
+                                            urlEstado={editable ? route('parametros.motivos.estado', m.id) : undefined}
+                                            onEditar={editable ? (boton) => abrirMotivo(m, boton) : undefined}
+                                            urlEliminar={editable && !m.usos ? route('parametros.motivos.destroy', m.id) : undefined}
+                                            consecuencia="Las próximas cargas de Drivin ya no lo reconocen: esas órdenes guardan solo el texto del motivo. Las órdenes ya cargadas lo conservan."
+                                        />
+                                    </div>
+                                </li>
+                            )),
+                    }))}
+                />
             </Seccion>
 
             <Seccion
                 id="titulo-novedades"
-                icono={ClipboardCheck}
                 titulo="Tipos de novedad"
                 descripcion="Lo que se anota al auditar las evidencias de una entrega. Los que sugiere la auditoría por sí sola conservan su nombre; su gravedad sí se puede ajustar."
                 accion={botonNuevo('Nuevo tipo', () => abrirNovedad(null))}
             >
-                <Tabla titulo="Tipos de novedad" minimo="min-w-[640px]" columnas={['48%', '18%', '18%', '12%', '3.5rem']}>
-                    <thead className="text-muted-foreground border-b">
-                        <tr>
-                            <th scope="col" className={claseTh}>
-                                Tipo
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Gravedad
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Origen
-                            </th>
-                            <th scope="col" className={claseTh}>
-                                Estado
-                            </th>
-                            <th scope="col" className={cn(claseTh, 'w-14')}>
-                                <span className="sr-only">Acciones</span>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {novedades.map((n) => {
-                            const severidad = SEVERIDADES.find((s) => s.valor === n.severidad) ?? SEVERIDADES[0];
-                            return (
-                                <tr key={n.id} className={cn('hover:bg-muted/40 transition-colors', !n.activo && 'text-muted-foreground')}>
-                                    <th scope="row" className={cn(claseTd, 'font-normal')}>
-                                        <p className={cn('truncate font-semibold', n.activo && 'text-foreground')} title={n.nombre}>
-                                            {n.nombre}
-                                        </p>
-                                    </th>
-                                    <td className={claseTd}>
-                                        <span
-                                            className={cn(
-                                                'rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap',
-                                                n.activo ? severidad.clase : 'bg-muted',
-                                            )}
-                                        >
-                                            {severidad.texto}
-                                        </span>
-                                    </td>
-                                    <td className={cn(claseTd, 'text-xs')}>{n.sistema ? 'De la auditoría' : 'Agregado aquí'}</td>
-                                    <td className={claseTd}>
-                                        <EstadoBadge activo={n.activo} />
-                                    </td>
-                                    <td className={cn(claseTd, 'text-right')}>
-                                        <AccionesFila
-                                            nombre={`el tipo ${n.nombre}`}
-                                            activo={n.activo}
-                                            urlEstado={editable ? route('parametros.novedades.estado', n.id) : undefined}
-                                            onEditar={editable ? (boton) => abrirNovedad(n, boton) : undefined}
-                                            urlEliminar={editable && !n.sistema ? route('parametros.novedades.destroy', n.id) : undefined}
-                                            consecuencia="Ya no se ofrece al auditar las evidencias. Las órdenes que ya lo tienen lo conservan."
-                                        />
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </Tabla>
+                {/* Agrupados por gravedad, de la más seria a la que no es falta: la gravedad se explica una vez */}
+                <ListaAgrupada
+                    grupos={[...SEVERIDADES].reverse().map((s) => ({
+                        clave: s.valor,
+                        titulo: (
+                            <>
+                                <span className={cn('size-2 shrink-0 rounded-full', s.marca)} aria-hidden="true" />
+                                {s.texto}
+                            </>
+                        ),
+                        ayuda: s.ayuda,
+                        filas: novedades
+                            .filter((n) => n.severidad === s.valor)
+                            .map((n) => (
+                                <li
+                                    key={n.id}
+                                    className={cn(
+                                        'flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5',
+                                        !n.activo && 'text-muted-foreground',
+                                    )}
+                                >
+                                    <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className={cn('font-semibold break-words', n.activo && 'text-foreground')}>{n.nombre}</span>
+                                        {!n.activo && <EstadoBadge activo={false} />}
+                                    </p>
+                                    <AccionesFila
+                                        nombre={`el tipo ${n.nombre}`}
+                                        activo={n.activo}
+                                        urlEstado={editable ? route('parametros.novedades.estado', n.id) : undefined}
+                                        onEditar={editable ? (boton) => abrirNovedad(n, boton) : undefined}
+                                        urlEliminar={editable && !n.sistema ? route('parametros.novedades.destroy', n.id) : undefined}
+                                        consecuencia="Ya no se ofrece al auditar las evidencias. Las órdenes que ya lo tienen lo conservan."
+                                    />
+                                </li>
+                            )),
+                    }))}
+                />
             </Seccion>
 
             <FormularioLateral
