@@ -63,12 +63,15 @@ class SeguimientoController extends Controller
             ->where('linea_servicio_id', $op->linea->id)
             // Las acciones se registran después de la jornada (el informe es a día vencido): hasta hoy
             ->whereBetween('fecha', [$desde->toDateString(), max($hasta, today())->toDateString()])
-            ->with('registradoPor:id,name')
+            ->with('registradoPor:id,name', 'informe:id,estado')
             ->latest('fecha')->latest('id')
             ->get()
             ->groupBy('user_id');
 
-        $filas = $personas->map(function (User $p) use ($porPersona, $acciones) {
+        // Como en el informe: la corrige o la quita quien la registró (o quien no tiene límites), y no si su informe está cerrado
+        $editable = fn (AccionDesempeno $a) => ($a->registrado_por === $yo->id || $yo->sinLimites()) && ! $a->informe?->estaCerrado();
+
+        $filas = $personas->map(function (User $p) use ($porPersona, $acciones, $editable) {
             $r = $porPersona[$p->id];
             $suyas = $acciones[$p->id] ?? collect();
 
@@ -94,6 +97,7 @@ class SeguimientoController extends Controller
                     'descripcion' => $a->descripcion,
                     'efectividad' => $a->efectividad_referencia !== null ? (float) $a->efectividad_referencia : null,
                     'registradaPor' => $a->registradoPor?->name,
+                    'editable' => $editable($a),
                 ])->values(),
             ];
         })->sortBy([['cumplimiento', 'asc'], ['nombre', 'asc']])->values();
