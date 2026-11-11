@@ -96,11 +96,16 @@ class OperacionLineasTest extends TestCase
             // Queda por programar quien coordina (también trabaja allí)
             ->where('programaciones.0.candidatos', fn ($c) => collect($c)->pluck('id')->all() === [$this->coordinador->id]));
 
-        // La asistencia de mañana aún no se registra, y con asistencia el lugar no se quita
+        // La asistencia de mañana aún no se registra
         $manana = Programacion::create(['fecha' => today()->addDay(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 1]);
         $fila = $manana->asignaciones()->create(['user_id' => $this->ana->id]);
         $this->patch("/programacion/personas/{$fila->id}/asistencia", ['asistencia' => 'asistio'])->assertSessionHasErrors(['asistencia']);
-        $this->delete("/programacion/{$programacion->id}")->assertSessionHas('error');
+
+        // Con asistencia el lugar también se quita: queda marcado y su asistencia se conserva en el historial
+        $this->delete("/programacion/{$programacion->id}")->assertSessionHas('success');
+        $this->assertSoftDeleted($programacion);
+        $this->assertSame(2, $programacion->asignaciones()->whereNotNull('asistencia')->count());
+        $this->assertDatabaseHas('bitacora', ['accion' => 'eliminada', 'modelo_tipo' => Programacion::class, 'modelo_id' => $programacion->id]);
     }
 
     public function test_se_copia_la_programacion_del_dia_anterior_sin_la_asistencia(): void
@@ -169,7 +174,7 @@ class OperacionLineasTest extends TestCase
         // Eliminar pide su propio permiso: el coordinador base no lo tiene
         $this->delete("/novedades/{$novedad->id}")->assertForbidden();
         $this->actingAs(User::factory()->admin()->create())->delete("/novedades/{$novedad->id}")->assertSessionHas('success');
-        $this->assertModelMissing($novedad);
+        $this->assertSoftDeleted($novedad);
         $this->assertDatabaseHas('bitacora', ['accion' => 'eliminada', 'modelo_id' => $novedad->id]);
     }
 

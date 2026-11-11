@@ -8,7 +8,6 @@ use App\Models\RolUsuario;
 use App\Models\SolicitudContacto;
 use App\Models\User;
 use App\Support\Permisos;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -337,12 +336,13 @@ class RolesTest extends TestCase
         $this->assertSame([$this->admin->email, $comercial->email], SolicitudContacto::destinatarios());
     }
 
-    public function test_un_rol_con_usuarios_no_se_borra(): void
+    public function test_un_rol_con_usuarios_no_se_elimina_sin_pasarlos_a_otro(): void
     {
         $conductor = $this->rol(['tablero.ver'], Permisos::ALCANCE_PROPIO, 'Conductor');
-        $this->persona($conductor);
+        $persona = $this->persona($conductor);
 
-        $this->expectException(QueryException::class);
-        $conductor->delete();
+        $this->actingAs($this->admin)->delete("/roles/{$conductor->id}")->assertSessionHasErrors(['pasar_a']);
+        $this->assertNotSoftDeleted($conductor);
+        $this->assertSame($conductor->id, $persona->fresh()->rol_id);
     }
 }

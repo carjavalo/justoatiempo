@@ -310,22 +310,30 @@ class CargaDrivinTest extends TestCase
         $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p->where('analisis.totales.ordenes', 1)->where('analisis.ordenesFuera', 0));
     }
 
-    public function test_una_carga_anulada_se_puede_volver_a_subir()
+    public function test_una_carga_anulada_se_puede_volver_a_subir_como_una_carga_nueva()
     {
         $archivo = $this->archivo([$this->fila('PDVT1', 'Aprobada')], 'repetido.xlsx');
         $contenido = file_get_contents($archivo->getRealPath());
         $carga = $this->subir($archivo);
         $this->post("/cargas/{$carga->id}/confirmar");
         $this->post("/cargas/{$carga->id}/anular");
+        // Sus órdenes ya no cuentan, pero no se borran: quedan marcadas con la carga anulada
         $this->assertSame(0, Orden::count());
+        $this->assertSame(1, Orden::onlyTrashed()->where('carga_id', $carga->id)->count());
 
         $copia = sys_get_temp_dir().'/'.uniqid('drivin_').'.xlsx';
         file_put_contents($copia, $contenido);
-        $this->post('/cargas', ['archivo' => new UploadedFile($copia, 'repetido.xlsx', null, null, true)])->assertRedirect("/cargas/{$carga->id}");
-        $this->assertTrue($carga->fresh()->enRevision());
+        $this->post('/cargas', ['archivo' => new UploadedFile($copia, 'repetido.xlsx', null, null, true)]);
+        $nueva = Carga::latest('id')->first();
+        $this->assertNotSame($carga->id, $nueva->id);
+        $this->assertTrue($nueva->enRevision());
+        // La anulada queda como estaba, con quién y cuándo la anuló
+        $this->assertSame(EstadoCarga::Anulada, $carga->fresh()->estado);
+        $this->assertNotNull($carga->fresh()->anulada_en);
 
-        $this->post("/cargas/{$carga->id}/confirmar")->assertRedirect();
+        $this->post("/cargas/{$nueva->id}/confirmar")->assertRedirect();
         $this->assertSame(1, Orden::count());
+        $this->assertSame(2, Orden::withTrashed()->count());
     }
 
     public function test_solo_coordinador_y_administrador_cargan_archivos()

@@ -203,9 +203,11 @@ class AuditoriaPodTest extends TestCase
         $this->patch("/evidencias/{$e->id}", ['tipo' => 'remesa'])->assertRedirect();
         $this->assertSame('remesa', $e->fresh()->tipo->value);
 
+        // Se elimina sin borrarse: deja de verse, queda marcada y su archivo se conserva
         $this->delete("/evidencias/{$e->id}")->assertRedirect();
         $this->assertSame(0, Evidencia::count());
-        Storage::disk('local')->assertMissing($e->path);
+        $this->assertSoftDeleted($e);
+        Storage::disk('local')->assertExists($e->path);
     }
 
     public function test_un_informe_cerrado_no_admite_cambios()

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Rol;
 use App\Models\Asignacion;
 use App\Models\LineaServicio;
 use App\Models\Sucursal;
@@ -197,18 +198,18 @@ class AsignacionesTest extends TestCase
         $this->assertSame(['2026-10-20', 'terminada'], [$vieja->fresh()->fecha_fin->toDateString(), $vieja->fresh()->estado()]);
         $this->assertSame([], $ana->fresh()->lineasIds());
 
-        // Programada: se quita
+        // Programada: se quita (queda marcada, no se borra)
         $this->actingAs($this->admin)->post('/asignaciones', $this->datos($ana, ['empresa_id' => $tugo->empresa_id, 'fecha_inicio' => '2026-12-01']))->assertSessionHasNoErrors();
         $programada = $ana->asignaciones()->latest('id')->first();
         $this->actingAs($this->admin)->patch("/asignaciones/{$programada->id}/terminar")->assertSessionHas('success');
-        $this->assertModelMissing($programada);
+        $this->assertSoftDeleted($programada);
     }
 
     public function test_al_crear_un_usuario_se_va_a_asignarlo(): void
     {
         $this->actingAs($this->admin)->post('/usuarios', [
             'nombres' => 'Luis', 'primer_apellido' => 'Gómez', 'email' => 'luis@example.com', 'cargo' => 'Conductor',
-            'rol_id' => $this->rolBase(\App\Enums\Rol::Auxiliar), 'password' => 'Clave-segura-1',
+            'rol_id' => $this->rolBase(Rol::Auxiliar), 'password' => 'Clave-segura-1',
         ])->assertRedirect();
         $luis = User::where('email', 'luis@example.com')->sole();
 

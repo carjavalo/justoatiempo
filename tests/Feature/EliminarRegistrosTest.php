@@ -12,6 +12,7 @@ use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\MotivoRechazo;
 use App\Models\Orden;
+use App\Models\Programacion;
 use App\Models\RolUsuario;
 use App\Models\SolicitudContacto;
 use App\Models\Sucursal;
@@ -22,8 +23,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Eliminar pide confirmación en la pantalla y aquí, su propio permiso. Lo que tiene historial no se borra: se explica y
- * se desactiva. Lo que se borra queda en la bitácora.
+ * Eliminar pide confirmación en la pantalla y aquí, su propio permiso. Nada se borra de la base: lo eliminado queda
+ * marcado (deleted_at), deja de verse y su rastro queda en la bitácora. Lo que lo referencia (órdenes, informes…) se
+ * conserva, y quienes estaban asignados a lo eliminado quedan sin esa asignación (termina ayer, sigue en su historial).
  */
 class EliminarRegistrosTest extends TestCase
 {
@@ -55,63 +57,84 @@ class EliminarRegistrosTest extends TestCase
         $this->assertModelExists($empresa);
     }
 
-    public function test_una_empresa_sin_historial_se_elimina_y_con_sedes_no(): void
+    public function test_una_empresa_se_elimina_sin_borrarse_con_sus_sedes_y_su_personal_queda_sin_asignacion(): void
     {
         $vacia = Empresa::create(['nombre' => 'Vacía', 'nit' => '900123456']);
         $vacia->lineas()->attach(LineaServicio::logistica());
         $this->delete("/empresas/{$vacia->id}")->assertSessionHas('success');
-        $this->assertDatabaseMissing('empresas', ['id' => $vacia->id]);
+        $this->assertSoftDeleted($vacia);
         $this->assertDatabaseHas('bitacora', ['accion' => 'eliminada', 'modelo_tipo' => Empresa::class, 'modelo_id' => $vacia->id]);
-
-        // Se borra del todo: su razón social y su NIT quedan libres
-        $this->assertSame(0, Empresa::withTrashed()->where('nit', '900123456')->count());
+        // Su razón social y su NIT quedan libres para una empresa nueva
+        Empresa::create(['nombre' => 'Vacía', 'nit' => '900123456']);
 
         $sede = $this->sede('TuGo');
-        $this->delete("/empresas/{$sede->empresa_id}")->assertSessionHas('error');
-        $this->assertModelExists($sede->empresa);
+        $sucursal = Sucursal::create(['nombre' => 'Cali Sur', 'sede_id' => $sede->id, 'ciudad' => 'Cali']);
+        $persona = User::factory()->sinAcceso()->create(['empresa_id' => $sede->empresa_id]);
+        $persona->asignaciones()->update(['fecha_inicio' => today()->subMonth()]);
+        $this->delete("/empresas/{$sede->empresa_id}")->assertSessionHas('success');
+
+        $this->assertSoftDeleted($sede);
+        $this->assertSoftDeleted($sucursal);
+        $asignacion = $persona->asignaciones()->sole();
+        $this->assertSame(today()->subDay()->toDateString(), $asignacion->fecha_fin->toDateString());
+        $this->assertSame(0, $persona->asignacionesVigentes()->count());
     }
 
-    public function test_sede_y_sucursal_con_operacion_no_se_eliminan(): void
+    public function test_sede_y_sucursal_se_eliminan_conservando_su_operacion_y_sin_dejar_a_nadie_asignado(): void
     {
         $sede = $this->sede('TuGo');
         $sucursal = Sucursal::create(['nombre' => 'Cali Sur', 'sede_id' => $sede->id, 'ciudad' => 'Cali']);
-        $this->delete("/sedes/{$sede->id}")->assertSessionHas('error');
-
         $orden = $this->orden(['sede_id' => $sede->id, 'sucursal_id' => $sucursal->id]);
-        $this->delete("/sucursales/{$sucursal->id}")->assertSessionHas('error');
-        $this->assertModelExists($sucursal);
+        $persona = User::factory()->sinAcceso()->create(['empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id]);
+        $persona->asignaciones()->update(['fecha_inicio' => today()->subMonth()]);
+        $futura = Programacion::create(['fecha' => today()->addDays(2), 'linea_servicio_id' => LineaServicio::logistica()->id, 'empresa_id' => $sede->empresa_id, 'sede_id' => $sede->id, 'sucursal_id' => $sucursal->id, 'personas_requeridas' => 1]);
 
-        $orden->delete();
         $this->delete("/sucursales/{$sucursal->id}")->assertSessionHas('success');
-        $this->assertDatabaseMissing('sucursales', ['id' => $sucursal->id]);
+        $this->assertSoftDeleted($sucursal);
+        // Su operación pasada se conserva; quien estaba asignado queda sin asignación y la programación por venir se quita
+        $this->assertModelExists($orden);
+        $this->assertSame($sucursal->id, $orden->fresh()->sucursal_id);
+        $this->assertSame('Cali Sur', $orden->fresh()->sucursal->nombre);
+        $this->assertSame(0, $persona->asignacionesVigentes()->count());
+        $this->assertSoftDeleted($futura);
+
+        // El nombre queda libre en la sede
+        $this->post('/sucursales', ['nombre' => 'Cali Sur', 'ciudad' => 'Cali', 'sede_id' => $sede->id])->assertSessionHasNoErrors();
+
         $this->delete("/sedes/{$sede->id}")->assertSessionHas('success');
-        $this->assertDatabaseMissing('sedes', ['id' => $sede->id]);
+        $this->assertSoftDeleted($sede);
+        $this->assertSame(0, Sucursal::where('sede_id', $sede->id)->count());
     }
 
-    public function test_un_vehiculo_con_ordenes_no_se_elimina(): void
+    public function test_un_vehiculo_se_elimina_conservando_sus_ordenes_y_su_placa_queda_libre(): void
     {
         $vehiculo = Vehiculo::create(['placa' => 'SNX708']);
         $orden = $this->orden(['vehiculo_id' => $vehiculo->id, 'placa' => 'SNX708']);
-        $this->delete("/vehiculos/{$vehiculo->id}")->assertSessionHas('error');
-        $this->assertModelExists($vehiculo);
-
-        $orden->delete();
         $this->delete("/vehiculos/{$vehiculo->id}")->assertSessionHas('success');
-        $this->assertDatabaseMissing('vehiculos', ['id' => $vehiculo->id]);
+        $this->assertSoftDeleted($vehiculo);
+        $this->assertSame($vehiculo->id, $orden->fresh()->vehiculo?->id);
+
+        Vehiculo::create(['placa' => 'SNX708']);
+        $this->assertSame(1, Vehiculo::where('placa', 'SNX708')->count());
     }
 
-    public function test_un_usuario_con_historial_no_se_elimina_y_uno_sin_historial_si(): void
+    public function test_un_usuario_se_elimina_conservando_su_historial(): void
     {
-        $conEntregas = User::factory()->sinAcceso()->create();
-        $this->orden(['auxiliar_id' => $conEntregas->id]);
-        $this->delete("/usuarios/{$conEntregas->id}")->assertSessionHas('error');
-        $this->assertModelExists($conEntregas);
+        $conEntregas = User::factory()->sinAcceso()->create(['cedula' => '1144203579']);
+        $conEntregas->asignaciones()->update(['fecha_inicio' => today()->subMonth()]);
+        $orden = $this->orden(['auxiliar_id' => $conEntregas->id]);
+        $this->delete("/usuarios/{$conEntregas->id}")->assertSessionHas('success');
 
-        $porError = User::factory()->sinAcceso()->create();
-        $this->assertSame(1, $porError->asignaciones()->count());
-        $this->delete("/usuarios/{$porError->id}")->assertSessionHas('success');
-        $this->assertModelMissing($porError);
-        $this->assertSame(0, Asignacion::where('user_id', $porError->id)->count());
+        $this->assertSoftDeleted($conEntregas);
+        $this->assertFalse(User::withTrashed()->find($conEntregas->id)->activo);
+        // Sus entregas siguen diciendo quién las hizo; su asignación terminó y sigue en su historial
+        $this->assertSame($conEntregas->id, $orden->fresh()->auxiliar?->id);
+        $this->assertSame(1, Asignacion::where('user_id', $conEntregas->id)->count());
+        $this->assertSame(0, $conEntregas->asignacionesVigentes()->count());
+
+        // Su cédula queda libre para registrarla de nuevo
+        User::factory()->sinAcceso()->create(['cedula' => '1144203579']);
+        $this->assertSame(1, User::where('cedula', '1144203579')->count());
     }
 
     public function test_nadie_se_elimina_a_si_mismo_ni_al_unico_administrador(): void
@@ -135,60 +158,63 @@ class EliminarRegistrosTest extends TestCase
         $this->assertModelExists($this->admin);
     }
 
-    public function test_un_rol_base_o_con_personas_no_se_elimina(): void
+    public function test_un_rol_base_no_se_elimina_y_uno_con_personas_las_pasa_a_otro_rol(): void
     {
         $this->delete('/roles/'.$this->rolBase(Rol::Auxiliar))->assertSessionHas('error');
 
         $rol = RolUsuario::create(['nombre' => 'Conductor', 'permisos' => [], 'alcance' => 'propio', 'activo' => true]);
         $persona = User::factory()->sinAcceso()->create(['rol_id' => $rol->id]);
-        $this->delete("/roles/{$rol->id}")->assertSessionHas('error');
+        // Nadie queda sin rol: hay que elegir a cuál pasan
+        $this->delete("/roles/{$rol->id}")->assertSessionHasErrors(['pasar_a']);
+        $this->assertNotSoftDeleted($rol);
 
-        $persona->update(['rol_id' => $this->rolBase(Rol::Auxiliar)]);
-        $this->delete("/roles/{$rol->id}")->assertSessionHas('success');
-        $this->assertModelMissing($rol);
+        $this->delete("/roles/{$rol->id}", ['pasar_a' => $this->rolBase(Rol::Auxiliar)])->assertSessionHas('success');
+        $this->assertSoftDeleted($rol);
+        $this->assertSame($this->rolBase(Rol::Auxiliar), $persona->fresh()->rol_id);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'eliminada', 'modelo_tipo' => RolUsuario::class, 'modelo_id' => $rol->id]);
     }
 
-    public function test_la_linea_de_drivin_o_una_con_empresas_no_se_elimina(): void
+    public function test_la_linea_de_drivin_no_se_elimina_y_otra_si_sin_dejar_a_nadie_en_ella(): void
     {
         $this->delete('/lineas-de-servicio/'.LineaServicio::logistica()->id)->assertSessionHas('error');
 
         $nueva = LineaServicio::create(['nombre' => 'Fumigación', 'slug' => 'fumigacion', 'icono' => 'layers', 'orden' => 99, 'activa' => true]);
         $empresa = Empresa::create(['nombre' => 'Con línea']);
         $empresa->lineas()->attach($nueva);
-        $this->delete("/lineas-de-servicio/{$nueva->id}")->assertSessionHas('error');
+        $soloEsta = User::factory()->sinAcceso()->create(['empresa_id' => $empresa->id, 'linea_servicio_id' => $nueva->id]);
+        $soloEsta->asignaciones()->update(['fecha_inicio' => today()->subMonth()]);
 
-        $empresa->lineas()->detach($nueva);
         $this->delete("/lineas-de-servicio/{$nueva->id}")->assertSessionHas('success');
-        $this->assertModelMissing($nueva);
+        $this->assertSoftDeleted($nueva);
+        $this->assertSame(0, $soloEsta->asignacionesVigentes()->count());
     }
 
-    public function test_catalogos_en_uso_no_se_eliminan(): void
+    public function test_los_catalogos_se_eliminan_y_lo_que_los_usa_los_conserva(): void
     {
         $motivo = MotivoRechazo::create(['nombre' => 'Motivo de prueba']);
         $orden = $this->orden(['motivo_rechazo_id' => $motivo->id]);
-        $this->delete("/parametros/motivos/{$motivo->id}")->assertSessionHas('error');
-        $orden->delete();
         $this->delete("/parametros/motivos/{$motivo->id}")->assertSessionHas('success');
-        $this->assertModelMissing($motivo);
+        $this->assertSoftDeleted($motivo);
+        $this->assertSame('Motivo de prueba', $orden->fresh()->motivoRechazo?->nombre);
 
         $sistema = TipoNovedad::firstOrCreate(['nombre' => TipoNovedad::DEL_SISTEMA[0]], ['severidad' => 'leve']);
         $this->delete("/parametros/novedades/{$sistema->id}")->assertSessionHas('error');
         $propio = TipoNovedad::create(['nombre' => 'Propio', 'severidad' => 'leve']);
         $this->delete("/parametros/novedades/{$propio->id}")->assertSessionHas('success');
-        $this->assertModelMissing($propio);
+        $this->assertSoftDeleted($propio);
     }
 
-    public function test_una_asignacion_y_una_solicitud_se_eliminan(): void
+    public function test_una_asignacion_y_una_solicitud_se_eliminan_sin_borrarse(): void
     {
         $persona = User::factory()->sinAcceso()->create();
         $asignacion = $persona->asignaciones()->sole();
         $this->delete("/asignaciones/{$asignacion->id}")->assertSessionHas('success');
-        $this->assertModelMissing($asignacion);
+        $this->assertSoftDeleted($asignacion);
         $this->assertModelExists($persona);
 
         $solicitud = SolicitudContacto::create(['nombre' => 'Ana', 'email' => 'ana@ejemplo.com', 'mensaje' => 'Hola', 'autoriza_datos' => true]);
         $this->delete("/solicitudes/{$solicitud->id}")->assertSessionHas('success');
-        $this->assertModelMissing($solicitud);
+        $this->assertSoftDeleted($solicitud);
     }
 
     public function test_quien_asigna_no_elimina_lo_que_no_ve(): void
@@ -228,6 +254,6 @@ class EliminarRegistrosTest extends TestCase
         $this->actingAs(User::factory()->create(['rol_id' => $rol->id]));
 
         $this->delete("/empresas/{$empresa->id}")->assertSessionHas('success');
-        $this->assertDatabaseMissing('empresas', ['id' => $empresa->id]);
+        $this->assertSoftDeleted($empresa);
     }
 }
