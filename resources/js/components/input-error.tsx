@@ -10,7 +10,7 @@ export default function InputError({ message, className = '', ...props }: HTMLAt
     return message ? (
         <p {...props} className={cn('text-critical flex items-start gap-1.5 text-sm', className)}>
             <XCircle className="mt-0.5 size-4" aria-hidden="true" />
-            <span>{message}</span>
+            <span className="text-pretty">{message}</span>
         </p>
     ) : null;
 }

@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Eye, EyeOff } from '@/components/iconos';
+import { IconoAlterno } from '@/components/icono-alterno';
 import * as React from 'react';
 
 /**
@@ -18,7 +19,6 @@ const PasswordInput = React.forwardRef<HTMLInputElement, Props>(
         const [visibleInterno, setVisibleInterno] = React.useState(false);
         const visible = visibleControlado ?? visibleInterno;
         const setVisible = (v: boolean) => (onVisibleChange ? onVisibleChange(v) : setVisibleInterno(v));
-        const Icono = visible ? EyeOff : Eye;
 
         return (
             <div className="relative">
@@ -31,9 +31,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, Props>(
                     aria-pressed={visible}
                     aria-controls={props.id}
                     // Toda la altura del campo y 44 px de ancho: fácil de tocar sin rozar lo que haya cerca
-                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
+                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                 >
-                    <Icono className="size-4" aria-hidden="true" />
+                    <IconoAlterno activo={visible} Activo={EyeOff} Inactivo={Eye} className="size-4" />
                 </button>
             </div>
         );

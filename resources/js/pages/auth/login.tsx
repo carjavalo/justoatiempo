@@ -3,6 +3,7 @@ import { FormEventHandler, KeyboardEvent, useEffect, useRef, useState } from 're
 import { flushSync } from 'react-dom';
 
 import { BotonEnviar } from '@/components/boton-enviar';
+import { IconoAlterno } from '@/components/icono-alterno';
 import { AlertTriangle, At, LockKeyhole, Numpad, UserRound, XCircle } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { MensajeEstado } from '@/components/mensaje-estado';
@@ -213,7 +214,7 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                         className="bg-critical-soft text-critical flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm font-medium motion-safe:animate-[aviso-nuevo_0.7s_ease-out]"
                     >
                         <XCircle className="mt-0.5 size-4" aria-hidden="true" />
-                        <p>{aviso}</p>
+                        <p className="text-pretty">{aviso}</p>
                     </div>
                 )}
                 {/* Siempre montada: lo que se escribe aquí se anuncia de inmediato (la cuenta regresiva no pasa por aquí) */}
@@ -255,13 +256,9 @@ export default function Login({ status, canResetPassword, correo }: LoginProps) 
                                 onClick={cambiarTeclado}
                                 aria-label="Teclado con @"
                                 aria-pressed={teclado === 'email'}
-                                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
+                                className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-lg transition-colors focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                             >
-                                {teclado === 'email' ? (
-                                    <Numpad className="size-[1.1rem]" aria-hidden="true" />
-                                ) : (
-                                    <At className="size-[1.1rem]" aria-hidden="true" />
-                                )}
+                                <IconoAlterno activo={teclado === 'email'} Activo={Numpad} Inactivo={At} className="size-[1.1rem]" />
                             </button>
                         )}
                     </div>

@@ -15,7 +15,10 @@ export function MensajeEstado({ mensaje, className }: { mensaje?: string | null;
     }, [mensaje]);
 
     return (
-        <div role="status" className={cn(texto ? 'bg-good-soft text-good mb-6 rounded-lg px-3 py-2 text-sm font-medium' : 'sr-only', className)}>
+        <div
+            role="status"
+            className={cn(texto ? 'bg-good-soft text-good mb-6 rounded-lg px-3 py-2 text-sm font-medium text-pretty' : 'sr-only', className)}
+        >
             {texto}
         </div>
     );
