@@ -12,18 +12,20 @@ export function Nosotros() {
                         <EncabezadoSeccion id="titulo-nosotros" antetitulo="Quiénes somos" titulo="Talento humano comprometido con su operación" />
                         <Revelar retraso={100} className="text-muted-foreground mt-6 space-y-4 text-base leading-relaxed md:text-lg">
                             {EMPRESA.quienesSomos.map((p) => (
-                                <p key={p.slice(0, 20)}>{p}</p>
+                                <p key={p.slice(0, 20)} className="text-pretty">
+                                    {p}
+                                </p>
                             ))}
                         </Revelar>
                     </div>
 
                     {/* Foto real de la operación, con el logo oficial como sello */}
-                    <Revelar retraso={150} className="relative mx-auto w-full max-w-md">
+                    <Revelar retraso={200} className="relative mx-auto w-full max-w-md">
                         <div className="bg-brand-coral-soft absolute -top-5 -right-5 -z-10 hidden size-40 rounded-3xl sm:block" aria-hidden="true" />
                         <img
                             src="/images/operacion/colaborador-alistando-pedido.jpg"
                             alt="Colaborador de Justo a Tiempo SP alistando un pedido en un centro de distribución"
-                            className="aspect-[3/4] w-full rounded-3xl object-cover object-top shadow-xl"
+                            className="aspect-[3/4] w-full rounded-3xl object-cover object-top shadow-xl outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
                         />
                         <LogoMarca
                             grande
@@ -44,7 +46,7 @@ export function Nosotros() {
                                 <Icono className="size-6" aria-hidden="true" />
                             </span>
                             <h3 className="mt-5 text-xl font-extrabold tracking-tight">{titulo}</h3>
-                            <p className="text-muted-foreground mt-2 leading-relaxed">{texto}</p>
+                            <p className="text-muted-foreground mt-2 leading-relaxed text-pretty">{texto}</p>
                         </Revelar>
                     ))}
                 </div>

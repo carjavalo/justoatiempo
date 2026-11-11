@@ -108,7 +108,7 @@ export function Encabezado() {
                                         href={`#${s.id}`}
                                         aria-current={actual === s.id ? 'true' : undefined}
                                         className={cn(
-                                            'focus-visible:ring-ring relative rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
+                                            'focus-visible:ring-ring relative inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-hidden',
                                             desplazado ? 'text-muted-foreground hover:text-foreground' : 'text-white/80 hover:text-white',
                                             actual === s.id && (desplazado ? 'text-foreground' : 'text-white'),
                                             // Subrayado coral de la sección actual
@@ -128,7 +128,7 @@ export function Encabezado() {
                         <Link
                             href={acceso.href}
                             className={cn(
-                                'hidden items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold underline-offset-4 transition-colors hover:underline sm:inline-flex',
+                                'hidden min-h-10 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold underline-offset-4 transition-colors hover:underline sm:inline-flex',
                                 'focus-visible:outline-2 focus-visible:outline-offset-2',
                                 desplazado ? 'text-muted-foreground hover:text-foreground focus-visible:outline-ring' : 'text-white/80 hover:text-white focus-visible:outline-white',
                             )}
@@ -142,10 +142,10 @@ export function Encabezado() {
                             href="#contacto"
                             inert={cotizarOculto}
                             className={cn(
-                                'bg-brand-coral text-brand-coral-foreground hidden items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold shadow-sm hover:bg-[#ee8574] lg:inline-flex',
+                                'bg-brand-coral text-brand-coral-foreground hidden min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold shadow-sm hover:bg-[#ee8574] lg:inline-flex active:scale-[0.96] motion-reduce:active:scale-100',
                                 'focus-visible:outline-2 focus-visible:outline-offset-2',
                                 desplazado ? 'focus-visible:outline-ring' : 'focus-visible:outline-white',
-                                'motion-safe:transition-[opacity,translate] motion-safe:duration-300 motion-safe:ease-out',
+                                'motion-safe:transition-[opacity,translate,scale] motion-safe:duration-300 motion-safe:ease-out',
                                 cotizarOculto && 'pointer-events-none translate-y-1 opacity-0',
                             )}
                         >
@@ -191,7 +191,7 @@ export function Encabezado() {
                                         <a
                                             href="#contacto"
                                             onClick={() => setMenuAbierto(false)}
-                                            className="bg-brand-coral text-brand-coral-foreground flex items-center justify-center gap-2 rounded-xl px-4 py-3.5 font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                            className="bg-brand-coral text-brand-coral-foreground flex items-center justify-center gap-2 rounded-xl px-4 py-3.5 font-bold transition-[scale] active:scale-[0.96] motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                                         >
                                             Solicitar cotización
                                             <ArrowRight className="size-4" aria-hidden="true" />
@@ -222,7 +222,7 @@ export function Encabezado() {
             >
                 <a
                     href="#contacto"
-                    className="bg-brand-coral text-brand-coral-foreground flex h-12 items-center justify-center gap-2 rounded-xl font-bold hover:bg-[#ee8574] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    className="bg-brand-coral text-brand-coral-foreground flex h-12 items-center justify-center gap-2 rounded-xl font-bold transition-[background-color,scale] hover:bg-[#ee8574] active:scale-[0.96] motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                     Solicitar cotización
                     <ArrowRight className="size-4" aria-hidden="true" />

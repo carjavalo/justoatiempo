@@ -16,12 +16,12 @@ export function PorQueElegirnos() {
                 />
                 <ul role="list" className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {RAZONES.map(({ icono: Icono, titulo, texto }, i) => (
-                        <Revelar as="li" key={titulo} retraso={(i % 3) * 80} className="rounded-3xl bg-white/[0.06] p-6 ring-1 ring-white/10 transition-colors hover:bg-white/[0.09]">
+                        <Revelar as="li" key={titulo} retraso={(i % 3) * 100} className="rounded-3xl bg-white/[0.06] p-6 ring-1 ring-white/10 transition-colors hover:bg-white/[0.09]">
                             <span className="bg-brand-coral text-brand-coral-foreground flex size-12 items-center justify-center rounded-2xl">
                                 <Icono className="size-6" aria-hidden="true" />
                             </span>
-                            <h3 className="mt-5 text-lg font-bold">{titulo}</h3>
-                            <p className="mt-2 text-sm leading-relaxed text-white/75">{texto}</p>
+                            <h3 className="mt-5 text-lg font-bold text-balance">{titulo}</h3>
+                            <p className="mt-2 text-sm leading-relaxed text-pretty text-white/75">{texto}</p>
                         </Revelar>
                     ))}
                 </ul>
@@ -47,8 +47,8 @@ export function Sectores() {
                         <Revelar
                             as="li"
                             key={nombre}
-                            retraso={(i % 5) * 50}
-                            className="bg-card group hover:border-primary/40 flex w-[calc(50%-0.375rem)] flex-col items-center gap-3 rounded-2xl border px-4 py-6 text-center transition-all hover:-translate-y-0.5 hover:shadow-md sm:w-[calc(33.333%-0.5rem)] lg:w-[calc(20%-0.6rem)]"
+                            retraso={(i % 5) * 100}
+                            className="bg-card group hover:border-primary/40 flex w-[calc(50%-0.375rem)] flex-col items-center gap-3 rounded-2xl border px-4 py-6 text-center transition-[border-color,box-shadow,translate] hover:-translate-y-0.5 hover:shadow-md sm:w-[calc(33.333%-0.5rem)] lg:w-[calc(20%-0.6rem)]"
                         >
                             <span className="bg-secondary text-primary group-hover:bg-brand-navy-deep flex size-12 items-center justify-center rounded-2xl transition-colors group-hover:text-white">
                                 <Icono className="size-6" aria-hidden="true" />
@@ -77,8 +77,8 @@ export function SeguridadCobertura() {
                     <span className="bg-brand-coral text-brand-coral-foreground flex size-14 items-center justify-center rounded-2xl">
                         <MapPin className="size-7" aria-hidden="true" />
                     </span>
-                    <h3 className="mt-6 text-2xl font-extrabold tracking-tight md:text-3xl">Donde su operación lo necesite</h3>
-                    <p className="mt-3 max-w-lg text-lg leading-relaxed text-white/85">{EMPRESA.cobertura}</p>
+                    <h3 className="mt-6 text-2xl font-extrabold tracking-tight text-balance md:text-3xl">Donde su operación lo necesite</h3>
+                    <p className="mt-3 max-w-lg text-lg leading-relaxed text-pretty text-white/85">{EMPRESA.cobertura}</p>
                 </Revelar>
 
                 {/* Compromiso con la seguridad */}
@@ -86,8 +86,8 @@ export function SeguridadCobertura() {
                     <span className="bg-good-soft text-good flex size-14 items-center justify-center rounded-2xl">
                         <ShieldCheck weight="fill" className="size-7" aria-hidden="true" />
                     </span>
-                    <h3 className="mt-6 text-2xl font-extrabold tracking-tight md:text-3xl">Compromiso con la seguridad</h3>
-                    <p className="text-muted-foreground mt-3 leading-relaxed">{EMPRESA.seguridad}</p>
+                    <h3 className="mt-6 text-2xl font-extrabold tracking-tight text-balance md:text-3xl">Compromiso con la seguridad</h3>
+                    <p className="text-muted-foreground mt-3 leading-relaxed text-pretty">{EMPRESA.seguridad}</p>
                     <ul role="list" className="mt-6 space-y-3">
                         {COMPROMISOS.map(({ icono: Icono, texto }) => (
                             <li key={texto} className="flex items-center gap-3 text-sm font-semibold">

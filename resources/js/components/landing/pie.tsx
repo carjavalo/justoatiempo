@@ -33,7 +33,7 @@ export function Pie() {
                                         <a
                                             href={href}
                                             {...(externo ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                                            className="min-w-0 break-words text-white/85 underline-offset-4 hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                            className="inline-block min-w-0 py-2.5 break-words text-white/85 underline-offset-4 hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                                         >
                                             <span className="sr-only">{etiqueta}: </span>
                                             {valor}
@@ -49,7 +49,7 @@ export function Pie() {
                                         <a
                                             href={alterno.href}
                                             aria-label={alterno.nombre}
-                                            className="inline-flex min-h-6 items-center font-semibold text-white/85 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                                            className="inline-flex min-h-10 items-center font-semibold text-white/85 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                                         >
                                             {alterno.texto}
                                         </a>
@@ -71,7 +71,7 @@ export function Pie() {
                             href={empresa.politicaDatos}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="underline-offset-4 hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                            className="inline-flex min-h-10 items-center underline-offset-4 hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                         >
                             Política de tratamiento de datos<span className="sr-only"> (se abre en otra pestaña)</span>
                         </a>

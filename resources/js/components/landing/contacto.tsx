@@ -98,7 +98,7 @@ export function Contacto({ servicios }: { servicios: string[] }) {
 
                     {/* Para quien prefiere llamar o escribir antes de llenar el formulario */}
                     {canales.length > 0 && (
-                        <Revelar retraso={150} className="mt-10">
+                        <Revelar retraso={200} className="mt-10">
                             <h3 className="flex flex-wrap items-center gap-3 text-sm font-bold tracking-[0.16em] uppercase">
                                 ¿Prefiere hablar ahora?
                                 {empresa.datosDePrueba && <MarcaPrueba />}
@@ -149,19 +149,19 @@ export function Contacto({ servicios }: { servicios: string[] }) {
                     )}
                 </div>
 
-                <Revelar retraso={150} className="bg-card rounded-3xl border p-6 shadow-[0_8px_30px_rgba(16,24,40,0.06)] md:p-8">
+                <Revelar retraso={100} className="bg-card rounded-3xl border p-6 shadow-[0_8px_30px_rgba(16,24,40,0.06)] md:p-8">
                     {enviado ? (
                         <div ref={confirmacion} tabIndex={-1} role="status" className="flex flex-col items-center py-10 text-center outline-none">
                             <span className="bg-good-soft text-good flex size-16 items-center justify-center rounded-full">
                                 <CheckCircle2 className="size-8" aria-hidden="true" />
                             </span>
-                            <h3 className="mt-5 text-2xl font-extrabold tracking-tight">¡Gracias! Recibimos su solicitud</h3>
-                            <p className="text-muted-foreground mt-2 max-w-sm">
+                            <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-balance">¡Gracias! Recibimos su solicitud</h3>
+                            <p className="text-muted-foreground mt-2 max-w-sm text-pretty">
                                 {empresa.tiempoRespuesta
                                     ? `Le responderemos en menos de ${empresa.tiempoRespuesta} al correo o al teléfono que nos dejó.`
                                     : 'Le responderemos al correo o al teléfono que nos dejó.'}
                             </p>
-                            <button type="button" onClick={() => setEnviado(false)} className="text-primary mt-6 text-sm font-semibold underline underline-offset-4">
+                            <button type="button" onClick={() => setEnviado(false)} className="text-primary mt-6 inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-4">
                                 Enviar otra solicitud
                             </button>
                         </div>

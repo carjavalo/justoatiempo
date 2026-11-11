@@ -1,13 +1,16 @@
 import { cn } from '@/lib/utils';
-import { type ElementType, type ReactNode, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ElementType, type ReactNode, type TransitionEvent, useEffect, useRef, useState } from 'react';
 
 /**
- * Aparece suavemente al entrar en pantalla. Con "reducir movimiento" no se anima
- * (variantes motion-safe) y sin IntersectionObserver se muestra de inmediato.
+ * Aparece suavemente al entrar en pantalla: sube 12 px, se aclara y se enfoca en medio segundo. Las piezas de una
+ * sección entran escalonadas de a 100 ms (`retraso`). Con "reducir movimiento" no se anima (variantes motion-safe) y
+ * sin IntersectionObserver se muestra de inmediato. Al terminar suelta su transición y su retraso: el efecto propio del
+ * elemento (p. ej. al pasar el mouse) no hereda ni la duración ni la espera de la entrada.
  */
 export function Revelar({ children, className, retraso = 0, as: Etiqueta = 'div' }: { children: ReactNode; className?: string; retraso?: number; as?: ElementType }) {
     const ref = useRef<HTMLElement>(null);
     const [visible, setVisible] = useState(false);
+    const [terminado, setTerminado] = useState(false);
 
     useEffect(() => {
         const el = ref.current;
@@ -32,10 +35,14 @@ export function Revelar({ children, className, retraso = 0, as: Etiqueta = 'div'
         <Etiqueta
             ref={ref}
             data-visible={visible}
-            style={{ transitionDelay: visible ? `${retraso}ms` : undefined }}
+            // El retraso, solo para la entrada y solo con movimiento (con "reducir movimiento" no se espera nada)
+            style={visible && !terminado ? ({ '--retraso': `${retraso}ms` } as CSSProperties) : undefined}
+            onTransitionEnd={(e: TransitionEvent) => {
+                if (e.target === e.currentTarget && e.propertyName === 'opacity') setTerminado(true);
+            }}
             className={cn(
-                'motion-safe:transition-[opacity,transform] motion-safe:duration-700 motion-safe:ease-out',
-                'motion-safe:data-[visible=false]:translate-y-6 motion-safe:data-[visible=false]:opacity-0',
+                !terminado && 'motion-safe:transition-[opacity,translate,filter] motion-safe:duration-500 motion-safe:ease-out motion-safe:[transition-delay:var(--retraso,0ms)]',
+                'motion-safe:data-[visible=false]:translate-y-3 motion-safe:data-[visible=false]:opacity-0 motion-safe:data-[visible=false]:blur-[4px]',
                 className,
             )}
         >

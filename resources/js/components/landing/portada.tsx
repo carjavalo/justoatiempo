@@ -18,14 +18,14 @@ export function Portada() {
                                 Soluciones integrales en servicios <span className="text-brand-coral-on-dark">operativos, logísticos y de aseo.</span>
                             </h1>
                         </Revelar>
-                        <Revelar retraso={160}>
-                            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/80">{EMPRESA.lema}</p>
+                        <Revelar retraso={100}>
+                            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-pretty text-white/80">{EMPRESA.lema}</p>
                         </Revelar>
-                        <Revelar retraso={240} className="mt-9 flex justify-center">
+                        <Revelar retraso={200} className="mt-9 flex justify-center">
                             <a
                                 id={ID_CTA_PORTADA}
                                 href="#contacto"
-                                className="bg-brand-coral text-brand-coral-foreground group inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-base font-bold shadow-lg shadow-black/25 transition hover:bg-[#ee8574] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+                                className="bg-brand-coral text-brand-coral-foreground group inline-flex items-center gap-2 rounded-xl py-3.5 pr-6.5 pl-7 text-base font-bold shadow-lg shadow-black/25 transition-[background-color,scale] hover:bg-[#ee8574] active:scale-[0.96] motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
                             >
                                 Solicitar cotización
                                 <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
@@ -48,7 +48,7 @@ export function Portada() {
             <div className="relative mx-auto -mt-10 max-w-7xl px-4 sm:-mt-14 sm:px-6 lg:px-8">
                 <ul role="list" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {DESTACADOS.map(({ icono: Icono, titulo, texto }, i) => (
-                        <Revelar as="li" key={titulo} retraso={i * 70} className="bg-card flex items-start gap-3 rounded-2xl border p-5 shadow-[var(--sombra-elevada)]">
+                        <Revelar as="li" key={titulo} retraso={i * 100} className="bg-card flex items-start gap-3 rounded-2xl border p-5 shadow-[var(--sombra-elevada)]">
                             <span className="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
                                 <Icono className="size-5" aria-hidden="true" />
                             </span>

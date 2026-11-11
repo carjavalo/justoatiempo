@@ -63,7 +63,7 @@ export function Servicios() {
                                     onClick={() => setActivo(i)}
                                     onKeyDown={(e) => mover(e, i)}
                                     className={cn(
-                                        'group flex shrink-0 snap-start items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all lg:w-full',
+                                        'group flex shrink-0 snap-start items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-[background-color,border-color,color,box-shadow] lg:w-full',
                                         'focus-visible:outline-hidden focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/25',
                                         sel ? 'bg-brand-navy-deep border-transparent text-white shadow-lg' : 'bg-card hover:border-primary/40 hover:shadow-sm',
                                     )}
@@ -108,8 +108,8 @@ export function Servicios() {
                                     />
                                 </div>
                                 <div className="flex flex-col p-6 md:p-8">
-                                    <h3 className="text-2xl leading-tight font-extrabold tracking-tight">{s.nombre}</h3>
-                                    <p className="text-muted-foreground mt-3 leading-relaxed">{s.descripcion}</p>
+                                    <h3 className="text-2xl leading-tight font-extrabold tracking-tight text-balance">{s.nombre}</h3>
+                                    <p className="text-muted-foreground mt-3 leading-relaxed text-pretty">{s.descripcion}</p>
 
                                     <h4 className="mt-6 text-xs font-bold tracking-[0.14em] uppercase">{s.tituloLista}</h4>
                                     <ul role="list" className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
@@ -134,7 +134,7 @@ export function Servicios() {
                                     <a
                                         href="#contacto"
                                         onClick={cotizar}
-                                        className="bg-accion text-accion-foreground group mt-8 inline-flex w-fit items-center gap-2 rounded-xl px-5 py-3 text-sm font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                        className="bg-accion text-accion-foreground group mt-8 inline-flex w-fit items-center gap-2 rounded-xl py-3 pr-4.5 pl-5 text-sm font-bold transition-[opacity,scale] hover:opacity-90 active:scale-[0.96] motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                     >
                                         Cotizar este servicio
                                         <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
