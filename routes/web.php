@@ -148,6 +148,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('auditoria/{orden}', [AuditoriaController::class, 'show'])->whereNumber('orden')->middleware('permiso:auditoria.ver')->name('auditoria.show');
     Route::post('auditoria/{orden}', [AuditoriaController::class, 'guardar'])->whereNumber('orden')->middleware('permiso:auditoria.revisar')->name('auditoria.guardar');
     Route::post('auditoria/{orden}/evidencias', [AuditoriaController::class, 'subirEvidencias'])->whereNumber('orden')->middleware('permiso:auditoria.subir')->name('auditoria.evidencias');
+    Route::post('auditoria/{orden}/ia', [AuditoriaController::class, 'revisarConIa'])->whereNumber('orden')->middleware('permiso:auditoria.revisar')->name('auditoria.ia');
     Route::get('evidencias/{evidencia}', [AuditoriaController::class, 'ver'])->middleware('permiso:auditoria.ver')->name('evidencias.ver');
     Route::patch('evidencias/{evidencia}', [AuditoriaController::class, 'clasificar'])->middleware('permiso:auditoria.revisar')->name('evidencias.clasificar');
     Route::delete('evidencias/{evidencia}', [AuditoriaController::class, 'eliminarEvidencia'])->middleware('permiso:auditoria.eliminar')->name('evidencias.eliminar');

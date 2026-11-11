@@ -13,13 +13,13 @@ class Evidencia extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'origen_id', 'imagenes', 'datos', 'subido_por',
+        'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'origen_id', 'imagenes', 'datos', 'ia', 'subido_por',
     ];
 
     protected function casts(): array
     {
-        // datos: lo que dice el PDF de prueba de entrega (LectorPod)
-        return ['tipo' => TipoEvidencia::class, 'datos' => 'array'];
+        // datos: lo que dice el PDF de prueba de entrega (LectorPod); ia: lo que propuso la IA de la foto (RevisorIa)
+        return ['tipo' => TipoEvidencia::class, 'datos' => 'array', 'ia' => 'array'];
     }
 
     public function esPdf(): bool

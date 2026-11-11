@@ -5,7 +5,7 @@ import { TIPOS_FOTO, type TipoEvidencia } from '@/lib/protocolo';
 import { subirEnTandas } from '@/lib/subida';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Download, Expand, FileText, ImagePlus, LoaderCircle, Trash2 } from '@/components/iconos';
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, Expand, FileText, ImagePlus, LoaderCircle, Sparkles, Trash2 } from '@/components/iconos';
 import { useId, useRef, useState } from 'react';
 import { type EvidenciaOrden } from './tipos';
 import { SegunPuntero } from '@/components/segun-puntero';
@@ -93,6 +93,31 @@ function EliminarEvidencia({ evidencia, deshabilitado }: { evidencia: EvidenciaO
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Si el tipo de la foto es el que propuso la IA (el auditor lo confirma o lo cambia). */
+const propuestoPorIa = (foto: EvidenciaOrden) => !!foto.ia && foto.ia.tipo === foto.tipo;
+
+/** La marca de la IA junto al tipo de la foto: un ícono, que el panel «Lo que ve la IA» explica una vez. */
+function MarcaIa({ foto }: { foto: EvidenciaOrden }) {
+    if (!propuestoPorIa(foto)) return null;
+    return (
+        <span className="text-primary flex size-6 shrink-0 items-center justify-center" title="Tipo propuesto por la IA">
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            <span className="sr-only">Tipo propuesto por la IA</span>
+        </span>
+    );
+}
+
+/** El posible daño que vio la IA en la foto del producto, si sigue siendo del producto. */
+function DanoIa({ foto }: { foto: EvidenciaOrden }) {
+    if (foto.ia?.estado !== 'posible_dano' || (foto.tipo !== 'sellado' && foto.tipo !== 'destapado')) return null;
+    return (
+        <p className="text-warning flex items-start gap-1 px-2 pb-2 text-xs font-semibold">
+            <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">Posible daño{foto.ia.detalle ? `: ${foto.ia.detalle}` : ''}</span>
+        </p>
     );
 }
 
@@ -187,6 +212,17 @@ function Ampliacion({
                                         dedo={null}
                                     />
                                 </p>
+                            </div>
+                        )}
+                        {(propuestoPorIa(foto) || foto.ia?.estado === 'posible_dano') && (
+                            <div className="-mt-1 flex flex-wrap items-center gap-x-3">
+                                {propuestoPorIa(foto) && (
+                                    <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                                        <Sparkles className="text-primary size-3.5" aria-hidden="true" />
+                                        Tipo propuesto por la IA
+                                    </p>
+                                )}
+                                <DanoIa foto={foto} />
                             </div>
                         )}
                         <img src={foto.url} alt={`${textoTipo(foto.tipo)}: ${foto.nombre ?? ''}`} className="bg-muted max-h-[65svh] w-full rounded-lg object-contain" />
@@ -286,8 +322,8 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                 ))}
 
                 {fotos.length > 0 && (
-                    <ul role="list" className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-3">
-                        {fotos.map((f) => (
+                    <ul role="list" className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+                        {fotos.map((f, i) => (
                             <li key={f.id} className="bg-card overflow-hidden rounded-xl border">
                                 <button
                                     type="button"
@@ -295,16 +331,22 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                                     className="focus-visible:ring-ring group relative block aspect-[4/3] w-full focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                                 >
                                     <img src={f.url} alt="" loading="lazy" className="size-full object-cover transition-transform group-hover:scale-[1.03]" />
+                                    {/* El número con que la nombran la IA y la foto ampliada ("Foto 23") */}
+                                    <span aria-hidden="true" className="absolute top-1.5 left-1.5 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px] font-bold text-white tabular-nums">
+                                        {i + 1}
+                                    </span>
                                     <span className="sr-only">
-                                        Ampliar {textoTipo(f.tipo)}, {f.nombre}
+                                        Ampliar la foto {i + 1}: {textoTipo(f.tipo)}, {f.nombre}
                                     </span>
                                 </button>
                                 <div className="flex items-center gap-1 p-2">
                                     <div className="min-w-0 flex-1">
                                         <TipoFoto evidencia={f} deshabilitado={!puedeClasificar} />
                                     </div>
+                                    <MarcaIa foto={f} />
                                     {puedeEliminar && <EliminarEvidencia evidencia={f} deshabilitado={deshabilitado} />}
                                 </div>
+                                <DanoIa foto={f} />
                             </li>
                         ))}
                     </ul>

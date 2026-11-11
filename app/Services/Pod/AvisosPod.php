@@ -2,7 +2,11 @@
 
 namespace App\Services\Pod;
 
+use App\Enums\TipoEvidencia;
+use App\Models\Evidencia;
 use App\Models\Orden;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Lo que Drivin dice de una entrega (el PDF de prueba de entrega y el comentario del conductor), en frases para el
@@ -49,6 +53,15 @@ class AvisosPod
             $avisos[] = ['nivel' => $nivel, 'texto' => $texto, ...($imagen ? ['imagen' => $imagen] : [])];
         };
 
+        // ¿Es el PDF de esta orden? La orden que nombra y la fecha de la entrega deben ser las de la carga de Drivin
+        if (($ordenes = $datos['ordenes'] ?? []) && ! in_array(strtoupper($orden->codigo_orden), $ordenes, true)) {
+            $aviso('atencion', 'El PDF no nombra esta orden: puede ser el de otra entrega');
+        }
+        if (($fecha = $datos['fecha'] ?? null) && $orden->fecha_operacion && $fecha !== $orden->fecha_operacion->toDateString()) {
+            $aviso('atencion', 'El PDF es de una entrega del '.Carbon::parse($fecha)->translatedFormat('j \d\e F').' y esta orden es del '
+                .$orden->fecha_operacion->translatedFormat('j \d\e F').': revisa que sea su PDF');
+        }
+
         if ($u = $datos['unidades'] ?? null) {
             $pedidas = self::numero($u['pedidas']);
             $completa = $u['entregadas'] >= $u['pedidas'];
@@ -60,7 +73,7 @@ class AvisosPod
             $aviso('atencion', "El PDF dice que la orden quedó «{$estado}»");
         }
 
-        [$hora, $ventana] = [$datos['hora'] ?? null, $datos['ventana'] ?? null];
+        [$hora, $ventana] = [$orden->hora_entrega?->format('H:i') ?? $datos['hora'] ?? null, $datos['ventana'] ?? null];
         if ($hora && $ventana) {
             $aTiempo = $hora >= $ventana[0] && $hora <= $ventana[1];
             $aviso($aTiempo ? 'bien' : 'atencion', "A las {$hora}, ".($aTiempo ? 'dentro' : 'fuera')." de la ventana de {$ventana[0]} a {$ventana[1]}");
@@ -83,6 +96,49 @@ class AvisosPod
 
         if ($sinSeparar = (int) ($datos['sin_separar'] ?? 0)) {
             $aviso('atencion', ($sinSeparar === 1 ? '1 foto del PDF no se pudo separar: mírala' : "{$sinSeparar} fotos del PDF no se pudieron separar: míralas").' en el PDF');
+        }
+
+        return $avisos;
+    }
+
+    /**
+     * Lo que propuso la IA de las fotos (RevisorIa), para el auditor: posibles daños con el número de la foto, qué dice
+     * la remesa y cuántas fotos son copias. Es una propuesta: el auditor la confirma mirando las fotos.
+     *
+     * @param  Collection<int, Evidencia>  $fotos  en el orden en que se muestran (su posición es "Foto n")
+     * @return list<array{nivel: 'bien'|'atencion'|'info', texto: string}>
+     */
+    public static function deIa(Collection $fotos): array
+    {
+        $avisos = [];
+        $producto = $fotos->filter(fn (Evidencia $f) => in_array($f->tipo, [TipoEvidencia::Sellado, TipoEvidencia::Destapado], true) && isset($f->ia['revision']));
+
+        foreach ($producto as $i => $f) {
+            if (($f->ia['revision']['estado'] ?? null) === 'posible_dano') {
+                $avisos[] = ['nivel' => 'atencion', 'texto' => 'Foto '.($i + 1).': posible daño'.(($d = $f->ia['revision']['detalle'] ?? null) ? " ({$d})" : '')];
+            }
+        }
+        $sanas = $producto->filter(fn (Evidencia $f) => ($f->ia['revision']['estado'] ?? null) === 'bien')->count();
+        if ($sanas && $sanas === $producto->count()) {
+            $avisos[] = ['nivel' => 'bien', 'texto' => $sanas === 1 ? 'El producto se ve en buen estado en la foto revisada' : "El producto se ve en buen estado en las {$sanas} fotos revisadas"];
+        }
+
+        $remesas = $fotos->filter(fn (Evidencia $f) => $f->tipo === TipoEvidencia::Remesa && isset($f->ia['remesa']));
+        if ($remesas->isNotEmpty()) {
+            $avisos[] = $remesas->contains(fn (Evidencia $f) => $f->ia['remesa']['firmada'])
+                ? ['nivel' => 'bien', 'texto' => 'La remesa está firmada']
+                : ['nivel' => 'atencion', 'texto' => 'La remesa no parece firmada: revísala'];
+            if ($remesas->contains(fn (Evidencia $f) => $f->ia['remesa']['sin_destapar'])) {
+                $avisos[] = ['nivel' => 'info', 'texto' => 'La remesa dice que el cliente recibe sin destapar'];
+            }
+            foreach ($remesas->filter(fn (Evidencia $f) => $f->ia['remesa']['novedad']) as $f) {
+                $avisos[] = ['nivel' => 'atencion', 'texto' => 'En la remesa marcaron una novedad'.(($d = $f->ia['revision']['detalle'] ?? null) ? ": «{$d}»" : '')];
+            }
+        }
+
+        $copias = $fotos->filter(fn (Evidencia $f) => ($f->ia['clasificacion']['copia'] ?? false) && $f->tipo === TipoEvidencia::Repetida)->count();
+        if ($copias) {
+            $avisos[] = ['nivel' => 'info', 'texto' => ($copias === 1 ? '1 foto es copia de otra' : "{$copias} fotos son copias de otras").' (foto de la pantalla de un celular): quedaron como repetidas'];
         }
 
         return $avisos;

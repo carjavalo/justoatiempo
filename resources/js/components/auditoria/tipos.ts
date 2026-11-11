@@ -46,6 +46,15 @@ export interface EvidenciaOrden {
     imagenes: number | null;
     tamano: number | null;
     url: string;
+    /** Lo que propuso la IA de la foto: qué muestra y cómo se ve el producto. */
+    ia: { tipo: TipoEvidencia | null; estado: 'bien' | 'posible_dano' | 'no_se_ve' | null; detalle: string | null } | null;
+}
+
+/** La revisión de las fotos con IA: si está configurada, cuántas fotos le faltan y lo que encontró. */
+export interface RevisionIaOrden {
+    disponible: boolean;
+    pendientes: number;
+    avisos: AvisoPdf[];
 }
 
 /** Algo que dice el PDF de Drivin de la entrega, leído al subirlo. */
@@ -77,6 +86,7 @@ export interface OrdenDetalle {
     evidencias: EvidenciaOrden[];
     /** Lo que dice el PDF de prueba de entrega más reciente que se pudo leer. */
     lecturaPdf: { avisos: AvisoPdf[] } | null;
+    ia: RevisionIaOrden;
     auditoria: Checklist & {
         tipo_novedad_id: number | null;
         concepto: string | null;

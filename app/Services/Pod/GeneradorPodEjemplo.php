@@ -96,11 +96,11 @@ class GeneradorPodEjemplo
      * fotos y se dibujan al final de la primera página, como en el real.
      *
      * @param  list<string>  $fotos  bytes JPEG
-     * @param  array{hora?: string, ventana?: string, intento?: int, unidades?: string, estado?: string, comentario?: ?string, firma?: bool}  $o
+     * @param  array{fecha?: string, hora?: string, ventana?: string, intento?: int, unidades?: string, estado?: string, comentario?: ?string, firma?: bool}  $o
      */
     public function pdfDrivin(string $codigo, array $fotos, array $o = []): string
     {
-        $o += ['hora' => '10:00', 'ventana' => '07:00 - 17:00', 'intento' => 1, 'unidades' => '1.0 / 1.0', 'estado' => 'Aprobada', 'comentario' => 'Entrega exitosa, el cliente revisa y está en buen estado', 'firma' => true];
+        $o += ['fecha' => '2026-10-05', 'hora' => '10:00', 'ventana' => '07:00 - 17:00', 'intento' => 1, 'unidades' => '1.0 / 1.0', 'estado' => 'Aprobada', 'comentario' => 'Entrega exitosa, el cliente revisa y está en buen estado', 'firma' => true];
 
         $objetos = [];
         $nuevo = function (?string $contenido = null) use (&$objetos): int {
@@ -127,7 +127,7 @@ class GeneradorPodEjemplo
         $y = 800;
         foreach (array_filter([
             'Informe de prueba de entrega', 'Información general', 'Nombre dirección: CLIENTE DE PRUEBA', 'Vehículo: abc123',
-            'Conductor: CONDUCTOR DE PRUEBA', 'Código de ruta: 1000001', "Ventana horaria: {$o['ventana']}", 'Fecha de entrega: 2026-10-05',
+            'Conductor: CONDUCTOR DE PRUEBA', 'Código de ruta: 1000001', "Ventana horaria: {$o['ventana']}", "Fecha de entrega: {$o['fecha']}",
             "Hora de entrega: {$o['hora']}", "Número de intento: {$o['intento']}", 'Detalle de órdenes',
             'Código de orden', 'Estado', 'Código ítem', 'Descripción', 'Unidades entregadas', 'ENTRGE', 'AS',
             substr($codigo, 0, 9), substr($codigo, 9), $o['estado'], '3068813', 'SOFACAMA GRIS', $o['unidades'], 'Aprobada',

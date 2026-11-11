@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // IA de visión para la auditoría POD: propone qué muestra cada foto y si el producto se ve bien (el auditor confirma)
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'url' => env('GROQ_URL', 'https://api.groq.com/openai/v1'),
+        'modelo' => env('GROQ_MODELO_VISION', 'qwen/qwen3.8-27b'),
+    ],
+
 ];

@@ -46,6 +46,8 @@ class LectorPod
             'codigos' => $this->codigos($texto),
             'datos' => [
                 ...$this->datos($texto),
+                // Las órdenes que nombra su tabla (con las terminaciones posibles): vacío si no trae la tabla de Drivin
+                'ordenes' => $this->tabla($texto) !== null ? $this->codigos($texto) : [],
                 // Las fotos de la entrega: las separadas y las que no se pudieron separar (siguen en el PDF)
                 'fotos' => count($fotos) + $sinSeparar,
                 'sin_separar' => $sinSeparar,

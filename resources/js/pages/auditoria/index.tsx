@@ -3,6 +3,7 @@ import { Cola, consultaFiltros, EstadoAuditoriaBadge } from '@/components/audito
 import { Evidencias } from '@/components/auditoria/evidencias';
 import { FormularioAuditoria } from '@/components/auditoria/formulario';
 import { LecturaPdf } from '@/components/auditoria/lectura-pdf';
+import { RevisionIa } from '@/components/auditoria/revision-ia';
 import { type FiltrosAuditoria, type Jornada, type OrdenCola, type OrdenDetalle, type Resumen, type TipoNovedad } from '@/components/auditoria/tipos';
 import { Search } from '@/components/iconos';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
@@ -282,6 +283,8 @@ function Detalle({
                     )}
 
                     {orden.lecturaPdf && orden.lecturaPdf.avisos.length > 0 && <LecturaPdf avisos={orden.lecturaPdf.avisos} />}
+
+                    <RevisionIa key={orden.id} ordenId={orden.id} ia={orden.ia} deshabilitado={orden.informeCerrado} />
 
                     <Evidencias ordenId={orden.id} evidencias={orden.evidencias} deshabilitado={orden.informeCerrado} />
                 </div>

@@ -17,12 +17,15 @@ use App\Services\Pod\AvisosPod;
 use App\Services\Pod\EmparejadorArchivos;
 use App\Services\Pod\EvaluadorProtocolo;
 use App\Services\Pod\LectorPod;
+use App\Services\Pod\LimiteIa;
+use App\Services\Pod\RevisorIa;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -47,6 +50,7 @@ class AuditoriaController extends Controller
         private EmparejadorArchivos $emparejador,
         private ConsolidadorInforme $consolidador,
         private LectorPod $lector,
+        private RevisorIa $revisor,
     ) {}
 
     public function index(Request $request): Response
@@ -128,11 +132,13 @@ class AuditoriaController extends Controller
         foreach ($request->file('archivos') as $archivo) {
             $lectura = $this->leerPdf($archivo);
 
-            // El PDF de otra orden no se agrega aquí: lo dice el código que trae adentro
+            // El PDF de otra orden no se agrega aquí: lo dice el código que trae adentro (aunque esa orden aún no esté en
+            // la plataforma)
             if ($lectura && ! in_array(strtoupper($orden->codigo_orden), $lectura['codigos'], true)) {
                 $otras = $this->emparejador->ordenes($lectura['codigos'])->pluck('codigo_orden');
-                if ($otras->isNotEmpty()) {
-                    $errores[] = "«{$archivo->getClientOriginalName()}» es la prueba de entrega de ".($otras->count() === 1 ? "la orden {$otras[0]}" : 'las órdenes '.$otras->implode(', ')).', no de esta.';
+                $otra = $otras->first() ?? $this->ordenDelPdf($lectura, $orden->codigo_orden);
+                if ($otra) {
+                    $errores[] = "«{$archivo->getClientOriginalName()}» es la prueba de entrega de ".($otras->count() > 1 ? 'las órdenes '.$otras->implode(', ') : "la orden {$otra}").', no de esta.';
 
                     continue;
                 }
@@ -170,11 +176,20 @@ class AuditoriaController extends Controller
         $ordenes = [];
         $sinOrden = [];
         $cerrados = [];
+        $errores = [];
+        // Para reconocer en el PDF un código de orden con la forma de los de Drivin ("PDVT…")
+        $referencia = Orden::query()->latest('id')->value('codigo_orden') ?? '';
 
         foreach ($request->file('archivos') as $archivo) {
             $nombre = $archivo->getClientOriginalName();
             $lectura = $this->leerPdf($archivo);
             $destinos = $this->emparejador->ordenes($lectura['codigos'] ?? [], $request->input('fecha'));
+            // El PDF nombra una orden que aún no está: no se asigna a otra por el nombre del archivo
+            if ($destinos->isEmpty() && ($ajena = $this->ordenDelPdf($lectura, $referencia))) {
+                $errores[] = "«{$nombre}» es la prueba de entrega de la orden {$ajena}, que todavía no está en la plataforma: importa primero su carga de Drivin.";
+
+                continue;
+            }
             if ($destinos->isEmpty()) {
                 $porNombre = $this->emparejador->orden($nombre, $request->input('fecha')) ?? $this->emparejador->orden($nombre);
                 $destinos = $porNombre ? collect([$porNombre]) : collect();
@@ -205,7 +220,7 @@ class AuditoriaController extends Controller
         }
 
         if ($request->wantsJson()) {
-            return response()->json(['asignados' => $asignados, 'repetidos' => $repetidos, 'ordenes' => array_keys($ordenes), 'sinOrden' => $sinOrden, 'cerrados' => $cerrados]);
+            return response()->json(['asignados' => $asignados, 'repetidos' => $repetidos, 'ordenes' => array_keys($ordenes), 'sinOrden' => $sinOrden, 'cerrados' => $cerrados, 'errores' => $errores]);
         }
 
         $mensaje = $asignados === 1 ? 'Se asignó 1 archivo' : "Se asignaron {$asignados} archivos";
@@ -215,8 +230,48 @@ class AuditoriaController extends Controller
         }
 
         return back()
-            ->with($asignados || $repetidos ? 'success' : 'error', $asignados || $repetidos ? $mensaje : 'Ningún archivo trae en el nombre el código de una orden.')
-            ->with('lote', ['sinOrden' => $sinOrden, 'cerrados' => $cerrados]);
+            ->with($asignados || $repetidos ? 'success' : 'error', $asignados || $repetidos ? $mensaje : ($errores ? implode(' ', $errores) : 'Ningún archivo trae en el nombre el código de una orden.'))
+            ->with('lote', ['sinOrden' => $sinOrden, 'cerrados' => $cerrados, 'errores' => $errores]);
+    }
+
+    /**
+     * Un paso de la revisión con IA de las fotos de la orden (una consulta a Groq). El navegador repite hasta que la IA
+     * termina y espera cuando Groq lo pide (el plan gratis deja pocas imágenes por minuto).
+     */
+    public function revisarConIa(Request $request, Orden $orden): JsonResponse
+    {
+        abort_unless($orden->estado === EstadoOrden::Aprobada, 404);
+        if ($this->informeCerrado($orden)) {
+            return response()->json(['message' => 'El informe de esta jornada ya está cerrado.'], 422);
+        }
+        if (! $this->revisor->disponible()) {
+            return response()->json(['message' => 'La IA no está configurada: falta GROQ_API_KEY en el .env.'], 422);
+        }
+
+        // Una revisión a la vez por orden (si dos personas la piden juntas, la segunda espera)
+        $candado = Cache::lock("revision-ia-orden-{$orden->id}", 180);
+        if (! $candado->get()) {
+            return response()->json(['listo' => false, 'esperar' => 5, 'mensaje' => 'Otra persona está revisando esta orden con la IA.']);
+        }
+
+        try {
+            $paso = $this->revisor->avanzar($orden);
+        } catch (LimiteIa $e) {
+            // Unos segundos: el límite por minuto. Más de dos minutos: se acabó el cupo del día
+            return $e->segundos > 120
+                ? response()->json(['message' => 'Se acabó el cupo de la IA por ahora (plan gratis de Groq). Vuelve a intentarlo en unos '.(int) ceil($e->segundos / 60).' minutos.'], 429)
+                : response()->json(['listo' => false, 'esperar' => $e->segundos, 'mensaje' => 'La IA pide esperar un momento.']);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        } finally {
+            $candado->release();
+        }
+
+        if ($paso['listo'] && $paso['revisadas'] > 0) {
+            Bitacora::registrar('revisada_con_ia', $orden, ['modelo' => config('services.groq.modelo'), 'por' => $request->user()->name]);
+        }
+
+        return response()->json($paso);
     }
 
     public function clasificar(Request $request, Evidencia $evidencia): RedirectResponse
@@ -342,6 +397,11 @@ class AuditoriaController extends Controller
         $pdf = $evidencias->filter(fn (Evidencia $e) => $e->esPdf() && $e->datos)->last();
         $comentario = $orden->comentario_pod ?: ($pdf?->datos['comentario'] ?? null);
         $firma = $pdf ? $evidencias->first(fn (Evidencia $e) => $e->origen_id === $pdf->id && $e->tipo === TipoEvidencia::Firma) : null;
+        $fotos = RevisorIa::fotos($evidencias);
+        // La remesa que la IA vio sin firma no cuenta como "remesa firmada" hasta que el auditor lo confirme
+        $remesas = $fotos->filter(fn (Evidencia $e) => $e->tipo === TipoEvidencia::Remesa);
+        $remesaFirmada = $remesas->contains(fn (Evidencia $e) => ($e->ia['remesa']['firmada'] ?? null) !== false);
+        $remesaSinDestapar = $remesas->contains(fn (Evidencia $e) => $e->ia['remesa']['sin_destapar'] ?? false);
 
         // Si aún no se ha auditado, la lista de chequeo parte de lo que dicen las fotos clasificadas (la firma no es
         // una evidencia del protocolo) y de lo que dice el comentario
@@ -351,9 +411,9 @@ class AuditoriaController extends Controller
             'fotos_sellado' => $porTipo['sellado'] ?? 0,
             'fotos_destapado' => $porTipo['destapado'] ?? 0,
             'fotos_ilegibles' => $porTipo['ilegible'] ?? 0,
-            'foto_remesa' => ($porTipo['remesa'] ?? 0) > 0,
+            'foto_remesa' => $remesaFirmada,
             'foto_rotulo' => ($porTipo['rotulo'] ?? 0) > 0,
-            'recibe_sin_destapar' => AvisosPod::recibeSinDestapar($comentario),
+            'recibe_sin_destapar' => AvisosPod::recibeSinDestapar($comentario) || $remesaSinDestapar,
             'sin_evidencia' => $evidencias->every(fn (Evidencia $e) => $e->tipo === TipoEvidencia::Firma),
         ];
 
@@ -385,7 +445,18 @@ class AuditoriaController extends Controller
                 'imagenes' => $e->imagenes,
                 'tamano' => $e->tamano_bytes,
                 'url' => route('evidencias.ver', $e),
+                // Lo que propuso la IA: el tipo, si es copia de otra y cómo se ve el producto
+                'ia' => isset($e->ia['clasificacion']) ? [
+                    'tipo' => ($e->ia['clasificacion']['copia'] ?? false) ? 'repetida' : ($e->ia['clasificacion']['tipo'] ?? null),
+                    'estado' => $e->ia['revision']['estado'] ?? null,
+                    'detalle' => $e->ia['revision']['detalle'] ?? null,
+                ] : null,
             ]),
+            'ia' => [
+                'disponible' => $this->revisor->disponible(),
+                'pendientes' => $this->revisor->pendientes($fotos),
+                'avisos' => AvisosPod::deIa($fotos),
+            ],
             'lecturaPdf' => $pdf ? ['avisos' => AvisosPod::de($pdf->datos, $orden, $comentario, $firma ? route('evidencias.ver', $firma) : null)] : null,
             'auditoria' => [
                 ...$checklist,
@@ -449,6 +520,19 @@ class AuditoriaController extends Controller
             (bool) $o->auditoria->cumple_protocolo => 'cumple',
             default => 'no_cumple',
         };
+    }
+
+    /**
+     * El código de orden que nombra la tabla del PDF de Drivin, si tiene la forma del de referencia (las mismas letras:
+     * "PDVT…"). null si el PDF no trae la tabla o no nombra una orden así.
+     */
+    private function ordenDelPdf(?array $lectura, string $referencia): ?string
+    {
+        if (! preg_match('/^[A-Z]+/', strtoupper($referencia), $letras)) {
+            return null;
+        }
+
+        return collect($lectura['datos']['ordenes'] ?? [])->first(fn (string $codigo) => str_starts_with($codigo, $letras[0]));
     }
 
     /** Lo que dice el archivo si es un PDF (null si no lo es o no se pudo leer). */

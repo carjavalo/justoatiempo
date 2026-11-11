@@ -18,7 +18,9 @@ use App\Services\Pod\AvisosPod;
 use App\Services\Pod\EvaluadorProtocolo;
 use App\Services\Pod\GeneradorPodEjemplo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as PeticionHttp;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -296,6 +298,41 @@ class AuditoriaPodTest extends TestCase
         $this->assertSame(0, Evidencia::count());
     }
 
+    public function test_el_pdf_de_una_orden_que_aun_no_esta_no_se_agrega_a_otra()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+
+        // Subido en otra orden: se rechaza aunque la suya (PDVT9999) todavía no se haya importado
+        $this->actingAs($this->coordinador)
+            ->postJson("/auditoria/{$orden->id}/evidencias", ['archivos' => [$this->pdfDrivin('PDVT9999', 'POD.pdf')]])
+            ->assertOk()
+            ->assertJson(['asignados' => 0, 'errores' => ['«POD.pdf» es la prueba de entrega de la orden PDVT9999, no de esta.']]);
+
+        // En la carga masiva tampoco se asigna por el nombre del archivo, que dice otra cosa
+        $this->postJson('/auditoria/lote', ['archivos' => [$this->pdfDrivin('PDVT9999', 'POD_PDVT1001_20261005.pdf')], 'fecha' => '2026-10-05'])
+            ->assertOk()
+            ->assertJson(['asignados' => 0, 'errores' => ['«POD_PDVT1001_20261005.pdf» es la prueba de entrega de la orden PDVT9999, que todavía no está en la plataforma: importa primero su carga de Drivin.']]);
+
+        $this->assertSame(0, Evidencia::count());
+    }
+
+    public function test_avisa_si_el_pdf_es_de_otra_fecha_y_usa_la_hora_real_de_la_carga()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+        $orden->update(['hora_entrega' => '2026-10-05 11:18:27']);
+        $this->actingAs($this->coordinador)->post("/auditoria/{$orden->id}/evidencias", ['archivos' => [$this->pdfDrivin('PDVT1001', 'POD.pdf', ['fecha' => '2026-10-30'])]]);
+
+        $this->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('seleccionada.lecturaPdf.avisos', fn ($avisos) => collect($avisos)->pluck('texto')->take(4)->all() === [
+                'El PDF es de una entrega del 30 de octubre y esta orden es del 5 de octubre: revisa que sea su PDF',
+                'Entregó 1 de 1 unidad',
+                // La hora real es la de la carga de Drivin (la del PDF puede ser la programada)
+                'A las 11:18, dentro de la ventana de 07:00 a 17:00',
+                'En el primer intento',
+            ])
+        );
+    }
+
     public function test_clasificar_y_eliminar_evidencias()
     {
         $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
@@ -333,5 +370,103 @@ class AuditoriaPodTest extends TestCase
         $this->actingAs($this->coordinador)->get("/auditoria/{$rechazada->id}")->assertNotFound();
 
         $this->actingAs(User::factory()->create())->get('/auditoria')->assertForbidden();
+    }
+
+    /** La respuesta de Groq con las fotos que "vio" la IA. */
+    private function respuestaIa(array $fotos): array
+    {
+        return ['choices' => [['message' => ['content' => json_encode(['fotos' => $fotos])]]]];
+    }
+
+    /** La orden PDVT1001 con su PDF: fotos 1 fachada, 2-5 sellado, 6-9 destapado, 10 remesa. */
+    private function ordenConPdfParaIa(): Orden
+    {
+        config(['services.groq.key' => 'clave-de-prueba']);
+        Http::preventStrayRequests();
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+        $this->actingAs($this->coordinador)->post("/auditoria/{$orden->id}/evidencias", ['archivos' => [$this->pdfDrivin('PDVT1001', 'POD_PDVT1001.pdf')]]);
+
+        return $orden;
+    }
+
+    public function test_la_ia_clasifica_las_fotos_marca_las_copias_y_revisa_el_producto_y_la_remesa()
+    {
+        $orden = $this->ordenConPdfParaIa();
+        $tipos = [1 => 'fachada', 2 => 'sellado', 3 => 'sellado', 4 => 'sellado', 5 => 'sellado', 6 => 'destapado', 7 => 'destapado', 8 => 'destapado', 9 => 'destapado', 10 => 'remesa'];
+        $bien = fn (int $n) => ['n' => $n, 'estado' => 'bien', 'detalle' => '', 'firmada' => false, 'sin_destapar' => false, 'novedad' => false];
+
+        Http::fake(['api.groq.com/*' => Http::sequence()
+            // 1. Clasificar: la 5 es la foto de la pantalla de otro celular y la 7 repite la toma de la 6
+            ->push($this->respuestaIa(collect($tipos)->map(fn ($tipo, $n) => ['n' => $n, 'tipo' => $tipo, 'pantalla' => $n === 5, 'copia_de' => $n === 7 ? 6 : 0, 'girar' => '0'])->values()->all()))
+            // 2. Revisar el producto (2, 3, 4 y 6) y la remesa (10), que está firmada. Más grande, la 3 también se ve que es
+            // de la pantalla de otro celular
+            ->push($this->respuestaIa([$bien(2), [...$bien(3), 'pantalla' => true], $bien(4), $bien(6), ['n' => 10, 'estado' => 'bien', 'detalle' => '', 'firmada' => true, 'sin_destapar' => false, 'novedad' => false]]))
+            // 3. El resto del producto: la 8 con un posible daño
+            ->push($this->respuestaIa([['n' => 8, 'estado' => 'posible_dano', 'detalle' => 'esquina de la caja hundida', 'firmada' => false, 'sin_destapar' => false, 'novedad' => false], $bien(9)])),
+        ]);
+
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertOk()->assertJson(['listo' => false, 'revisadas' => 10]);
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertOk()->assertJson(['listo' => false, 'revisadas' => 5]);
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertOk()->assertJson(['listo' => true, 'revisadas' => 2]);
+
+        // Cada consulta lleva a lo sumo 2 imágenes (el plan gratis cuenta 2048 tokens por imagen) y pide JSON con esquema
+        Http::assertSentCount(3);
+        Http::assertSent(fn (PeticionHttp $p) => $p['model'] === 'qwen/qwen3.8-27b' && $p['response_format']['type'] === 'json_schema'
+            && collect($p['messages'][0]['content'])->where('type', 'image_url')->count() <= 2);
+
+        $fotos = $orden->evidencias()->where('tipo', '!=', 'pdf_pod')->where('tipo', '!=', 'firma')->orderBy('id')->pluck('tipo')->map->value->all();
+        $this->assertSame(['fachada', 'sellado', 'repetida', 'sellado', 'repetida', 'destapado', 'repetida', 'destapado', 'destapado', 'remesa'], $fotos);
+
+        $this->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('seleccionada.ia.pendientes', 0)
+            ->where('seleccionada.ia.avisos', fn ($avisos) => collect($avisos)->pluck('texto')->all() === [
+                'Foto 8: posible daño (esquina de la caja hundida)',
+                'La remesa está firmada',
+                '3 fotos son copias de otras (foto de la pantalla de un celular): quedaron como repetidas',
+            ])
+            // La lista de chequeo parte de lo que propuso la IA, sin contar las copias
+            ->where('seleccionada.auditoria.foto_fachada', true)
+            ->where('seleccionada.auditoria.fotos_sellado', 2)
+            ->where('seleccionada.auditoria.fotos_destapado', 3)
+            ->where('seleccionada.auditoria.foto_remesa', true)
+            ->where('seleccionada.evidencias.8.ia.estado', 'posible_dano')
+        );
+    }
+
+    public function test_la_ia_no_cambia_lo_que_ya_clasifico_el_auditor()
+    {
+        $orden = $this->ordenConPdfParaIa();
+        $primera = $orden->evidencias()->where('tipo', 'otro')->orderBy('id')->first();
+        $this->patch("/evidencias/{$primera->id}", ['tipo' => 'remesa']);
+
+        Http::fake(['api.groq.com/*' => Http::response($this->respuestaIa(collect(range(1, 10))->map(fn ($n) => ['n' => $n, 'tipo' => 'sellado', 'pantalla' => false, 'copia_de' => 0, 'girar' => '0'])->all()))]);
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertOk();
+
+        $this->assertSame('remesa', $primera->fresh()->tipo->value);
+        $this->assertSame('sellado', $primera->fresh()->ia['clasificacion']['tipo']); // lo que propuso queda aparte
+    }
+
+    public function test_cuando_groq_pide_esperar_el_paso_espera_y_sin_cupo_avisa()
+    {
+        $orden = $this->ordenConPdfParaIa();
+
+        Http::fake(['api.groq.com/*' => Http::sequence()
+            ->push(['error' => ['message' => 'Rate limit']], 429, ['retry-after' => '18'])
+            ->push(['error' => ['message' => 'Rate limit']], 429, ['retry-after' => '3600'])]);
+
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertOk()->assertJson(['listo' => false, 'esperar' => 18]);
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertStatus(429)->assertJson(['message' => 'Se acabó el cupo de la IA por ahora (plan gratis de Groq). Vuelve a intentarlo en unos 60 minutos.']);
+
+        // Nada quedó a medias: las fotos siguen pendientes
+        $this->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p->where('seleccionada.ia.pendientes', 10));
+    }
+
+    public function test_sin_la_clave_de_groq_no_se_ofrece_la_ia()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+        Http::preventStrayRequests();
+
+        $this->actingAs($this->coordinador)->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p->where('seleccionada.ia.disponible', false));
+        $this->postJson("/auditoria/{$orden->id}/ia")->assertStatus(422);
     }
 }

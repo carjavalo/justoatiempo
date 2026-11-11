@@ -1,1 +1,0 @@
-import{j as n}from"./app-DM7YCsJG.js";function r({mouse:i,dedo:e}){return n.jsxs(n.Fragment,{children:[n.jsx("span",{className:"hidden [@media(pointer:fine)]:inline",children:i}),e&&n.jsx("span",{className:"[@media(pointer:fine)]:hidden",children:e})]})}export{r as S};
