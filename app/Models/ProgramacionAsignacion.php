@@ -5,10 +5,13 @@ namespace App\Models;
 use App\Enums\EstadoAsistencia;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** Una persona programada en un día: su turno, su vehículo y ruta (logística) y su asistencia. */
 class ProgramacionAsignacion extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'programacion_asignaciones';
 
     protected $fillable = [
@@ -28,16 +31,16 @@ class ProgramacionAsignacion extends Model
 
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     public function vehiculo(): BelongsTo
     {
-        return $this->belongsTo(Vehiculo::class);
+        return $this->belongsTo(Vehiculo::class)->withTrashed();
     }
 
     public function registradaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'asistencia_por');
+        return $this->belongsTo(User::class, 'asistencia_por')->withTrashed();
     }
 }

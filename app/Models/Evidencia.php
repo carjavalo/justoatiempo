@@ -5,9 +5,12 @@ namespace App\Models;
 use App\Enums\TipoEvidencia;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Evidencia extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'imagenes', 'subido_por',
     ];
@@ -29,6 +32,6 @@ class Evidencia extends Model
 
     public function subidoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'subido_por');
+        return $this->belongsTo(User::class, 'subido_por')->withTrashed();
     }
 }

@@ -5,12 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SucursalRequest;
 use App\Models\Asignacion;
-use App\Models\InformeDiario;
-use App\Models\NovedadLinea;
-use App\Models\Orden;
-use App\Models\Programacion;
 use App\Models\Sede;
 use App\Models\Sucursal;
+use App\Support\Retiro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -104,15 +101,12 @@ class SucursalController extends Controller
             : "La sucursal {$sucursal->nombre} quedó inactiva: no recibirá nuevos usuarios.");
     }
 
-    /** Solo una sucursal sin personal y sin operación: lo demás se desactiva, para conservar su historial. */
+    /**
+     * Se elimina sin borrar nada: quienes estaban asignados a ella quedan sin esa asignación (termina ayer y sigue en
+     * su historial), su programación por venir se quita, y su operación pasada (órdenes, informes) se conserva.
+     */
     public function destroy(Sucursal $sucursal): RedirectResponse
     {
-        $enUso = "La sucursal {$sucursal->nombre} tiene personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
-        if ($sucursal->asignaciones()->exists() || Orden::where('sucursal_id', $sucursal->id)->exists() || InformeDiario::where('sucursal_id', $sucursal->id)->exists()
-            || Programacion::where('sucursal_id', $sucursal->id)->exists() || NovedadLinea::where('sucursal_id', $sucursal->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
-
-        return $this->eliminarRegistro($sucursal, "la sucursal {$sucursal->nombre}", $enUso);
+        return $this->eliminarRegistro($sucursal, "la sucursal {$sucursal->nombre}", fn () => Retiro::lugar(fn ($q) => $q->where('sucursal_id', $sucursal->id)));
     }
 }

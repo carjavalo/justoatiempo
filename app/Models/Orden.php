@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Orden extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'ordenes';
 
     protected $fillable = [
@@ -87,28 +90,28 @@ class Orden extends Model
 
     public function sede(): BelongsTo
     {
-        return $this->belongsTo(Sede::class);
+        return $this->belongsTo(Sede::class)->withTrashed();
     }
 
     public function sucursal(): BelongsTo
     {
-        return $this->belongsTo(Sucursal::class);
+        return $this->belongsTo(Sucursal::class)->withTrashed();
     }
 
     public function vehiculo(): BelongsTo
     {
-        return $this->belongsTo(Vehiculo::class);
+        return $this->belongsTo(Vehiculo::class)->withTrashed();
     }
 
     /** El auxiliar de la ruta (la persona; el nombre como venía en Drivin queda en auxiliar_nombre). */
     public function auxiliar(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'auxiliar_id');
+        return $this->belongsTo(User::class, 'auxiliar_id')->withTrashed();
     }
 
     public function motivoRechazo(): BelongsTo
     {
-        return $this->belongsTo(MotivoRechazo::class);
+        return $this->belongsTo(MotivoRechazo::class)->withTrashed();
     }
 
     public function auditoria(): HasOne

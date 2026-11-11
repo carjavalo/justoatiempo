@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AuditoriaPod;
 use App\Models\MotivoRechazo;
 use App\Models\Parametro;
 use App\Models\TipoNovedad;
@@ -65,7 +64,7 @@ class ParametroController extends Controller
     {
         $request->merge(['nombre' => trim((string) $request->input('nombre'))]);
         $datos = $request->validate([
-            'nombre' => ['required', 'string', 'max:150', Rule::unique('motivos_rechazo', 'nombre')->ignore($motivo?->id)],
+            'nombre' => ['required', 'string', 'max:150', Rule::unique('motivos_rechazo', 'nombre')->whereNull('deleted_at')->ignore($motivo?->id)],
             'imputable' => ['required', 'boolean'],
         ], ['nombre.unique' => 'Ya hay un motivo con este nombre.', 'nombre.required' => 'Escribe el motivo como llega de Drivin.']);
 
@@ -81,22 +80,17 @@ class ParametroController extends Controller
         return back()->with('success', $motivo->activo ? "{$motivo->nombre} está activo de nuevo." : "{$motivo->nombre} quedó inactivo.");
     }
 
-    /** Solo un motivo que ninguna orden usa. */
+    /** Se elimina sin borrar nada: las órdenes que ya lo tienen lo conservan; las próximas cargas ya no lo reconocen. */
     public function eliminarMotivo(MotivoRechazo $motivo): RedirectResponse
     {
-        $enUso = "«{$motivo->nombre}» ya está en órdenes importadas: no se puede eliminar. Desactívalo para conservar su historial.";
-        if ($motivo->ordenes()->exists()) {
-            return back()->with('error', $enUso);
-        }
-
-        return $this->eliminarRegistro($motivo, "el motivo «{$motivo->nombre}»", $enUso);
+        return $this->eliminarRegistro($motivo, "el motivo «{$motivo->nombre}»");
     }
 
     public function guardarNovedad(Request $request, ?TipoNovedad $novedad = null): RedirectResponse
     {
         $request->merge(['nombre' => trim((string) $request->input('nombre'))]);
         $datos = $request->validate([
-            'nombre' => ['required', 'string', 'max:150', Rule::unique('tipos_novedad', 'nombre')->ignore($novedad?->id)],
+            'nombre' => ['required', 'string', 'max:150', Rule::unique('tipos_novedad', 'nombre')->whereNull('deleted_at')->ignore($novedad?->id)],
             'severidad' => ['required', Rule::in(['ninguna', 'leve', 'grave'])],
         ], ['nombre.unique' => 'Ya hay un tipo de novedad con este nombre.', 'nombre.required' => 'Escribe el tipo de novedad.']);
 
@@ -117,17 +111,13 @@ class ParametroController extends Controller
         return back()->with('success', $novedad->activo ? "{$novedad->nombre} está activo de nuevo." : "{$novedad->nombre} quedó inactivo: ya no se ofrece en la auditoría.");
     }
 
-    /** Solo un tipo que la auditoría no sugiere sola y que ninguna auditoría usa. */
+    /** Se elimina sin borrar nada: las auditorías que ya lo tienen lo conservan; deja de ofrecerse al auditar. */
     public function eliminarNovedad(TipoNovedad $novedad): RedirectResponse
     {
         if (in_array($novedad->nombre, TipoNovedad::DEL_SISTEMA, true)) {
             return back()->with('error', "«{$novedad->nombre}» lo sugiere la auditoría: no se elimina.");
         }
-        $enUso = "«{$novedad->nombre}» ya está en auditorías: no se puede eliminar. Desactívalo para conservar su historial.";
-        if (AuditoriaPod::where('tipo_novedad_id', $novedad->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
 
-        return $this->eliminarRegistro($novedad, "el tipo de novedad «{$novedad->nombre}»", $enUso);
+        return $this->eliminarRegistro($novedad, "el tipo de novedad «{$novedad->nombre}»");
     }
 }

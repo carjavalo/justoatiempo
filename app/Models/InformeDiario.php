@@ -6,9 +6,12 @@ use App\Enums\EstadoInforme;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class InformeDiario extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'informes_diarios';
 
     protected $fillable = [
@@ -35,12 +38,12 @@ class InformeDiario extends Model
 
     public function sede(): BelongsTo
     {
-        return $this->belongsTo(Sede::class);
+        return $this->belongsTo(Sede::class)->withTrashed();
     }
 
     public function sucursal(): BelongsTo
     {
-        return $this->belongsTo(Sucursal::class);
+        return $this->belongsTo(Sucursal::class)->withTrashed();
     }
 
     public function ordenes(): HasMany
@@ -60,6 +63,6 @@ class InformeDiario extends Model
 
     public function cerradoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'cerrado_por');
+        return $this->belongsTo(User::class, 'cerrado_por')->withTrashed();
     }
 }

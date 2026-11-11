@@ -6,9 +6,12 @@ use App\Enums\EstadoCarga;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Carga extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'archivo_nombre', 'archivo_path', 'archivo_hash', 'hoja', 'fila_encabezados', 'fecha_operacion', 'estado',
         'total_filas', 'filas_validas', 'filas_error', 'ordenes_importadas', 'advertencias', 'errores',
@@ -41,11 +44,11 @@ class Carga extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'cargado_por');
+        return $this->belongsTo(User::class, 'cargado_por')->withTrashed();
     }
 
     public function anuladaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'anulada_por');
+        return $this->belongsTo(User::class, 'anulada_por')->withTrashed();
     }
 }

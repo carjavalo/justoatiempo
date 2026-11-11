@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
  */
 class LineaServicio extends Model
 {
+    use SoftDeletes;
+
     /** Línea con las herramientas de Drivin: tablero de indicadores, cargas y auditoría POD. */
     public const LOGISTICA = 'logistica';
 
@@ -65,7 +68,7 @@ class LineaServicio extends Model
     {
         $base = Str::limit(Str::slug($nombre), 50, '') ?: 'linea';
         $slug = $base;
-        for ($i = 2; static::where('slug', $slug)->exists(); $i++) {
+        for ($i = 2; static::withTrashed()->where('slug', $slug)->exists(); $i++) {
             $slug = "{$base}-{$i}";
         }
 

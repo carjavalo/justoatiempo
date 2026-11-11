@@ -60,12 +60,12 @@ class UsuarioRequest extends FormRequest
             'primer_apellido' => ['required', 'string', 'max:80'],
             'segundo_apellido' => ['nullable', 'string', 'max:80'],
             // Sin acceso a la plataforma, la cédula es la que la identifica (en su carnet y en las entregas de Drivin)
-            'cedula' => ['nullable', 'required_unless:acceso,true', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->ignore($usuario?->id)],
+            'cedula' => ['nullable', 'required_unless:acceso,true', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->whereNull('deleted_at')->ignore($usuario?->id)],
             // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
             'acceso' => ['required', 'boolean'],
             // Ingresa con su correo o con su cédula: con acceso, al menos uno de los dos
-            'email' => ['nullable', Rule::requiredIf(fn () => $this->boolean('acceso') && blank($this->input('cedula'))), 'string', 'email', 'max:150', Rule::unique('users', 'email')->ignore($usuario?->id)],
+            'email' => ['nullable', Rule::requiredIf(fn () => $this->boolean('acceso') && blank($this->input('cedula'))), 'string', 'email', 'max:150', Rule::unique('users', 'email')->whereNull('deleted_at')->ignore($usuario?->id)],
             'rol_id' => ['required', 'integer', Rule::exists('roles', 'id')],
             // Con acceso y sin contraseña aún: la que se escriba o, en blanco, un código inicial (con él entra y crea la
             // suya). Al editar, en blanco conserva la actual. Sin acceso no se usa.

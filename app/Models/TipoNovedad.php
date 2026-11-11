@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TipoNovedad extends Model
 {
+    use SoftDeletes;
+
     /** Los que la auditoría sugiere sola (App\Services\Pod\EvaluadorProtocolo): su nombre no se cambia. */
     public const DEL_SISTEMA = [
         'Buen protocolo de entrega', 'Entregado sin destapar con nota en remesa', 'Falta foto de fachada',

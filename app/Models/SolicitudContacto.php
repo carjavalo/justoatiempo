@@ -5,10 +5,13 @@ namespace App\Models;
 use App\Enums\Rol;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** Solicitud de cotización del formulario "Hablemos de su operación" del sitio web. */
 class SolicitudContacto extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'solicitudes_contacto';
 
     protected $fillable = ['nombre', 'empresa', 'email', 'telefono', 'servicio', 'mensaje', 'autoriza_datos_en', 'ip', 'atendida', 'atendida_en', 'atendida_por_id'];
@@ -20,7 +23,7 @@ class SolicitudContacto extends Model
 
     public function atendidaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'atendida_por_id');
+        return $this->belongsTo(User::class, 'atendida_por_id')->withTrashed();
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Enums\Rol;
 use App\Support\Permisos;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Rol que se le asigna a un usuario (lo crea la administración): su nombre es libre ("Conductor", "Supervisor de
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class RolUsuario extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'roles';
 
     protected $fillable = ['nombre', 'descripcion', 'permisos', 'alcance', 'activo'];

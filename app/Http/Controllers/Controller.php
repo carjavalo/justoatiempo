@@ -4,31 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\Bitacora;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 
 abstract class Controller
 {
     /**
-     * Elimina un registro ya revisado (sin historial) y deja constancia en la bitácora. Si la base aún lo referencia,
-     * no se borra y se explica por qué. Los de borrado lógico también se borran del todo: si no, su nombre o su NIT
-     * quedarían ocupados por un registro que nadie puede ver.
+     * Elimina un registro sin borrarlo de la base: queda marcado como eliminado (deleted_at), deja de verse y su
+     * rastro queda en la bitácora (quién, cuándo y qué). Lo que lo referencia (órdenes, informes, programación…)
+     * se conserva tal cual. Su nombre, cédula o placa quedan libres: los únicos solo cuentan lo vigente.
+     *
+     * `$antes` corre dentro de la misma transacción, antes de marcarlo: lo que hay que dejar en orden primero
+     * (terminar las asignaciones de un lugar, pasar a otro rol a sus personas…).
      */
-    protected function eliminarRegistro(Model $registro, string $nombre, string $enUso, ?callable $despues = null): RedirectResponse
+    protected function eliminarRegistro(Model $registro, string $nombre, ?callable $antes = null, array $detalle = []): RedirectResponse
     {
-        try {
-            DB::transaction(function () use ($registro, $nombre) {
-                Bitacora::registrar('eliminada', $registro, ['nombre' => $nombre]);
-                method_exists($registro, 'forceDelete') ? $registro->forceDelete() : $registro->delete();
-            });
-        } catch (QueryException) {
-            return back()->with('error', $enUso);
-        }
-
-        if ($despues) {
-            $despues();
-        }
+        DB::transaction(function () use ($registro, $nombre, $antes, $detalle) {
+            $resultado = $antes ? $antes() : [];
+            Bitacora::registrar('eliminada', $registro, ['nombre' => $nombre, ...$detalle, ...(is_array($resultado) ? $resultado : [])]);
+            $registro->delete();
+        });
 
         return back()->with('success', "Se eliminó {$nombre}.");
     }

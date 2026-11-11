@@ -80,6 +80,6 @@ class SolicitudController extends Controller
 
     public function destroy(SolicitudContacto $solicitud): RedirectResponse
     {
-        return $this->eliminarRegistro($solicitud, "la solicitud de {$solicitud->nombre}", 'No se pudo eliminar la solicitud.');
+        return $this->eliminarRegistro($solicitud, "la solicitud de {$solicitud->nombre}");
     }
 }

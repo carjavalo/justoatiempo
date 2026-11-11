@@ -192,7 +192,7 @@ class AsignacionController extends Controller
             return back()->with('error', 'No puedes eliminar esta asignación: está fuera de lo que tu rol te deja cambiar.');
         }
 
-        return $this->eliminarRegistro($asignacion, "la asignación de {$persona->name} en {$asignacion->lugar()}", 'No se pudo eliminar la asignación.');
+        return $this->eliminarRegistro($asignacion, "la asignación de {$persona->name} en {$asignacion->lugar()}");
     }
 
     /** Si la empresa aún no recibía alguna de las líneas asignadas, desde ahora la recibe (y aparece en su tablero). */

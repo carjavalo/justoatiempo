@@ -29,7 +29,11 @@ return new class extends Migration
             $table->dropColumn(['productos', 'productos_entregados']);
         });
 
-        app(ConsolidadorInforme::class)->recalcularTodos();
+        // Solo si ya hay informes: en una base nueva no hay nada que recalcular, y el consolidador usa los modelos de
+        // hoy (con columnas, como deleted_at, que esta migración todavía no conoce)
+        if (DB::table('informes_diarios')->exists()) {
+            app(ConsolidadorInforme::class)->recalcularTodos();
+        }
     }
 
     public function down(): void

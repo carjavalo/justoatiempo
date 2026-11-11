@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Una novedad de la operación de una línea (una llegada tarde, una queja del cliente, un faltante de insumos…), con
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class NovedadLinea extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'novedades_linea';
 
     /** Tipos que se ofrecen al registrar, con la gravedad que se sugiere (se puede cambiar). */
@@ -44,38 +47,38 @@ class NovedadLinea extends Model
 
     public function linea(): BelongsTo
     {
-        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
+        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id')->withTrashed();
     }
 
     public function empresa(): BelongsTo
     {
-        return $this->belongsTo(Empresa::class);
+        return $this->belongsTo(Empresa::class)->withTrashed();
     }
 
     public function sede(): BelongsTo
     {
-        return $this->belongsTo(Sede::class);
+        return $this->belongsTo(Sede::class)->withTrashed();
     }
 
     public function sucursal(): BelongsTo
     {
-        return $this->belongsTo(Sucursal::class);
+        return $this->belongsTo(Sucursal::class)->withTrashed();
     }
 
     /** La persona involucrada (si la hay). */
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     public function registradaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'registrada_por');
+        return $this->belongsTo(User::class, 'registrada_por')->withTrashed();
     }
 
     public function cerradaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'cerrada_por');
+        return $this->belongsTo(User::class, 'cerrada_por')->withTrashed();
     }
 
     /** Las acciones de desempeño que se tomaron por ella. */

@@ -80,7 +80,7 @@ class SucursalRequest extends FormRequest
             }
 
             // El nombre no se repite dentro de la misma sede ni entre las sucursales propias
-            $repetida = Sucursal::withTrashed()
+            $repetida = Sucursal::query()
                 ->where('nombre', $this->input('nombre'))
                 ->when($sedeId, fn ($q) => $q->where('sede_id', $sedeId), fn ($q) => $q->whereNull('sede_id'))
                 ->when($sucursal, fn ($q) => $q->whereKeyNot($sucursal->id))

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -14,6 +15,8 @@ use Illuminate\Support\Carbon;
  */
 class Asignacion extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'asignaciones';
 
     /** Cómo se elige el periodo. */
@@ -34,7 +37,7 @@ class Asignacion extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     public function empresa(): BelongsTo
@@ -59,7 +62,7 @@ class Asignacion extends Model
 
     public function creadaPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'creada_por');
+        return $this->belongsTo(User::class, 'creada_por')->withTrashed();
     }
 
     /** Las que están en curso hoy: ya empezaron y no han terminado. */

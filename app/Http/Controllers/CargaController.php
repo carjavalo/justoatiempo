@@ -14,7 +14,6 @@ use App\Services\Drivin\MapeoColumnas;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -65,20 +64,10 @@ class CargaController extends Controller
         $archivo = $request->file('archivo');
         $hash = hash_file('sha256', $archivo->getRealPath());
 
-        if ($existente = Carga::firstWhere('archivo_hash', $hash)) {
+        // Una carga anulada no cuenta: el mismo archivo se importa como una carga nueva y la anulada queda como estaba
+        if ($existente = Carga::where('archivo_hash', $hash)->where('estado', '!=', EstadoCarga::Anulada)->first()) {
             if ($existente->enRevision()) {
                 return to_route('cargas.show', $existente)->with('success', 'Este archivo ya estaba en revisión: puedes continuar donde quedaste.');
-            }
-            // Una carga anulada no dejó órdenes: el mismo archivo vuelve a su revisión
-            if ($existente->estado === EstadoCarga::Anulada) {
-                $existente->update([
-                    'estado' => EstadoCarga::EnRevision, 'fecha_operacion' => null, 'total_filas' => 0, 'filas_validas' => 0, 'filas_error' => 0,
-                    'ordenes_importadas' => 0, 'advertencias' => 0, 'errores' => null, 'resumen' => null, 'procesado_en' => null, 'duracion_ms' => null,
-                    'anulada_por' => null, 'anulada_en' => null,
-                ]);
-                Bitacora::registrar('reabierta', $existente);
-
-                return to_route('cargas.show', $existente)->with('success', 'Este archivo se había anulado: vuelve a su revisión para importarlo de nuevo.');
             }
 
             return back()->withErrors(['archivo' => "Este archivo ya se importó el {$existente->procesado_en?->format('d/m/Y H:i')} (carga #{$existente->id})."]);
@@ -95,11 +84,11 @@ class CargaController extends Controller
             'cargado_por' => $request->user()->id,
         ]);
 
-        // Si no se puede leer, mejor avisar ya que dejar una revisión inservible
+        // Si no se puede leer, mejor avisar ya que dejar una revisión inservible (queda marcada, con su archivo)
         try {
             $this->importador->analizar($carga);
         } catch (RuntimeException $e) {
-            Storage::disk('local')->delete($ruta);
+            Bitacora::registrar('descartada', $carga, ['archivo' => $carga->archivo_nombre, 'motivo' => $e->getMessage()]);
             $carga->delete();
 
             return back()->withErrors(['archivo' => $e->getMessage()]);
@@ -231,7 +220,7 @@ class CargaController extends Controller
     {
         abort_unless($carga->enRevision(), 409, 'Solo se puede descartar una carga en revisión. Para deshacer una importación, anúlala.');
 
-        Storage::disk('local')->delete($carga->archivo_path);
+        // No se borra nada: la carga queda marcada como descartada y su archivo se conserva
         Bitacora::registrar('descartada', $carga, ['archivo' => $carga->archivo_nombre]);
         $carga->delete();
 

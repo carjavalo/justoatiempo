@@ -37,7 +37,7 @@ class EmpresaRequest extends FormRequest
         $empresa = $this->route('empresa');
 
         return [
-            'nombre' => ['required', 'string', 'max:120', Rule::unique('empresas', 'nombre')->ignore($empresa?->id)],
+            'nombre' => ['required', 'string', 'max:120', Rule::unique('empresas', 'nombre')->whereNull('deleted_at')->ignore($empresa?->id)],
             'nit' => ['nullable', 'string', 'max:25', function (string $atributo, mixed $valor, Closure $falla) use ($empresa) {
                 $partes = Nit::partes((string) $valor);
                 if (! $partes) {
@@ -52,7 +52,7 @@ class EmpresaRequest extends FormRequest
 
                     return;
                 }
-                $existe = Empresa::withTrashed()
+                $existe = Empresa::query()
                     ->where('nit', $numero.'-'.$esperado)
                     ->when($empresa, fn ($q) => $q->whereKeyNot($empresa->id))
                     ->exists();

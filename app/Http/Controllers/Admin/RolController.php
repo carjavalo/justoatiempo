@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\RolRequest;
 use App\Models\RolUsuario;
+use App\Models\User;
 use App\Support\Permisos;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -113,20 +115,37 @@ class RolController extends Controller
             : "El rol {$rol->nombre} quedó inactivo: ya no se ofrece al crear usuarios (quienes lo tienen lo conservan).");
     }
 
-    /** Solo un rol que no es de la plataforma y que nadie tiene. */
+    /**
+     * Se elimina sin borrar nada. Si alguien lo tiene, primero pasa al rol que se elija (nadie queda sin rol): quién
+     * pasó a cuál queda en la bitácora.
+     */
     public function destroy(Request $request, RolUsuario $rol): RedirectResponse
     {
+        $yo = $request->user();
         if ($rol->base) {
             return back()->with('error', 'Es un rol base de la plataforma: no se elimina.');
         }
-        if (! $request->user()->rolUsuario?->cubre($rol)) {
+        if (! $yo->rolUsuario?->cubre($rol)) {
             return back()->with('error', 'Este rol tiene permisos que el tuyo no tiene: no puedes eliminarlo.');
         }
-        $enUso = "El rol {$rol->nombre} lo tienen personas de la plataforma: dales otro rol antes de eliminarlo, o desactívalo.";
-        if ($rol->usuarios()->exists()) {
-            return back()->with('error', $enUso);
+
+        $personas = $rol->usuarios()->pluck('id');
+        $nuevo = null;
+        if ($personas->isNotEmpty()) {
+            $id = $request->validate(['pasar_a' => ['required', 'integer']], ['pasar_a.required' => 'Elige el rol al que pasan sus personas.'])['pasar_a'];
+            $nuevo = RolUsuario::where('activo', true)->whereKeyNot($rol->id)->find($id);
+            // Solo a un rol activo que el propio rol cubre (nadie gana permisos que quien lo hace no tiene)
+            if (! $nuevo || ! $yo->rolUsuario?->cubre($nuevo)) {
+                throw ValidationException::withMessages(['pasar_a' => 'Elige uno de los roles de la lista.']);
+            }
         }
 
-        return $this->eliminarRegistro($rol, "el rol {$rol->nombre}", $enUso);
+        return $this->eliminarRegistro($rol, "el rol {$rol->nombre}", function () use ($personas, $nuevo) {
+            if ($nuevo) {
+                User::whereIn('id', $personas)->update(['rol_id' => $nuevo->id]);
+            }
+
+            return $nuevo ? ['personas' => $personas->all(), 'pasaron_a' => ['id' => $nuevo->id, 'nombre' => $nuevo->nombre]] : [];
+        });
     }
 }

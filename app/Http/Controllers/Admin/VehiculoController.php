@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\InformeLinea;
-use App\Models\ProgramacionAsignacion;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Database\Eloquent\Builder;
@@ -93,15 +91,10 @@ class VehiculoController extends Controller
         return back()->with('success', $activo ? "{$vehiculo->placa} está activo de nuevo." : "{$vehiculo->placa} quedó inactivo: su historial se conserva.");
     }
 
-    /** Solo un vehículo que nunca ha operado (p. ej. una placa mal escrita): el que tiene historial se desactiva. */
+    /** Se elimina sin borrar nada: sus órdenes y su programación pasada lo conservan; deja de ofrecerse. */
     public function destroy(Vehiculo $vehiculo): RedirectResponse
     {
-        $enUso = "{$vehiculo->placa} tiene órdenes o programación registradas: no se puede eliminar. Desactívalo para conservar su historial.";
-        if ($vehiculo->ordenes()->exists() || InformeLinea::where('vehiculo_id', $vehiculo->id)->exists() || ProgramacionAsignacion::where('vehiculo_id', $vehiculo->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
-
-        return $this->eliminarRegistro($vehiculo, "el vehículo {$vehiculo->placa}", $enUso);
+        return $this->eliminarRegistro($vehiculo, "el vehículo {$vehiculo->placa}");
     }
 
     /** @return array<string, mixed> */
@@ -117,8 +110,8 @@ class VehiculoController extends Controller
         ]);
 
         return $request->validate([
-            'placa' => ['required', 'string', 'regex:/^[A-Z0-9]{5,8}$/', Rule::unique('vehiculos', 'placa')->ignore($vehiculo?->id)],
-            'codigo_interno' => ['nullable', 'string', 'max:30', Rule::unique('vehiculos', 'codigo_interno')->ignore($vehiculo?->id)],
+            'placa' => ['required', 'string', 'regex:/^[A-Z0-9]{5,8}$/', Rule::unique('vehiculos', 'placa')->whereNull('deleted_at')->ignore($vehiculo?->id)],
+            'codigo_interno' => ['nullable', 'string', 'max:30', Rule::unique('vehiculos', 'codigo_interno')->whereNull('deleted_at')->ignore($vehiculo?->id)],
             'tipo' => ['nullable', 'string', 'max:50'],
             'descripcion' => ['nullable', 'string', 'max:255'],
             'conductor_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('activo', true)],

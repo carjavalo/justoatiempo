@@ -30,7 +30,7 @@ class LineaServicioRequest extends FormRequest
         $linea = $this->route('servicio');
 
         return [
-            'nombre' => ['required', 'string', 'max:120', Rule::unique('lineas_servicio', 'nombre')->ignore($linea?->id)],
+            'nombre' => ['required', 'string', 'max:120', Rule::unique('lineas_servicio', 'nombre')->whereNull('deleted_at')->ignore($linea?->id)],
             'descripcion' => ['nullable', 'string', 'max:300'],
             'icono' => ['required', Rule::in(LineaServicio::ICONOS)],
         ];

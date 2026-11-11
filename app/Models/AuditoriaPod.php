@@ -62,11 +62,11 @@ class AuditoriaPod extends Model
 
     public function tipoNovedad(): BelongsTo
     {
-        return $this->belongsTo(TipoNovedad::class);
+        return $this->belongsTo(TipoNovedad::class)->withTrashed();
     }
 
     public function auditor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'auditado_por');
+        return $this->belongsTo(User::class, 'auditado_por')->withTrashed();
     }
 }

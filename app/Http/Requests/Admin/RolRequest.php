@@ -37,7 +37,7 @@ class RolRequest extends FormRequest
         $rol = $this->route('rol');
 
         return [
-            'nombre' => ['required', 'string', 'max:60', Rule::unique('roles', 'nombre')->ignore($rol?->id)],
+            'nombre' => ['required', 'string', 'max:60', Rule::unique('roles', 'nombre')->whereNull('deleted_at')->ignore($rol?->id)],
             'descripcion' => ['nullable', 'string', 'max:200'],
             // Sin permisos es válido: quien tenga el rol solo verá su carnet
             'permisos' => ['present', 'array'],

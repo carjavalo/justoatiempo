@@ -40,8 +40,8 @@ class SedeRequest extends FormRequest
 
         return [
             // Drivin la reconoce por su nombre o su código: ninguno de los dos se repite entre sedes
-            'nombre' => ['required', 'string', 'max:120', Rule::unique('sedes', 'nombre')->ignore($sede?->id)],
-            'codigo' => ['nullable', 'string', 'max:30', Rule::unique('sedes', 'codigo')->ignore($sede?->id)],
+            'nombre' => ['required', 'string', 'max:120', Rule::unique('sedes', 'nombre')->whereNull('deleted_at')->ignore($sede?->id)],
+            'codigo' => ['nullable', 'string', 'max:30', Rule::unique('sedes', 'codigo')->whereNull('deleted_at')->ignore($sede?->id)],
             'empresa_id' => ['required', 'integer', Rule::exists('empresas', 'id')->whereNull('deleted_at')],
             'meta_efectividad' => ['required', 'numeric', 'min:1', 'max:100'],
         ];

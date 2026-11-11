@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoAsistencia;
+use App\Models\Bitacora;
 use App\Models\LineaServicio;
 use App\Models\Programacion;
 use App\Models\ProgramacionAsignacion;
@@ -165,10 +166,9 @@ class ProgramacionController extends Controller
     public function destroy(Request $request, Programacion $programacion): RedirectResponse
     {
         $this->autorizar($request->user(), $programacion, 'programacion.editar');
-        if ($programacion->asignaciones()->whereNotNull('asistencia')->exists()) {
-            return back()->with('error', 'Ya tiene asistencia registrada: no se puede quitar. Quita primero a las personas que no fueron.');
-        }
+        // No se borra nada: queda marcada como quitada, con su asistencia (si la tenía) en el historial
         $lugar = $programacion->lugar();
+        Bitacora::registrar('eliminada', $programacion, ['lugar' => $lugar, 'fecha' => $programacion->fecha->toDateString()]);
         $programacion->delete();
 
         return back()->with('success', "Se quitó la programación de {$lugar}.");
@@ -259,6 +259,8 @@ class ProgramacionController extends Controller
     {
         $this->autorizar($request->user(), $fila->programacion, 'programacion.editar');
         $nombre = $fila->persona?->name ?? 'La persona';
+        // No se borra nada: queda marcada como quitada (con su asistencia, si la tenía)
+        Bitacora::registrar('eliminada', $fila, ['persona' => $nombre, 'lugar' => $fila->programacion->lugar(), 'fecha' => $fila->programacion->fecha->toDateString()]);
         $fila->delete();
 
         return back()->with('success', "{$nombre} ya no está en la programación de este día.");

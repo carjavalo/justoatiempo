@@ -5,9 +5,12 @@ namespace App\Models;
 use App\Enums\TipoAccion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AccionDesempeno extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'acciones_desempeno';
 
     protected $fillable = [
@@ -28,7 +31,7 @@ class AccionDesempeno extends Model
     /** La persona a la que se le hace el seguimiento. */
     public function persona(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withTrashed();
     }
 
     public function informe(): BelongsTo
@@ -38,7 +41,7 @@ class AccionDesempeno extends Model
 
     public function linea(): BelongsTo
     {
-        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
+        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id')->withTrashed();
     }
 
     /** La novedad por la que se tomó (en las líneas sin Drivin). */
@@ -49,6 +52,6 @@ class AccionDesempeno extends Model
 
     public function registradoPor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'registrado_por');
+        return $this->belongsTo(User::class, 'registrado_por')->withTrashed();
     }
 }

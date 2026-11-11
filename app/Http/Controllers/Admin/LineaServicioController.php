@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\LineaServicioRequest;
-use App\Models\AccionDesempeno;
 use App\Models\Asignacion;
 use App\Models\LineaServicio;
-use App\Models\NovedadLinea;
-use App\Models\Programacion;
+use App\Support\Retiro;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,18 +93,16 @@ class LineaServicioController extends Controller
             : "{$servicio->nombre} quedó inactiva: ya no se ofrece en las empresas ni en las asignaciones nuevas. Su historial se conserva.");
     }
 
-    /** Solo una línea que nadie usa. La de Drivin no: de ella dependen el tablero, las cargas y la auditoría. */
+    /**
+     * Se elimina sin borrar nada: quien solo la tenía en una asignación queda sin ella (termina ayer y sigue en su
+     * historial), su programación por venir se quita y su operación pasada se conserva. La de Drivin no se elimina.
+     */
     public function destroy(LineaServicio $servicio): RedirectResponse
     {
         if ($servicio->modulo !== null) {
             return back()->with('error', "{$servicio->nombre} tiene las herramientas de Drivin (tablero, cargas y auditoría): no se elimina.");
         }
-        $enUso = "{$servicio->nombre} tiene empresas, personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
-        if ($servicio->empresas()->exists() || $servicio->asignaciones()->exists() || Programacion::where('linea_servicio_id', $servicio->id)->exists()
-            || NovedadLinea::where('linea_servicio_id', $servicio->id)->exists() || AccionDesempeno::where('linea_servicio_id', $servicio->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
 
-        return $this->eliminarRegistro($servicio, "la línea {$servicio->nombre}", $enUso);
+        return $this->eliminarRegistro($servicio, "la línea {$servicio->nombre}", fn () => Retiro::linea($servicio));
     }
 }

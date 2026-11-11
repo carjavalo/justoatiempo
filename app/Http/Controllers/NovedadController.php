@@ -129,7 +129,7 @@ class NovedadController extends Controller
         $op = OperacionLinea::para($request->user(), $novedad->linea, 'novedades.eliminar');
         abort_unless($op->incluye($novedad->empresa_id, $novedad->sede_id, $novedad->sucursal_id), 404);
 
-        return $this->eliminarRegistro($novedad, "la novedad «{$novedad->tipo}» del {$novedad->fecha->format('d/m/Y')}", 'No se pudo eliminar la novedad.');
+        return $this->eliminarRegistro($novedad, "la novedad «{$novedad->tipo}» del {$novedad->fecha->format('d/m/Y')}");
     }
 
     /**

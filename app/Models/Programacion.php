@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * La programación de un día en un lugar de una línea de servicio: cuántas personas (y, en logística, cuántos
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Programacion extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'programaciones';
 
     protected $fillable = [
@@ -26,22 +29,22 @@ class Programacion extends Model
 
     public function linea(): BelongsTo
     {
-        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id');
+        return $this->belongsTo(LineaServicio::class, 'linea_servicio_id')->withTrashed();
     }
 
     public function empresa(): BelongsTo
     {
-        return $this->belongsTo(Empresa::class);
+        return $this->belongsTo(Empresa::class)->withTrashed();
     }
 
     public function sede(): BelongsTo
     {
-        return $this->belongsTo(Sede::class);
+        return $this->belongsTo(Sede::class)->withTrashed();
     }
 
     public function sucursal(): BelongsTo
     {
-        return $this->belongsTo(Sucursal::class);
+        return $this->belongsTo(Sucursal::class)->withTrashed();
     }
 
     /** Las personas programadas, con su turno y su asistencia. */
@@ -52,7 +55,7 @@ class Programacion extends Model
 
     public function creador(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'creado_por');
+        return $this->belongsTo(User::class, 'creado_por')->withTrashed();
     }
 
     /** "Ditransa · TuGo · Cali Sur". */

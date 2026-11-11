@@ -59,9 +59,9 @@ class AlmacenEvidencias
         return [$evidencia, true];
     }
 
+    /** No se borra nada: la evidencia queda marcada como eliminada y su archivo se conserva. */
     public function eliminar(Evidencia $evidencia): void
     {
-        Storage::disk('local')->delete($evidencia->path);
         $evidencia->delete();
     }
 

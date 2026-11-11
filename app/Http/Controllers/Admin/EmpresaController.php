@@ -6,8 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\EmpresaRequest;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
-use App\Models\NovedadLinea;
-use App\Models\Programacion;
+use App\Support\Retiro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,15 +92,23 @@ class EmpresaController extends Controller
             : "{$empresa->nombre} quedó inactiva: no recibirá nuevas sedes ni usuarios.");
     }
 
-    /** Solo una empresa sin sedes, sin personal y sin operación: lo demás se desactiva, para conservar su historial. */
+    /**
+     * Se elimina sin borrar nada, con sus sedes y sucursales: quienes estaban asignados a ella quedan sin esa
+     * asignación, su programación por venir se quita y su operación pasada se conserva.
+     */
     public function destroy(Empresa $empresa): RedirectResponse
     {
-        $enUso = "{$empresa->nombre} tiene sedes, personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
-        if ($empresa->sedes()->withTrashed()->exists() || $empresa->asignaciones()->exists()
-            || Programacion::where('empresa_id', $empresa->id)->exists() || NovedadLinea::where('empresa_id', $empresa->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
+        return $this->eliminarRegistro($empresa, $empresa->nombre, function () use ($empresa) {
+            $sedes = $empresa->sedes()->with('sucursales')->get();
+            $sucursales = $sedes->flatMap->sucursales;
+            $sucursales->each->delete();
+            $sedes->each->delete();
 
-        return $this->eliminarRegistro($empresa, $empresa->nombre, $enUso);
+            return [
+                ...Retiro::lugar(fn ($q) => $q->where('empresa_id', $empresa->id)),
+                'sedes_eliminadas' => $sedes->pluck('id')->all(),
+                'sucursales_eliminadas' => $sucursales->pluck('id')->all(),
+            ];
+        });
     }
 }

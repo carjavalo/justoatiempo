@@ -6,12 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SedeRequest;
 use App\Models\Asignacion;
 use App\Models\Empresa;
-use App\Models\InformeDiario;
-use App\Models\NovedadLinea;
-use App\Models\Orden;
 use App\Models\Parametro;
-use App\Models\Programacion;
 use App\Models\Sede;
+use App\Support\Retiro;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -108,15 +105,17 @@ class SedeController extends Controller
             : "La sede {$sede->nombre} quedó inactiva: no recibirá nuevas sucursales ni usuarios.");
     }
 
-    /** Solo una sede sin sucursales, sin personal y sin operación: lo demás se desactiva, para conservar su historial. */
+    /**
+     * Se elimina sin borrar nada, con sus sucursales: quienes estaban asignados a la sede (o a una de sus sucursales)
+     * quedan sin esa asignación, su programación por venir se quita y su operación pasada se conserva.
+     */
     public function destroy(Sede $sede): RedirectResponse
     {
-        $enUso = "La sede {$sede->nombre} tiene sucursales, personal u operación registrada: no se puede eliminar. Desactívala para conservar su historial.";
-        if ($sede->sucursales()->withTrashed()->exists() || $sede->asignaciones()->exists() || Orden::where('sede_id', $sede->id)->exists()
-            || InformeDiario::where('sede_id', $sede->id)->exists() || Programacion::where('sede_id', $sede->id)->exists() || NovedadLinea::where('sede_id', $sede->id)->exists()) {
-            return back()->with('error', $enUso);
-        }
+        return $this->eliminarRegistro($sede, "la sede {$sede->nombre}", function () use ($sede) {
+            $sucursales = $sede->sucursales()->get();
+            $sucursales->each->delete();
 
-        return $this->eliminarRegistro($sede, "la sede {$sede->nombre}", $enUso);
+            return [...Retiro::lugar(fn ($q) => $q->where('sede_id', $sede->id)), 'sucursales_eliminadas' => $sucursales->pluck('id')->all()];
+        });
     }
 }
