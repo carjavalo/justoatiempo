@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Link, router } from '@inertiajs/react';
 import { MoreHorizontal, Pencil, Power, PowerOff, Trash2, type TipoIcono } from '@/components/iconos';
-import { type RefObject, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useRef, useState } from 'react';
 
 interface Props {
     nombre: string;
@@ -18,6 +18,17 @@ interface Props {
     urlEliminar?: string;
     /** Páginas propias del registro (p. ej. el carnet de un usuario), antes de las acciones. */
     enlaces?: { texto: string; href: string; icono: TipoIcono }[];
+    /** Qué pasa al eliminarlo (quién queda sin asignación, qué se conserva). */
+    consecuenciaEliminar?: string;
+    /** Lo que hay que elegir para eliminarlo (p. ej. a qué rol pasan sus personas), con lo que se envía. */
+    camposEliminar?: CamposEliminar;
+}
+
+/** Campos de la confirmación de eliminar: lo que se elige va con la petición. */
+export interface CamposEliminar {
+    iniciales: Record<string, string>;
+    listo: (datos: Record<string, string>) => boolean;
+    render: (datos: Record<string, string>, cambiar: (clave: string, valor: string) => void, error?: string) => ReactNode;
 }
 
 /**
@@ -25,7 +36,7 @@ interface Props {
  * confirmación porque cambian el acceso de otras personas o no se pueden deshacer; activar es inmediato. Sin ninguna
  * acción posible no se muestra el menú.
  */
-export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia, urlEliminar, enlaces = [] }: Props) {
+export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia, urlEliminar, enlaces = [], consecuenciaEliminar, camposEliminar }: Props) {
     const [confirmando, setConfirmando] = useState(false);
     const [eliminando, setEliminando] = useState(false);
     const [procesando, setProcesando] = useState(false);
@@ -125,17 +136,32 @@ export function AccionesFila({ nombre, activo, urlEstado, onEditar, consecuencia
                 </DialogContent>
             </Dialog>
 
-            {urlEliminar && <ConfirmarEliminar abierto={eliminando} nombre={nombre} url={urlEliminar} onCerrar={() => setEliminando(false)} focoAlCerrar={boton} />}
+            {urlEliminar && (
+                <ConfirmarEliminar
+                    abierto={eliminando}
+                    nombre={nombre}
+                    url={urlEliminar}
+                    consecuencia={consecuenciaEliminar}
+                    campos={camposEliminar}
+                    onCerrar={() => setEliminando(false)}
+                    focoAlCerrar={boton}
+                />
+            )}
         </>
     );
 }
 
-/** Confirmación antes de eliminar. La consecuencia por omisión es la de los registros que solo se eliminan sin historial. */
+/**
+ * Confirmación antes de eliminar. Nada se borra de la base: lo eliminado deja de verse y queda en el historial (con
+ * quién y cuándo). Con `campos`, se elige algo antes (p. ej. a qué rol pasan sus personas) y va con la petición; si el
+ * servidor lo rechaza, el mensaje se muestra aquí y la confirmación sigue abierta.
+ */
 export function ConfirmarEliminar({
     abierto,
     nombre,
     url,
-    consecuencia = 'No se puede deshacer. Solo se elimina si no tiene historial; si lo tiene, la plataforma te lo dirá y podrás desactivarlo.',
+    consecuencia = 'Deja de verse en la plataforma. No se borra: queda en el historial, con quién y cuándo se eliminó.',
+    campos,
     onCerrar,
     focoAlCerrar,
 }: {
@@ -143,21 +169,26 @@ export function ConfirmarEliminar({
     nombre: string;
     url: string;
     consecuencia?: string;
+    campos?: CamposEliminar;
     onCerrar: () => void;
     focoAlCerrar?: RefObject<HTMLElement | null>;
 }) {
     const [procesando, setProcesando] = useState(false);
+    const [datos, setDatos] = useState<Record<string, string>>(campos?.iniciales ?? {});
+    const [error, setError] = useState<string | undefined>();
+    const listo = !campos || campos.listo(datos);
 
     const eliminar = () => {
-        if (procesando) return;
+        if (procesando || !listo) return;
+        setError(undefined);
         router.delete(url, {
+            data: datos,
             preserveScroll: true,
             preserveState: true,
             onStart: () => setProcesando(true),
-            onFinish: () => {
-                setProcesando(false);
-                onCerrar();
-            },
+            onSuccess: () => onCerrar(),
+            onError: (errores) => setError(Object.values(errores)[0]),
+            onFinish: () => setProcesando(false),
         });
     };
 
@@ -177,11 +208,17 @@ export function ConfirmarEliminar({
                     <DialogTitle className="text-lg font-extrabold">¿Eliminar {nombre}?</DialogTitle>
                     <DialogDescription>{consecuencia}</DialogDescription>
                 </DialogHeader>
+                {campos?.render(datos, (clave, valor) => setDatos((d) => ({ ...d, [clave]: valor })), error)}
+                {!campos && error && <p className="text-critical text-sm">{error}</p>}
                 <DialogFooter className="gap-2 sm:gap-0">
                     <Button variant="outline" onClick={onCerrar} className="rounded-lg">
                         Cancelar
                     </Button>
-                    <Button onClick={eliminar} aria-disabled={procesando || undefined} className="rounded-lg bg-[#c2352f] text-white hover:bg-[#a92c27] aria-disabled:opacity-70">
+                    <Button
+                        onClick={eliminar}
+                        aria-disabled={procesando || !listo || undefined}
+                        className="rounded-lg bg-[#c2352f] text-white hover:bg-[#a92c27] aria-disabled:opacity-70"
+                    >
                         {procesando ? 'Eliminando…' : 'Eliminar'}
                     </Button>
                 </DialogFooter>

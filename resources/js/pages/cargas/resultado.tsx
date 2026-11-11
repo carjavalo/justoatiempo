@@ -1,11 +1,15 @@
+import { BarraFiltros, CampoBusqueda, FiltroLista, POCOS_PARA_FILTRAR, useFiltros } from '@/components/admin/filtros';
+import { Paginacion, SinResultados } from '@/components/admin/piezas';
 import { Cifra, Cifras, EstadoCargaBadge, ListaAdvertencias, Pasos, TablaErrores, type Advertencia, type ErrorFila, type EstadoCarga } from '@/components/cargas/piezas';
 import { BarraProgreso, Panel } from '@/components/dashboard/piezas';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
 import { fmt } from '@/lib/formato';
-import { router } from '@inertiajs/react';
-import { Ban, FileSpreadsheet, Undo2 } from '@/components/iconos';
+import { cn } from '@/lib/utils';
+import { type Paginado } from '@/types';
+import { Link, router } from '@inertiajs/react';
+import { AlertTriangle, Ban, CheckCircle2, FileSpreadsheet, type TipoIcono, Undo2, XCircle } from '@/components/iconos';
 import { useState } from 'react';
 
 interface Informe {
@@ -18,6 +22,24 @@ interface Informe {
     asignadas: number;
     aprobadas: number;
     efectividad: number;
+}
+
+type EstadoOrden = 'aprobada' | 'rechazada' | 'pendiente';
+
+interface Orden {
+    id: number;
+    /** El código de Drivin: la nota (NP) de la orden. */
+    codigo: string;
+    fecha: string;
+    destinatario: string | null;
+    ciudad: string | null;
+    placa: string | null;
+    auxiliar: string | null;
+    estado: EstadoOrden;
+    estadoLabel: string;
+    productos: number;
+    entregados: number;
+    novedad: string | null;
 }
 
 interface Props {
@@ -46,11 +68,16 @@ interface Props {
     errores: ErrorFila[];
     informes: Informe[];
     puedeAnular: boolean;
+    /** Las órdenes que trajo, también las retiradas si se anuló. */
+    ordenes: Paginado<Orden>;
+    filtrosOrdenes: { q: string; estado: string };
+    /** Si puede abrir el recorrido de cada orden (trazabilidad). */
+    verRecorrido: boolean;
 }
 
 const fechaHora = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
 
-export default function Resultado({ carga, advertencias, errores, informes, puedeAnular }: Props) {
+export default function Resultado({ carga, advertencias, errores, informes, puedeAnular, ordenes, filtrosOrdenes, verRecorrido }: Props) {
     const anulada = carga.estado === 'anulada';
     const [anulando, setAnulando] = useState(false);
 
@@ -121,7 +148,12 @@ export default function Resultado({ carga, advertencias, errores, informes, pued
                 )}
 
                 <Cifras columnas={3}>
-                    <Cifra etiqueta={anulada ? 'Órdenes retiradas' : 'Órdenes importadas'} valor={fmt.numero(carga.ordenes)} detalle={`de ${fmt.numero(carga.filas)} filas del archivo`} />
+                    <Cifra
+                        etiqueta={anulada ? 'Órdenes retiradas' : 'Órdenes importadas'}
+                        valor={fmt.numero(carga.ordenes)}
+                        detalle={`de ${fmt.numero(carga.filas)} filas del archivo`}
+                        enlace={ordenes.total > 0 ? { href: '#ordenes', texto: 'Ver cuáles' } : undefined}
+                    />
                     <Cifra etiqueta="Jornada" valor={<span className="text-lg">{carga.fechaOperacion ? fmt.fechaMedia(carga.fechaOperacion) : '—'}</span>} detalle={carga.hoja ? `Hoja ${carga.hoja}` : undefined} />
                     <Cifra
                         etiqueta="Filas omitidas"
@@ -186,10 +218,142 @@ export default function Resultado({ carga, advertencias, errores, informes, pued
                     </Panel>
                 )}
 
+                {(ordenes.total > 0 || filtrosOrdenes.q || filtrosOrdenes.estado) && (
+                    <OrdenesDeLaCarga carga={carga} anulada={anulada} ordenes={ordenes} filtros={filtrosOrdenes} verRecorrido={verRecorrido} />
+                )}
+
                 <div id="filas-error" className="scroll-mt-24 empty:hidden">
                     <TablaErrores errores={errores} total={errores.length} titulo="Filas que no se importaron" />
                 </div>
                 {!anulada && <ListaAdvertencias advertencias={advertencias} />}
         </MarcoLinea>
+    );
+}
+
+const ESTADO: Record<EstadoOrden, { icono: TipoIcono; clase: string }> = {
+    aprobada: { icono: CheckCircle2, clase: 'bg-good-soft text-good' },
+    rechazada: { icono: XCircle, clase: 'bg-critical-soft text-critical' },
+    pendiente: { icono: AlertTriangle, clase: 'bg-warning-soft text-warning' },
+};
+
+/**
+ * Las órdenes de la carga con su nota, para encontrar una y abrir su recorrido. Las de una carga anulada siguen aquí:
+ * se retiraron de los informes, no de la plataforma.
+ */
+function OrdenesDeLaCarga({
+    carga,
+    anulada,
+    ordenes,
+    filtros,
+    verRecorrido,
+}: {
+    carga: Props['carga'];
+    anulada: boolean;
+    ordenes: Paginado<Orden>;
+    filtros: Props['filtrosOrdenes'];
+    verRecorrido: boolean;
+}) {
+    const { valores, cambiar, limpiar, activos } = useFiltros(route('cargas.show', carga.id), filtros);
+    // Con pocas órdenes se ven todas: los filtros solo estorban
+    const conFiltros = carga.ordenes > POCOS_PARA_FILTRAR || activos;
+
+    return (
+        <div id="ordenes" className="scroll-mt-24">
+            <Panel
+                titulo={anulada ? 'Órdenes retiradas' : 'Órdenes de esta carga'}
+                descripcion={
+                    anulada
+                        ? 'Ya no cuentan en los informes; quedan aquí para consultarlas.'
+                        : verRecorrido
+                          ? 'Cada una con su nota de Drivin. Abre una para ver su recorrido.'
+                          : 'Cada una con su nota de Drivin.'
+                }
+                cuerpoClassName="px-0 pb-2"
+            >
+                {conFiltros && (
+                    <div className="px-5 pb-4">
+                        <BarraFiltros
+                            resumen={`${fmt.numero(ordenes.total)} ${ordenes.total === 1 ? 'orden' : 'órdenes'}`}
+                            soloAnunciar={ordenes.total === 0}
+                            activos={activos}
+                            onLimpiar={limpiar}
+                            idBusqueda="buscar-orden-carga"
+                        >
+                            <CampoBusqueda
+                                id="buscar-orden-carga"
+                                etiqueta="Buscar una orden de esta carga"
+                                placeholder="Nota, destinatario, ciudad, placa o auxiliar"
+                                valor={valores.q}
+                                onCambio={(v) => cambiar('q', v, { inmediato: false })}
+                            />
+                            <FiltroLista
+                                id="filtro-estado-orden"
+                                etiqueta="Estado de la orden"
+                                valor={valores.estado}
+                                onCambio={(v) => cambiar('estado', v)}
+                                opciones={[
+                                    { valor: '', texto: 'Todos los estados' },
+                                    { valor: 'aprobada', texto: 'Aprobadas' },
+                                    { valor: 'rechazada', texto: 'Rechazadas' },
+                                    { valor: 'pendiente', texto: 'Pendientes' },
+                                ]}
+                            />
+                        </BarraFiltros>
+                    </div>
+                )}
+
+                {ordenes.data.length === 0 ? (
+                    <div className="px-5 pb-4">
+                        <SinResultados texto="Ninguna orden de esta carga coincide con la búsqueda." />
+                    </div>
+                ) : (
+                    <ul role="list" className="divide-y border-t">
+                        {ordenes.data.map((o) => {
+                            const { icono: Icono, clase } = ESTADO[o.estado];
+                            const datos = [o.destinatario, o.ciudad, o.placa, o.auxiliar].filter(Boolean).join(' · ');
+                            const otraFecha = o.fecha !== carga.fechaOperacion;
+                            const contenido = (
+                                <>
+                                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <span className="font-mono font-bold">{o.codigo}</span>
+                                        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold', clase)}>
+                                            <Icono className="size-3.5" aria-hidden="true" />
+                                            {o.estadoLabel}
+                                        </span>
+                                        {o.novedad && <span className="text-warning text-xs font-semibold">{o.novedad}</span>}
+                                        <span className="text-muted-foreground tabular ml-auto text-xs whitespace-nowrap">
+                                            {o.entregados} de {o.productos} {o.productos === 1 ? 'producto' : 'productos'}
+                                            {otraFecha && <> · {fmt.fechaCorta(o.fecha)}</>}
+                                        </span>
+                                    </span>
+                                    {datos && <span className="text-muted-foreground mt-0.5 block truncate text-xs">{datos}</span>}
+                                </>
+                            );
+                            const clases = 'block px-5 py-3 text-sm';
+                            return (
+                                <li key={o.id}>
+                                    {verRecorrido ? (
+                                        <Link
+                                            href={route('trazabilidad.index', { q: o.codigo })}
+                                            className={cn(clases, 'hover:bg-muted/50 focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset')}
+                                        >
+                                            {contenido}
+                                        </Link>
+                                    ) : (
+                                        <div className={clases}>{contenido}</div>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+
+                {ordenes.last_page > 1 && (
+                    <div className="border-t px-5 pt-3">
+                        <Paginacion pagina={ordenes} nombre="las órdenes de esta carga" />
+                    </div>
+                )}
+            </Panel>
+        </div>
     );
 }

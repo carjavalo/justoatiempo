@@ -14,6 +14,7 @@ use App\Models\Sede;
 use App\Models\User;
 use App\Support\OperacionLinea;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
@@ -125,6 +126,70 @@ class OperacionLineasTest extends TestCase
         $this->assertNull($copia->asistencia);
         // Copiar otra vez no duplica
         $this->post('/lineas/aseo-general/programacion/copiar', ['desde' => today()->subDay()->toDateString(), 'fecha' => today()->toDateString()])->assertSessionHas('error');
+    }
+
+    public function test_cualquiera_de_la_linea_se_programa_en_cualquier_lugar_se_ordena_y_se_pasa_a_otro(): void
+    {
+        // Marta trabaja en otra sede de Bodegas: igual se puede programar en la planta
+        $sur = $this->sede('Bodega Sur', [], $this->bodegas);
+        $marta = User::factory()->sinAcceso()->create(['name' => 'Marta Gil', 'cedula' => '1004', 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $sur->id]);
+        $planta = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $this->planta->id, 'personas_requeridas' => 3]);
+        $enSur = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $sur->id, 'personas_requeridas' => 1]);
+
+        $this->actingAs($this->coordinador)
+            ->post("/programacion/{$planta->id}/personas", ['personas' => [$this->ana->id, $this->luis->id, $marta->id]])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(3, $planta->asignaciones()->count());
+
+        // El orden lo pone quien programa
+        $fila = fn (User $u) => ProgramacionAsignacion::where('user_id', $u->id)->sole();
+        $this->patch("/programacion/{$planta->id}/orden", ['personas' => [$fila($marta)->id, $fila($this->luis)->id, $fila($this->ana)->id]])
+            ->assertSessionHas('success');
+        $this->get('/lineas/aseo-general/programacion')->assertInertia(fn (Assert $p) => $p
+            ->where('programaciones', fn ($l) => collect(collect($l)->firstWhere('id', $planta->id)['personas'])->pluck('nombre')->all() === ['Marta Gil', 'Luis Mora', 'Ana Ríos'])
+            // Toda la línea, con dónde está asignada cada persona
+            ->where('personasLinea', fn ($l) => collect($l)->firstWhere('id', $marta->id)['asignadaEn'] === 'Bodegas del Valle · Bodega Sur'));
+
+        // Pasa a otro lugar el mismo día, con su asistencia
+        $fila($this->ana)->update(['asistencia' => EstadoAsistencia::Asistio]);
+        $this->patch("/programacion/personas/{$fila($this->ana)->id}/mover", ['programacion_id' => $planta->id])->assertSessionHasErrors(['programacion_id']);
+        $this->patch("/programacion/personas/{$fila($this->ana)->id}/mover", ['programacion_id' => $enSur->id])->assertSessionHasNoErrors();
+        $this->assertSame($enSur->id, $fila($this->ana)->programacion_id);
+        $this->assertSame(EstadoAsistencia::Asistio, $fila($this->ana)->asistencia);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'movida', 'modelo_id' => $fila($this->ana)->id]);
+        // A un lugar donde ya está, no
+        $enSur->asignaciones()->create(['user_id' => $this->luis->id]);
+        $luisEnPlanta = ProgramacionAsignacion::where('user_id', $this->luis->id)->where('programacion_id', $planta->id)->sole();
+        $this->patch("/programacion/personas/{$luisEnPlanta->id}/mover", ['programacion_id' => $enSur->id])->assertSessionHasErrors(['programacion_id']);
+    }
+
+    public function test_se_quita_la_programacion_del_dia_y_se_programa_otra_vez_desde_cero(): void
+    {
+        $hoy = today()->toDateString();
+        $planta = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'sede_id' => $this->planta->id, 'personas_requeridas' => 1]);
+        $planta->asignaciones()->create(['user_id' => $this->luis->id, 'asistencia' => EstadoAsistencia::Asistio]);
+        $empresa = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $this->bodegas->id, 'personas_requeridas' => 1]);
+
+        $this->actingAs($this->coordinador)->delete("/lineas/aseo-general/programacion/dia?fecha={$hoy}")
+            ->assertSessionHas('success', 'Se quitó la programación del día (2 lugares).');
+        // Nada se borra: quedan marcadas, con la asistencia y el rastro
+        $this->assertSoftDeleted($planta);
+        $this->assertSoftDeleted($empresa);
+        $this->assertSame(1, ProgramacionAsignacion::whereNotNull('asistencia')->count());
+        $this->assertSame(2, DB::table('bitacora')->where('accion', 'eliminada')->where('modelo_tipo', Programacion::class)->count());
+        $this->delete("/lineas/aseo-general/programacion/dia?fecha={$hoy}")->assertSessionHas('error');
+
+        // El día queda libre para programarlo desde cero
+        $this->post('/lineas/aseo-general/programacion', ['fecha' => $hoy, 'lugar' => $this->clave($this->planta), 'personas_requeridas' => 2])->assertSessionHasNoErrors();
+        $nueva = Programacion::whereDate('fecha', today())->sole();
+        $this->post("/programacion/{$nueva->id}/personas", ['personas' => [$this->luis->id]])->assertSessionHasNoErrors();
+        $this->assertNull($nueva->asignaciones()->sole()->asistencia);
+
+        // Lo de otra empresa no se toca
+        $otra = Empresa::create(['nombre' => 'Clínica Norte']);
+        $ajena = Programacion::create(['fecha' => today(), 'linea_servicio_id' => $this->aseo->id, 'empresa_id' => $otra->id, 'personas_requeridas' => 1]);
+        $this->delete("/lineas/aseo-general/programacion/dia?fecha={$hoy}")->assertSessionHas('success');
+        $this->assertNotSoftDeleted($ajena);
     }
 
     public function test_cada_quien_ve_y_opera_solo_su_linea_y_sus_lugares(): void

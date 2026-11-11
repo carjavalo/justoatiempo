@@ -77,6 +77,11 @@ class RolController extends Controller
                 'permisos' => $r->permisos ?? [],
                 'alcance' => $r->alcance,
             ]),
+            // A dónde pueden pasar las personas de un rol que se elimina: un rol activo que el propio cubre
+            'destinos' => RolUsuario::where('activo', true)->orderBy('nombre')->get()
+                ->filter(fn (RolUsuario $r) => (bool) $miRol?->cubre($r))
+                ->map(fn (RolUsuario $r) => ['id' => $r->id, 'nombre' => $r->nombre])
+                ->values(),
         ]);
     }
 

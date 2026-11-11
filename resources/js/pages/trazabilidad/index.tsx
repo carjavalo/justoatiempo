@@ -34,7 +34,16 @@ interface Props {
     limite: number;
     traza: {
         codigo: string;
-        resumen: { destinatario: string | null; direccion: string | null; ciudad: string | null; estado: string; jornadas: number; productos: string[] } | null;
+        resumen: {
+            destinatario: string | null;
+            direccion: string | null;
+            ciudad: string | null;
+            estado: string;
+            jornadas: number;
+            productos: string[];
+            /** Su carga se anuló: sigue a la vista, pero ya no cuenta en los informes. */
+            retirada: boolean;
+        } | null;
         eventos: Evento[];
     } | null;
 }
@@ -163,5 +172,6 @@ export default function Trazabilidad({ filtros, resultados, limite, traza }: Pro
 function descripcion(r: NonNullable<Props['traza']>['resumen'] & object): string {
     const partes = [r.destinatario, [r.direccion, r.ciudad].filter(Boolean).join(', '), `Estado: ${r.estado}`];
     if (r.jornadas > 1) partes.push(`${r.jornadas} jornadas`);
+    if (r.retirada) partes.push('Retirada de los informes: su carga se anuló');
     return partes.filter(Boolean).join(' · ');
 }

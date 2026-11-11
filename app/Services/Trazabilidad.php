@@ -26,7 +26,8 @@ class Trazabilidad
     /** @return array{codigo: string, resumen: array<string, mixed>|null, eventos: list<array<string, mixed>>}|null */
     public function deOrden(string $codigo): ?array
     {
-        $ordenes = Orden::query()
+        // También las de una carga anulada: se retiraron, no se borraron
+        $todas = Orden::withTrashed()
             ->where('codigo_orden', $codigo)
             ->with([
                 'carga.usuario:id,name', 'sede:id,nombre', 'sucursal:id,nombre', 'auxiliar:id,name', 'motivoRechazo:id,nombre',
@@ -34,6 +35,8 @@ class Trazabilidad
             ])
             ->orderBy('fecha_operacion')
             ->get();
+        // Si la misma jornada se volvió a importar, cuenta la vigente (la retirada queda en la anulación)
+        $ordenes = $todas->reject(fn (Orden $o) => $o->trashed() && $todas->contains(fn (Orden $v) => ! $v->trashed() && $v->fecha_operacion->equalTo($o->fecha_operacion)))->values();
         $anulaciones = Bitacora::query()
             ->with('usuario:id,name')
             ->where('modelo_tipo', Carga::class)
@@ -151,7 +154,8 @@ class Trazabilidad
     /** @return array<string, mixed>|null */
     private function resumen(Collection $ordenes): ?array
     {
-        $ultima = $ordenes->last();
+        $vigentes = $ordenes->reject(fn (Orden $o) => $o->trashed());
+        $ultima = $vigentes->last() ?? $ordenes->last();
         if (! $ultima) {
             return null;
         }
@@ -162,6 +166,8 @@ class Trazabilidad
             'ciudad' => $ultima->ciudad,
             'estado' => $ultima->estado->label(),
             'jornadas' => $ordenes->count(),
+            // Ninguna sigue en los informes: su carga se anuló
+            'retirada' => $vigentes->isEmpty(),
             'productos' => collect($ultima->datos_crudos['productos'] ?? [])->pluck('producto')->filter()->unique()->values()->all(),
         ];
     }

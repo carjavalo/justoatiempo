@@ -157,6 +157,7 @@ export default function Sedes({ sedes, total, filtros, empresas, metaPorDefecto 
             urlEstado={puede('sedes.estado') ? route('sedes.estado', s.id) : undefined}
             onEditar={puede('sedes.editar') ? (boton) => abrir(s, boton) : undefined}
             urlEliminar={puede('sedes.eliminar') ? route('sedes.destroy', s.id) : undefined}
+            consecuenciaEliminar="Se eliminan también sus sucursales. Quienes estaban asignados a ella quedan sin esa asignación (sigue en su historial) y se quita su programación de los días por venir. Sus órdenes e informes se conservan."
             consecuencia={`No se le podrán asignar nuevas sucursales ni personas. ${
                 s.sucursales === 0
                     ? 'No tiene sucursales'

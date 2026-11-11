@@ -139,7 +139,7 @@ class ImportadorPreliquidacion
         });
     }
 
-    /** Elimina las órdenes de la carga y recalcula los informes; solo si ninguno está cerrado. */
+    /** Retira las órdenes de la carga de los informes y los recalcula; solo si ninguno está cerrado. */
     public function anular(Carga $carga): void
     {
         $claves = $carga->ordenes()
@@ -160,7 +160,7 @@ class ImportadorPreliquidacion
         }
 
         DB::transaction(function () use ($carga, $claves) {
-            // Sus órdenes se borran: la bitácora guarda sus códigos para la trazabilidad
+            // Sus órdenes se retiran sin borrarse: siguen a la vista en la carga y en la trazabilidad
             $codigos = $carga->ordenes()->pluck('codigo_orden')->unique()->values()->all();
             $carga->ordenes()->delete();
 

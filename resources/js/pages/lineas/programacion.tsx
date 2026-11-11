@@ -1,7 +1,23 @@
 import { Campo } from '@/components/admin/campo';
 import { Panel } from '@/components/dashboard/piezas';
 import { DialogoFormulario } from '@/components/dialogo-formulario';
-import { AlertTriangle, CheckCircle2, ChevronDown, Info, Pencil, Plus, Search, Trash2, Undo2, UserCheck, XCircle } from '@/components/iconos';
+import {
+    AlertTriangle,
+    ArrowDown,
+    ArrowRight,
+    ArrowUp,
+    CheckCircle2,
+    ChevronDown,
+    Info,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Undo2,
+    UserCheck,
+    XCircle,
+} from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { fechaDia, FranjaHoy, pasosDelDia, plural } from '@/components/linea/dia';
 import { MarcoLinea } from '@/components/linea/marco-linea';
@@ -45,6 +61,8 @@ interface Candidato {
     nombre: string;
     detalle: string;
     otrosLugares: string[];
+    /** Dónde está su asignación (en las personas de toda la línea). */
+    asignadaEn?: string;
 }
 
 interface Lugar {
@@ -68,6 +86,8 @@ interface Props {
     filtros: { lugar: string };
     lugares: OpcionSelector[];
     programaciones: Lugar[];
+    /** Todas las personas de la línea ese día: se pueden programar en cualquier lugar, no solo donde están asignadas. */
+    personasLinea: Candidato[];
     /** Las cuentas del día con las mismas reglas del tablero y el inicio, sobre lo que se ve. */
     resumen: {
         lugares: number;
@@ -136,6 +156,7 @@ export default function Programacion({
     filtros,
     lugares,
     programaciones,
+    personasLinea,
     resumen,
     copiarDe,
     estados,
@@ -150,6 +171,7 @@ export default function Programacion({
     const [turnoDe, setTurnoDe] = useState<Persona | null>(null);
     const [detalleDe, setDetalleDe] = useState<Persona | null>(null);
     const [quitando, setQuitando] = useState<{ titulo: string; texto: string; url: string } | null>(null);
+    const [moviendo, setMoviendo] = useState<{ persona: Persona; desde: Lugar } | null>(null);
     const asistencia = useColaAsistencia();
 
     const ir = (cambios: { fecha?: string; lugar?: string }) => {
@@ -161,6 +183,9 @@ export default function Programacion({
     };
 
     const copiar = () => copiarDe && router.post(route('programacion.copiar', linea.slug), { desde: copiarDe, fecha }, { preserveScroll: true });
+
+    // Además de quienes trabajan en cada lugar, cualquiera de la línea que aún no esté programado allí
+    const otrasDe = (l: Lugar) => personasLinea.filter((c) => !l.candidatos.some((x) => x.id === c.id) && !l.personas.some((x) => x.userId === c.id));
 
     const programados = new Set(programaciones.map((p) => p.clave));
     // Sin programación, los lugares que se pueden programar (el filtrado, si se eligió uno)
@@ -202,10 +227,26 @@ export default function Programacion({
                     )}
                     {/* Sin programación, cada lugar se programa desde la lista del día vacío */}
                     {editar && programaciones.length > 0 && (
-                        <Button className="h-9 rounded-lg text-xs font-semibold" onClick={() => setNuevo({ lugar: '' })}>
-                            <Plus className="size-4" aria-hidden="true" />
-                            Programar un lugar
-                        </Button>
+                        <>
+                            <Button className="h-9 rounded-lg text-xs font-semibold" onClick={() => setNuevo({ lugar: '' })}>
+                                <Plus className="size-4" aria-hidden="true" />
+                                Programar un lugar
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="text-critical hover:text-critical h-9 rounded-lg text-xs font-semibold"
+                                onClick={() =>
+                                    setQuitando({
+                                        titulo: `¿Quitar la programación del ${fechaDia(fecha)}?`,
+                                        texto: 'Se quitan todos los lugares de este día con sus personas, para programarlo desde cero o copiar otro día. No se borra nada: la asistencia registrada queda en el historial, con quién y cuándo se quitó.',
+                                        url: route('programacion.dia.destroy', { linea: linea.slug, fecha }),
+                                    })
+                                }
+                            >
+                                <Trash2 className="size-4" aria-hidden="true" />
+                                Quitar el día
+                            </Button>
+                        </>
                     )}
                 </div>
             }
@@ -264,21 +305,24 @@ export default function Programacion({
                             registrar={registrar}
                             futuro={esFutura}
                             asistencia={asistencia}
+                            otras={otrasDe(p).length}
+                            hayOtrosLugares={programaciones.length > 1}
                             onEditar={() => setEditando(p)}
                             onAgregar={() => setAgregando(p)}
                             onTurno={setTurnoDe}
                             onDetalle={setDetalleDe}
+                            onMover={(persona) => setMoviendo({ persona, desde: p })}
                             onQuitarPersona={(persona) =>
                                 setQuitando({
                                     titulo: `¿Quitar a ${persona.nombre}?`,
-                                    texto: `Ya no estará en la programación de ${p.lugar} este día.`,
+                                    texto: `Ya no estará en la programación de ${p.lugar} este día. Si tenía asistencia, queda en el historial.`,
                                     url: route('programacion.personas.destroy', persona.id),
                                 })
                             }
                             onQuitar={() =>
                                 setQuitando({
                                     titulo: `¿Quitar la programación de ${p.lugar}?`,
-                                    texto: 'Se quitan también las personas programadas allí este día.',
+                                    texto: 'Se quitan también las personas programadas allí este día. No se borra nada: la asistencia registrada queda en el historial.',
                                     url: route('programacion.destroy', p.id),
                                 })
                             }
@@ -299,11 +343,19 @@ export default function Programacion({
                     }))}
                     onCerrar={() => setNuevo(null)}
                     // Programado el lugar, lo que sigue es elegir a quienes van
-                    onProgramado={(p) => p.candidatos.length > 0 && setAgregando(p)}
+                    onProgramado={(p) => (p.candidatos.length > 0 || personasLinea.length > 0) && setAgregando(p)}
                 />
             )}
             {editando && <DialogoLugar linea={linea} fecha={fecha} lugar={editando} onCerrar={() => setEditando(null)} />}
-            {agregando && <DialogoPersonas lugar={agregando} onCerrar={() => setAgregando(null)} />}
+            {agregando && <DialogoPersonas lugar={agregando} otras={otrasDe(agregando)} onCerrar={() => setAgregando(null)} />}
+            {moviendo && (
+                <DialogoMover
+                    persona={moviendo.persona}
+                    desde={moviendo.desde}
+                    destinos={programaciones.filter((x) => x.id !== moviendo.desde.id)}
+                    onCerrar={() => setMoviendo(null)}
+                />
+            )}
             {turnoDe && <DialogoTurno persona={turnoDe} logistica={linea.logistica} vehiculos={vehiculos} onCerrar={() => setTurnoDe(null)} />}
             {detalleDe && <DialogoAsistencia persona={detalleDe} estados={estados} onCerrar={() => setDetalleDe(null)} />}
             {quitando && <Confirmar {...quitando} onCerrar={() => setQuitando(null)} />}
@@ -428,14 +480,22 @@ function LugarProgramado({
     registrar,
     futuro,
     asistencia,
+    otras,
+    hayOtrosLugares,
     onEditar,
     onAgregar,
     onTurno,
     onDetalle,
+    onMover,
     onQuitarPersona,
     onQuitar,
 }: {
     lugar: Lugar;
+    /** Cuántas personas de la línea, de otros lugares, se pueden agregar. */
+    otras: number;
+    /** Si ese día hay otro lugar programado al que pasar a alguien. */
+    hayOtrosLugares: boolean;
+    onMover: (p: Persona) => void;
     logistica: boolean;
     estados: Props['estados'];
     editar: boolean;
@@ -452,8 +512,14 @@ function LugarProgramado({
     const faltan = Math.max(0, lugar.requeridas - lugar.personas.length);
     const lista = useRef<HTMLUListElement>(null);
     const sinRegistro = lugar.personas.filter((p) => !p.asistencia && asistencia.pendientes[p.id] === undefined);
-    const conAsistencia = lugar.personas.length - lugar.personas.filter((p) => !p.asistencia).length;
     const marcarTodos = registrar && sinRegistro.length > 0;
+    // El orden lo deja quien programa: se sube o se baja a una persona y se guarda el orden del lugar
+    const ordenar = (desde: number, hacia: number) => {
+        const ids = lugar.personas.map((p) => p.id);
+        const [movida] = ids.splice(desde, 1);
+        ids.splice(hacia, 0, movida);
+        router.patch(route('programacion.orden', lugar.id), { personas: ids }, { preserveScroll: true, preserveState: true });
+    };
 
     // Marcar presentes a quienes faltan por registrar: arriba desde 640 px; en el teléfono, al pie del lugar (a lo ancho
     // y a mano del pulgar, después de marcar las excepciones). Se muestra uno solo: el otro queda oculto del todo
@@ -511,17 +577,15 @@ function LugarProgramado({
                             >
                                 Editar
                             </Button>
-                            {conAsistencia === 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-critical size-8 rounded-lg"
-                                    onClick={onQuitar}
-                                    aria-label={`Quitar la programación de ${lugar.lugar}`}
-                                >
-                                    <Trash2 className="size-4" aria-hidden="true" />
-                                </Button>
-                            )}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-critical size-8 rounded-lg"
+                                onClick={onQuitar}
+                                aria-label={`Quitar la programación de ${lugar.lugar}`}
+                            >
+                                <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
                         </>
                     )}
                 </>
@@ -546,10 +610,13 @@ function LugarProgramado({
                         <span />
                     </div>
                     <ul ref={lista} role="list" aria-label={`Personas programadas en ${lugar.lugar}`} className="divide-y">
-                        {lugar.personas.map((p) => (
+                        {lugar.personas.map((p, i) => (
                             <FilaPersona
                                 key={p.id}
                                 persona={p}
+                                onSubir={i > 0 ? () => ordenar(i, i - 1) : undefined}
+                                onBajar={i < lugar.personas.length - 1 ? () => ordenar(i, i + 1) : undefined}
+                                onMover={hayOtrosLugares ? () => onMover(p) : undefined}
                                 columnas={columnas}
                                 logistica={logistica}
                                 estados={estados}
@@ -574,14 +641,14 @@ function LugarProgramado({
                             variant="outline"
                             className="h-9 rounded-lg text-xs font-semibold"
                             onClick={onAgregar}
-                            disabled={lugar.candidatos.length === 0}
+                            disabled={lugar.candidatos.length === 0 && otras === 0}
                         >
                             <Plus className="size-4" aria-hidden="true" />
                             Agregar personas
                         </Button>
                     )}
-                    {editar && lugar.candidatos.length === 0 && (
-                        <span className="text-muted-foreground text-xs">Ya están todas las personas asignadas a este lugar en la línea.</span>
+                    {editar && lugar.candidatos.length === 0 && otras === 0 && (
+                        <span className="text-muted-foreground text-xs">Ya están aquí todas las personas de la línea.</span>
                     )}
                 </div>
             )}
@@ -605,8 +672,15 @@ function FilaPersona({
     onTurno,
     onDetalle,
     onQuitar,
+    onSubir,
+    onBajar,
+    onMover,
 }: {
     persona: Persona;
+    /** Sin función, no se ofrece (la primera no sube, la última no baja, sin otro lugar no se mueve). */
+    onSubir?: () => void;
+    onBajar?: () => void;
+    onMover?: () => void;
     columnas: string;
     logistica: boolean;
     estados: Props['estados'];
@@ -718,18 +792,42 @@ function FilaPersona({
                 </div>
             )}
 
-            {/* Arriba a la derecha cuando va apilada; al final de la fila en columnas. Solo sin asistencia registrada */}
+            {/* Arriba a la derecha cuando va apilada; al final de la fila en columnas */}
             <div className="col-start-3 row-start-1 flex w-8 justify-end xl:col-start-auto xl:row-start-auto">
-                {editar && !valor && (
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-critical -my-1 size-8 rounded-lg"
-                        onClick={onQuitar}
-                        aria-label={`Quitar a ${p.nombre} de la programación`}
-                    >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                    </Button>
+                {editar && (
+                    <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground -my-1 size-8 rounded-lg">
+                                <MoreHorizontal className="size-5" aria-hidden="true" />
+                                <span className="sr-only">Más acciones para {p.nombre}</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-48">
+                            {onSubir && (
+                                <DropdownMenuItem onSelect={onSubir} className="gap-2">
+                                    <ArrowUp className="size-4" aria-hidden="true" />
+                                    Subir en la lista
+                                </DropdownMenuItem>
+                            )}
+                            {onBajar && (
+                                <DropdownMenuItem onSelect={onBajar} className="gap-2">
+                                    <ArrowDown className="size-4" aria-hidden="true" />
+                                    Bajar en la lista
+                                </DropdownMenuItem>
+                            )}
+                            {onMover && (
+                                <DropdownMenuItem onSelect={onMover} className="gap-2">
+                                    <ArrowRight className="size-4" aria-hidden="true" />
+                                    Pasar a otro lugar
+                                </DropdownMenuItem>
+                            )}
+                            {(onSubir || onBajar || onMover) && <DropdownMenuSeparator />}
+                            <DropdownMenuItem onSelect={onQuitar} className="text-critical focus:text-critical gap-2">
+                                <Trash2 className="size-4" aria-hidden="true" />
+                                Quitar de la programación
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
         </li>
@@ -969,13 +1067,26 @@ function DialogoLugar({
     );
 }
 
-function DialogoPersonas({ lugar, onCerrar }: { lugar: Lugar; onCerrar: () => void }) {
+function DialogoPersonas({ lugar, otras, onCerrar }: { lugar: Lugar; otras: Candidato[]; onCerrar: () => void }) {
     const form = useForm<{ personas: number[]; hora_entrada: string; hora_salida: string }>({ personas: [], hora_entrada: '', hora_salida: '' });
     const [buscar, setBuscar] = useState('');
-    const visibles = useMemo(() => {
-        const texto = buscar.trim().toLowerCase();
-        return texto ? lugar.candidatos.filter((c) => `${c.nombre} ${c.detalle}`.toLowerCase().includes(texto)) : lugar.candidatos;
-    }, [buscar, lugar.candidatos]);
+    const coincide = useCallback(
+        (c: Candidato) => {
+            const texto = buscar.trim().toLowerCase();
+            return !texto || `${c.nombre} ${c.detalle} ${c.asignadaEn ?? ''}`.toLowerCase().includes(texto);
+        },
+        [buscar],
+    );
+    // Primero quienes trabajan aquí; después cualquiera de la línea (con dónde está asignada)
+    const grupos = useMemo(
+        () =>
+            [
+                { titulo: 'Trabajan en este lugar', personas: lugar.candidatos.filter(coincide) },
+                { titulo: 'Otras personas de la línea', personas: otras.filter(coincide) },
+            ].filter((g) => g.personas.length > 0),
+        [coincide, lugar.candidatos, otras],
+    );
+    const total = lugar.candidatos.length + otras.length;
     const faltan = Math.max(0, lugar.requeridas - lugar.personas.length);
 
     const alternar = (id: number, elegido: boolean) =>
@@ -990,14 +1101,14 @@ function DialogoPersonas({ lugar, onCerrar }: { lugar: Lugar; onCerrar: () => vo
     return (
         <DialogoFormulario
             titulo={`Agregar personas a ${lugar.lugar}`}
-            descripcion={`Quienes trabajan en la línea en este lugar.${faltan ? ` Faltan ${faltan} para completar las requeridas.` : ''}`}
+            descripcion={`Primero, quienes trabajan aquí; también puedes programar a cualquiera de la línea.${faltan ? ` Faltan ${faltan} para completar las requeridas.` : ''}`}
             onCerrar={onCerrar}
             onEnviar={enviar}
             procesando={form.processing}
             textoEnviar={form.data.personas.length > 1 ? `Agregar ${form.data.personas.length} personas` : 'Agregar'}
             ancho="max-w-xl"
         >
-            {lugar.candidatos.length > 6 && (
+            {total > 6 && (
                 <div className="relative">
                     <label htmlFor="buscar-candidato" className="sr-only">
                         Buscar persona
@@ -1019,29 +1130,48 @@ function DialogoPersonas({ lugar, onCerrar }: { lugar: Lugar; onCerrar: () => vo
             )}
             <fieldset className="grid gap-1.5" aria-describedby={form.errors.personas ? 'personas-error' : undefined}>
                 <legend className="sr-only">Personas</legend>
-                <ul role="list" className="max-h-72 divide-y overflow-y-auto rounded-xl border">
-                    {visibles.map((c, i) => {
-                        const id = i === 0 ? 'personas' : `persona-${c.id}`;
-                        const elegido = form.data.personas.includes(c.id);
-                        return (
-                            <li key={c.id}>
-                                <label htmlFor={id} className={cn('flex cursor-pointer items-start gap-3 px-3 py-2.5', elegido && 'bg-secondary/60')}>
-                                    <Checkbox id={id} checked={elegido} onCheckedChange={(v) => alternar(c.id, v === true)} className="mt-0.5" />
-                                    <span className="min-w-0">
-                                        <span className="block truncate text-sm font-semibold">{c.nombre}</span>
-                                        {c.detalle && <span className="text-muted-foreground block truncate text-xs">{c.detalle}</span>}
-                                        {c.otrosLugares.length > 0 && (
-                                            <span className="text-warning block text-xs font-medium">Ya está en {c.otrosLugares.join(', ')}</span>
-                                        )}
-                                    </span>
-                                </label>
-                            </li>
-                        );
-                    })}
-                    {visibles.length === 0 && (
-                        <li className="text-muted-foreground px-3 py-6 text-center text-sm">Nadie coincide con la búsqueda.</li>
-                    )}
-                </ul>
+                <div className="max-h-80 overflow-y-auto rounded-xl border">
+                    {grupos.map((g, gi) => (
+                        <section key={g.titulo} aria-label={g.titulo} className={cn(gi > 0 && 'border-t')}>
+                            <p className="bg-muted/50 text-muted-foreground border-b px-3 py-1.5 text-xs font-semibold">{g.titulo}</p>
+                            <ul role="list" className="divide-y">
+                                {g.personas.map((c, i) => {
+                                    // La primera casilla lleva el id "personas" para recibir el foco si hay un error
+                                    const id = gi === 0 && i === 0 ? 'personas' : `persona-${c.id}`;
+                                    const elegido = form.data.personas.includes(c.id);
+                                    return (
+                                        <li key={c.id}>
+                                            <label
+                                                htmlFor={id}
+                                                className={cn('flex cursor-pointer items-start gap-3 px-3 py-2.5', elegido && 'bg-secondary/60')}
+                                            >
+                                                <Checkbox
+                                                    id={id}
+                                                    checked={elegido}
+                                                    onCheckedChange={(v) => alternar(c.id, v === true)}
+                                                    className="mt-0.5"
+                                                />
+                                                <span className="min-w-0">
+                                                    <span className="block truncate text-sm font-semibold">{c.nombre}</span>
+                                                    {c.detalle && <span className="text-muted-foreground block truncate text-xs">{c.detalle}</span>}
+                                                    {c.asignadaEn && (
+                                                        <span className="text-muted-foreground block text-xs">Asignada en {c.asignadaEn}</span>
+                                                    )}
+                                                    {c.otrosLugares.length > 0 && (
+                                                        <span className="text-warning block text-xs font-medium">
+                                                            Ya está en {c.otrosLugares.join(', ')}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </label>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </section>
+                    ))}
+                    {grupos.length === 0 && <p className="text-muted-foreground px-3 py-6 text-center text-sm">Nadie coincide con la búsqueda.</p>}
+                </div>
                 <InputError id="personas-error" message={form.errors.personas} />
             </fieldset>
             <div className="grid grid-cols-2 gap-4">
@@ -1191,6 +1321,42 @@ function DialogoAsistencia({ persona, estados, onCerrar }: { persona: Persona; e
                     autoFocus={persona.asistencia !== 'tarde'}
                     value={form.data.observacion}
                     onChange={(e) => form.setData('observacion', e.target.value)}
+                />
+            </Campo>
+        </DialogoFormulario>
+    );
+}
+
+/** Pasa a una persona programada a otro lugar del mismo día, con su turno y su asistencia. */
+function DialogoMover({ persona, desde, destinos, onCerrar }: { persona: Persona; desde: Lugar; destinos: Lugar[]; onCerrar: () => void }) {
+    const form = useForm<{ programacion_id: string }>({ programacion_id: '' });
+    const opciones = destinos.map((d) => {
+        const yaEsta = d.personas.some((x) => x.userId === persona.userId);
+        return { valor: String(d.id), texto: d.lugar, detalle: yaEsta ? 'Ya está aquí' : undefined, deshabilitada: yaEsta };
+    });
+
+    const enviar = (e: FormEvent) => {
+        e.preventDefault();
+        if (form.processing) return;
+        form.patch(route('programacion.personas.mover', persona.id), { preserveScroll: true, onSuccess: onCerrar });
+    };
+
+    return (
+        <DialogoFormulario
+            titulo={`Pasar a ${persona.nombre} a otro lugar`}
+            descripcion={`Sale de ${desde.lugar} y pasa al lugar que elijas este mismo día, con su turno y su asistencia.`}
+            onCerrar={onCerrar}
+            onEnviar={enviar}
+            procesando={form.processing}
+            textoEnviar="Pasar"
+        >
+            <Campo id="programacion_id" etiqueta="Pasa a" requerido error={form.errors.programacion_id}>
+                <Selector
+                    {...propsCampo('programacion_id', form.errors.programacion_id)}
+                    valor={form.data.programacion_id}
+                    onCambio={(v) => form.setData('programacion_id', v)}
+                    placeholder="Elige el lugar"
+                    opciones={opciones}
                 />
             </Campo>
         </DialogoFormulario>

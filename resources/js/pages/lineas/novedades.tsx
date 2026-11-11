@@ -275,7 +275,7 @@ export default function Novedades({ linea, novedades, filtros, conteo, lugares, 
                     abierto
                     nombre={`la novedad ${eliminando.tipo}`}
                     url={route('novedades.destroy', eliminando.id)}
-                    consecuencia="No se puede deshacer. Si ya se resolvió, mejor ciérrala: así queda en el informe de la jornada."
+                    consecuencia="Para una novedad registrada por error: deja de verse. No se borra: queda en el historial. Si ya se resolvió, mejor ciérrala: así queda en el informe de la jornada."
                     onCerrar={() => setEliminando(null)}
                 />
             )}

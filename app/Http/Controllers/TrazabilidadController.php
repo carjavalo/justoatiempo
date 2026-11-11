@@ -43,10 +43,11 @@ class TrazabilidadController extends Controller
         $like = '%'.addcslashes($texto, '%_\\').'%';
         $placa = '%'.addcslashes((string) Vehiculo::normalizarPlaca($texto), '%_\\').'%';
 
-        return Orden::query()
+        // También las de cargas anuladas (retiradas, no borradas)
+        return Orden::withTrashed()
             ->where(fn ($q) => $q->where('codigo_orden', 'like', $like)->orWhere('destinatario', 'like', $like)
                 ->orWhere('placa', 'like', $placa)->orWhere('auxiliar_nombre', 'like', $like)->orWhere('auxiliar_cedula', 'like', $like))
-            ->selectRaw('codigo_orden, COUNT(*) as jornadas, MAX(fecha_operacion) as ultima, MAX(destinatario) as destinatario, MAX(placa) as placa, MAX(auxiliar_nombre) as auxiliar')
+            ->selectRaw('codigo_orden, COUNT(DISTINCT fecha_operacion) as jornadas, MAX(fecha_operacion) as ultima, MAX(destinatario) as destinatario, MAX(placa) as placa, MAX(auxiliar_nombre) as auxiliar')
             ->groupBy('codigo_orden')
             ->orderByDesc('ultima')
             ->limit(self::MAX_RESULTADOS)

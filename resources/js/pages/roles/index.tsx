@@ -68,6 +68,8 @@ interface Props {
     miRol: { id: number | null; permisos: string[]; alcance: string };
     /** Roles de los que se pueden copiar los permisos. */
     modelos: { id: number; nombre: string; permisos: string[]; alcance: string }[];
+    /** A qué roles pueden pasar las personas de un rol que se elimina (activos y que el propio cubre). */
+    destinos: { id: number; nombre: string }[];
 }
 
 const VACIO = { nombre: '', descripcion: '', permisos: [] as string[], alcance: 'asignacion' };
@@ -80,7 +82,7 @@ const DESDE_EL_TABLERO = ['cargas', 'auditoria', 'informes', 'seguimiento', 'pro
 const SOLO_LO_SUYO = ['tablero', 'entregas', 'lineas'];
 const aplica = (alcance: string, modulo: string) => alcance !== 'propio' || SOLO_LO_SUYO.includes(modulo);
 
-export default function Roles({ roles, total, filtros, catalogo, todasLasLineas, alcances, miRol, modelos }: Props) {
+export default function Roles({ roles, total, filtros, catalogo, todasLasLineas, alcances, miRol, modelos, destinos }: Props) {
     const puede = usePuede();
     const { valores, cambiar, limpiar, activos } = useFiltros(route('roles.index'), filtros);
     const [abierto, setAbierto] = useState(false);
@@ -218,6 +220,30 @@ export default function Roles({ roles, total, filtros, catalogo, todasLasLineas,
                       ? 'La persona que lo tiene lo conserva, con los mismos permisos.'
                       : `Las ${r.usuarios} personas que lo tienen lo conservan, con los mismos permisos.`
             } Puedes volver a activarlo cuando quieras.`}
+            consecuenciaEliminar={
+                r.usuarios === 0
+                    ? 'Deja de ofrecerse al crear usuarios. No se borra: queda en el historial, con quién y cuándo se eliminó.'
+                    : `${r.usuarios === 1 ? 'La persona que lo tiene pasa' : `Las ${r.usuarios} personas que lo tienen pasan`} al rol que elijas (nadie queda sin rol). No se borra: queda en el historial.`
+            }
+            camposEliminar={
+                r.usuarios > 0
+                    ? {
+                          iniciales: { pasar_a: '' },
+                          listo: (d) => d.pasar_a !== '',
+                          render: (d, cambiar, error) => (
+                              <Campo id={`pasar-a-${r.id}`} etiqueta={r.usuarios === 1 ? 'Pasa al rol' : 'Pasan al rol'} requerido error={error}>
+                                  <Selector
+                                      {...propsCampo(`pasar-a-${r.id}`, error)}
+                                      valor={d.pasar_a}
+                                      onCambio={(v) => cambiar('pasar_a', v)}
+                                      placeholder="Elige el rol"
+                                      opciones={destinos.filter((x) => x.id !== r.id).map((x) => ({ valor: String(x.id), texto: x.nombre }))}
+                                  />
+                              </Campo>
+                          ),
+                      }
+                    : undefined
+            }
         />
     );
     // Los filtros aparecen cuando hay muchos roles (o si ya hay uno puesto, para poder quitarlo)

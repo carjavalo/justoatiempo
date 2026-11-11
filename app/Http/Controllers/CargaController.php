@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\EstadoCarga;
+use App\Enums\EstadoOrden;
 use App\Models\Bitacora;
 use App\Models\Carga;
 use App\Models\InformeDiario;
@@ -99,7 +100,7 @@ class CargaController extends Controller
         return to_route('cargas.show', $carga);
     }
 
-    public function show(Carga $carga): Response
+    public function show(Request $request, Carga $carga): Response
     {
         $carga->load('usuario:id,name', 'anuladaPor:id,name');
 
@@ -135,6 +136,7 @@ class CargaController extends Controller
             ]);
 
         return Inertia::render('cargas/resultado', [
+            ...$this->ordenesDe($request, $carga),
             'carga' => [
                 ...$base,
                 'fechaOperacion' => $carga->fecha_operacion?->toDateString(),
@@ -155,6 +157,55 @@ class CargaController extends Controller
                 && ! $informes->contains(fn ($i) => $i['estado'] === 'cerrado')
                 && request()->user()->puede('cargas.anular'),
         ]);
+    }
+
+    /**
+     * Las órdenes que trajo la carga, con su nota (el código de Drivin), para buscarlas y abrir su recorrido. Las de una
+     * carga anulada siguen a la vista: se retiraron de los informes, no de la plataforma.
+     *
+     * @return array{ordenes: mixed, filtrosOrdenes: array{q: string, estado: string}, verRecorrido: bool}
+     */
+    private function ordenesDe(Request $request, Carga $carga): array
+    {
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', Rule::in(EstadoOrden::values())],
+        ]);
+        $texto = trim($filtros['q'] ?? '');
+        $like = '%'.addcslashes($texto, '%_\\').'%';
+
+        $ordenes = Orden::withTrashed()
+            ->where('carga_id', $carga->id)
+            ->when($texto !== '', fn ($q) => $q->where(fn ($q) => $q->where('codigo_orden', 'like', $like)->orWhere('destinatario', 'like', $like)
+                ->orWhere('placa', 'like', $like)->orWhere('auxiliar_nombre', 'like', $like)->orWhere('ciudad', 'like', $like)))
+            ->when($filtros['estado'] ?? null, fn ($q, $estado) => $q->where('estado', $estado))
+            ->with('auxiliar:id,name')
+            ->orderBy('fecha_operacion')
+            ->orderBy('placa')
+            ->orderBy('codigo_orden')
+            ->paginate(25, ['id', 'codigo_orden', 'fecha_operacion', 'destinatario', 'ciudad', 'placa', 'auxiliar_id', 'auxiliar_nombre', 'estado', 'productos', 'productos_entregados', 'faltante', 'averia', 'deleted_at'], 'pagina')
+            ->withQueryString()
+            ->through(fn (Orden $o) => [
+                'id' => $o->id,
+                'codigo' => $o->codigo_orden,
+                'fecha' => $o->fecha_operacion->toDateString(),
+                'destinatario' => $o->destinatario,
+                'ciudad' => $o->ciudad,
+                'placa' => $o->placa,
+                'auxiliar' => $o->auxiliar?->name ?? $o->auxiliar_nombre,
+                'estado' => $o->estado->value,
+                'estadoLabel' => $o->estado->label(),
+                'productos' => $o->productos,
+                'entregados' => $o->productos_entregados,
+                'novedad' => $o->averia ? 'Avería' : ($o->faltante ? 'Faltante' : null),
+                'retirada' => $o->trashed(),
+            ]);
+
+        return [
+            'ordenes' => $ordenes,
+            'filtrosOrdenes' => ['q' => $texto, 'estado' => $filtros['estado'] ?? ''],
+            'verRecorrido' => $request->user()->puede('auditoria.ver'),
+        ];
     }
 
     /** Ajustes de la revisión: hoja, mapeo de columnas, sede/sucursal por defecto y a quién se incluye de otra operación. */

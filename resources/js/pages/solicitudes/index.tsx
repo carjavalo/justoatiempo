@@ -310,7 +310,7 @@ function FilaSolicitud({
                     abierto={eliminando}
                     nombre={`la solicitud${deQuien}`}
                     url={route('solicitudes.destroy', s.id)}
-                    consecuencia="Se borran sus datos de contacto y su mensaje. No se puede deshacer."
+                    consecuencia="Deja de verse en la bandeja. No se borra: queda en el historial, con quién y cuándo se eliminó."
                     onCerrar={() => setEliminando(false)}
                 />
             </article>

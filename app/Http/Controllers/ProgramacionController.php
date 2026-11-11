@@ -49,7 +49,7 @@ class ProgramacionController extends Controller
             ->groupBy(0)->map(fn ($v) => $v->pluck(1)->all());
 
         $filas = $programaciones->map(function (Programacion $p) use ($op, $fecha, $enOtroLugar) {
-            $personas = $p->asignaciones->sortBy(fn ($a) => ($a->hora_entrada ?? '99').'|'.$a->persona?->name)->values();
+            $personas = $p->asignaciones->sortBy(fn ($a) => sprintf('%05d', $a->orden ?? 99999).'|'.($a->hora_entrada ?? '99').'|'.$a->persona?->name)->values();
             $presentes = $personas->filter(fn ($a) => $a->asistencia?->presente())->count();
 
             return [
@@ -92,6 +92,15 @@ class ProgramacionController extends Controller
         $registradas = $todas->whereNotNull('asistencia');
         $lugares = $filas->map(fn ($f) => ['requeridas' => $f['requeridas'], 'programadas' => $f['personas']->count(), 'presentes' => $f['presentes']]);
 
+        // Cualquiera de la línea se puede programar en cualquier lugar: cada lugar ofrece primero a las suyas
+        $personasLinea = $op->personasDeLaLinea($fecha)->map(fn (array $x) => [
+            'id' => $x['persona']->id,
+            'nombre' => $x['persona']->name,
+            'detalle' => trim(($x['persona']->cargo ?? '').($x['persona']->cedula ? " · C.C. {$x['persona']->cedula}" : ''), ' ·'),
+            'asignadaEn' => $x['asignadaEn'],
+            'otrosLugares' => $enOtroLugar[$x['persona']->id] ?? [],
+        ])->values();
+
         // Para copiar: el último día anterior con programación en lo que ve
         $anterior = $op->filtrar(Programacion::query(), 'programaciones')->where('linea_servicio_id', $linea->id)
             ->whereDate('fecha', '<', $fecha)->max('fecha');
@@ -105,6 +114,7 @@ class ProgramacionController extends Controller
             'filtros' => ['lugar' => $lugar['clave'] ?? ''],
             'lugares' => $op->lugares()->map(fn ($l) => ['valor' => $l['clave'], 'texto' => $l['nombre'], 'detalle' => $l['detalle']])->values(),
             'programaciones' => $filas,
+            'personasLinea' => $personasLinea,
             // Con las mismas cuentas del día en el tablero y el inicio (JornadaLinea::resumenDia), sobre lo que se ve
             'resumen' => [
                 'lugares' => $lugares->count(),
@@ -174,6 +184,75 @@ class ProgramacionController extends Controller
         return back()->with('success', "Se quitó la programación de {$lugar}.");
     }
 
+    /**
+     * Quita la programación completa de un día (los lugares que se ven), aunque tenga asistencia: no se borra nada,
+     * queda marcada con quién y cuándo, y la asistencia se conserva en el historial. Ese día queda para programar
+     * desde cero o copiando otro.
+     */
+    public function quitarDia(Request $request, LineaServicio $linea): RedirectResponse
+    {
+        $op = OperacionLinea::para($request->user(), $linea, 'programacion.editar');
+        $fecha = $request->validate(['fecha' => ['required', 'date_format:Y-m-d']])['fecha'];
+        $programaciones = $op->filtrar(Programacion::query(), 'programaciones')->where('linea_servicio_id', $linea->id)->whereDate('fecha', $fecha)->get();
+        if ($programaciones->isEmpty()) {
+            return back()->with('error', 'Ese día no tiene programación que quitar.');
+        }
+
+        DB::transaction(function () use ($programaciones, $fecha) {
+            foreach ($programaciones as $p) {
+                Bitacora::registrar('eliminada', $p, ['lugar' => $p->lugar(), 'fecha' => $fecha, 'dia_completo' => true, 'personas' => $p->asignaciones()->count()]);
+                $p->delete();
+            }
+        });
+        $n = $programaciones->count();
+
+        return back()->with('success', $n === 1 ? 'Se quitó la programación del día (1 lugar).' : "Se quitó la programación del día ({$n} lugares).");
+    }
+
+    /** Pasa a una persona programada a otro lugar el mismo día, con su turno y su asistencia. */
+    public function moverPersona(Request $request, ProgramacionAsignacion $fila): RedirectResponse
+    {
+        $origen = $fila->programacion;
+        $this->autorizar($request->user(), $origen, 'programacion.editar');
+        $id = $request->validate(['programacion_id' => ['required', 'integer']], ['programacion_id.required' => 'Elige a qué lugar pasa.'])['programacion_id'];
+        $destino = Programacion::whereKey($id)->where('linea_servicio_id', $origen->linea_servicio_id)->whereDate('fecha', $origen->fecha)->first();
+        if (! $destino || $destino->is($origen)) {
+            throw ValidationException::withMessages(['programacion_id' => 'Elige otro de los lugares programados ese día.']);
+        }
+        $this->autorizar($request->user(), $destino, 'programacion.editar');
+        if ($destino->asignaciones()->where('user_id', $fila->user_id)->exists()) {
+            throw ValidationException::withMessages(['programacion_id' => "{$fila->persona?->name} ya está programada en {$destino->lugar()} ese día."]);
+        }
+
+        $ultimo = $destino->asignaciones()->max('orden');
+        Bitacora::registrar('movida', $fila, ['persona' => $fila->persona?->name, 'de' => $origen->lugar(), 'a' => $destino->lugar(), 'fecha' => $origen->fecha->toDateString()]);
+        $fila->update(['programacion_id' => $destino->id, 'orden' => $ultimo === null ? null : $ultimo + 1]);
+
+        return back()->with('success', "{$fila->persona?->name} pasó a {$destino->lugar()}.");
+    }
+
+    /** El orden de las personas de un lugar, como lo deja quien programa. */
+    public function ordenar(Request $request, Programacion $programacion): RedirectResponse
+    {
+        $this->autorizar($request->user(), $programacion, 'programacion.editar');
+        $ids = $request->validate(['personas' => ['required', 'array', 'max:500'], 'personas.*' => ['integer']])['personas'];
+        $filas = $programacion->asignaciones()->get()->keyBy('id');
+        $orden = collect($ids)->unique()->filter(fn ($id) => $filas->has($id))->values();
+
+        DB::transaction(function () use ($orden, $filas) {
+            foreach ($orden as $i => $id) {
+                $filas[$id]->update(['orden' => $i + 1]);
+            }
+            // Quien no venía en la lista (agregado mientras tanto) va al final
+            $n = $orden->count();
+            foreach ($filas->except($orden->all()) as $fila) {
+                $fila->update(['orden' => ++$n]);
+            }
+        });
+
+        return back()->with('success', "Orden de {$programacion->lugar()} guardado.");
+    }
+
     /** Copia la programación de otro día (lugares, personas y turnos; sin la asistencia) en los lugares aún sin programar. */
     public function copiar(Request $request, LineaServicio $linea): RedirectResponse
     {
@@ -190,7 +269,8 @@ class ProgramacionController extends Controller
             ->map(fn (Programacion $p) => OperacionLinea::clave($p->empresa_id, $p->sede_id, $p->sucursal_id));
 
         $copiadas = 0;
-        DB::transaction(function () use ($origen, $yaProgramados, $datos, $linea, $request, $op, &$copiadas) {
+        $disponibles = null;
+        DB::transaction(function () use ($origen, $yaProgramados, $datos, $linea, $request, $op, &$copiadas, &$disponibles) {
             foreach ($origen as $p) {
                 $clave = OperacionLinea::clave($p->empresa_id, $p->sede_id, $p->sucursal_id);
                 if ($yaProgramados->contains($clave) || ! $op->incluye($p->empresa_id, $p->sede_id, $p->sucursal_id)) {
@@ -200,10 +280,10 @@ class ProgramacionController extends Controller
                     ...$p->only(['empresa_id', 'sede_id', 'sucursal_id', 'personas_requeridas', 'vehiculos_requeridos', 'observaciones']),
                     'fecha' => $datos['fecha'], 'linea_servicio_id' => $linea->id, 'creado_por' => $request->user()->id,
                 ]);
-                // Solo quien aún puede trabajar allí ese día
-                $disponibles = $op->personasEn($p->empresa_id, $p->sede_id, $p->sucursal_id, Carbon::parse($datos['fecha']))->pluck('id');
+                // Solo quien sigue en la línea ese día (aunque lo hayan programado fuera de su asignación)
+                $disponibles ??= $op->personasDeLaLinea(Carbon::parse($datos['fecha']))->pluck('persona.id');
                 foreach ($p->asignaciones->whereIn('user_id', $disponibles) as $a) {
-                    $nueva->asignaciones()->create($a->only(['user_id', 'hora_entrada', 'hora_salida', 'vehiculo_id', 'ruta']));
+                    $nueva->asignaciones()->create($a->only(['user_id', 'orden', 'hora_entrada', 'hora_salida', 'vehiculo_id', 'ruta']));
                 }
                 $copiadas++;
             }
@@ -225,14 +305,21 @@ class ProgramacionController extends Controller
             'hora_salida' => ['nullable', 'date_format:H:i'],
         ], ['personas.required' => 'Elige al menos una persona.', 'hora_entrada.date_format' => 'Escribe la hora como 07:00.', 'hora_salida.date_format' => 'Escribe la hora como 17:00.']);
 
-        $disponibles = $op->personasEn($programacion->empresa_id, $programacion->sede_id, $programacion->sucursal_id, $programacion->fecha)->pluck('id');
+        // Cualquiera de la línea, aunque su asignación sea en otro lugar
+        $disponibles = $op->personasDeLaLinea($programacion->fecha)->pluck('persona.id');
         $elegidas = collect($datos['personas'])->unique()->filter(fn ($id) => $disponibles->contains($id));
         if ($elegidas->isEmpty()) {
-            throw ValidationException::withMessages(['personas' => 'Esas personas no trabajan en este lugar en la línea.']);
+            throw ValidationException::withMessages(['personas' => 'Esas personas no trabajan en esta línea.']);
         }
 
+        $ultimo = $programacion->asignaciones()->max('orden');
         foreach ($elegidas as $id) {
-            $programacion->asignaciones()->firstOrCreate(['user_id' => $id], ['hora_entrada' => $datos['hora_entrada'] ?? null, 'hora_salida' => $datos['hora_salida'] ?? null]);
+            $programacion->asignaciones()->firstOrCreate(['user_id' => $id], [
+                'hora_entrada' => $datos['hora_entrada'] ?? null,
+                'hora_salida' => $datos['hora_salida'] ?? null,
+                // Si el lugar ya tiene un orden puesto a mano, quien llega va al final
+                'orden' => $ultimo === null ? null : ++$ultimo,
+            ]);
         }
         $n = $elegidas->count();
 

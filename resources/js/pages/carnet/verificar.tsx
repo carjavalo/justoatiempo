@@ -1,8 +1,7 @@
 import { Iniciales } from '@/components/admin/piezas';
 import { EnlaceVolver } from '@/components/enlace-volver';
-import { AlertTriangle, Building2, CheckCircle2, FileText, Layers, MapPinned, XCircle } from '@/components/iconos';
+import { AlertTriangle, CheckCircle2, FileText, Layers, XCircle } from '@/components/iconos';
 import LogoMarca from '@/components/logo-marca';
-import { aFecha } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
 
@@ -11,9 +10,12 @@ interface Vigente {
     nombre: string;
     cedula: string | null;
     cargo: string;
-    email: string | null;
-    /** Dónde presta el servicio hoy (todos son personal de Justo a Tiempo): cada empresa con su sede, sucursal y líneas. */
-    asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
+    rh: string | null;
+    eps: string | null;
+    /** La ARL a la que está afiliada ("SURA"); el certificado va aparte. */
+    entidadArl: string | null;
+    /** Las líneas de servicio que hace hoy, como en la franja del carnet (sin la empresa). */
+    lineas: string[];
     foto: string | null;
     arl: { url: string; pdf: boolean; subida: string | null } | null;
 }
@@ -24,8 +26,8 @@ const fechaLarga = new Intl.DateTimeFormat('es-CO', { dateStyle: 'long' });
 
 /**
  * Lo que se ve al escanear el QR de un carnet (página pública, pensada para el celular de quien controla el
- * ingreso, p. ej. la portería de un cliente): quién es la persona, dónde trabaja y su certificado de ARL. Si el
- * carnet ya no está vigente, solo se dice eso.
+ * ingreso, p. ej. la portería de un cliente): lo mismo que dice el carnet (quién es, su cargo, su línea, su cédula,
+ * su RH, su EPS y su ARL) y su certificado de ARL. Si el carnet ya no está vigente, solo se dice eso.
  */
 export default function VerificarCarnet(props: Props) {
     return (
@@ -85,7 +87,9 @@ function NoVigente({ nombre }: { nombre: string }) {
 function Datos({ persona: p }: { persona: Vigente }) {
     const filas = [
         { titulo: 'Cédula', valor: p.cedula ? `C.C. ${Number(p.cedula).toLocaleString('es-CO')}` : null },
-        { titulo: 'Correo', valor: p.email },
+        { titulo: 'RH', valor: p.rh },
+        { titulo: 'EPS', valor: p.eps },
+        { titulo: 'ARL', valor: p.entidadArl },
     ].filter((f) => f.valor);
 
     return (
@@ -107,40 +111,21 @@ function Datos({ persona: p }: { persona: Vigente }) {
                 </div>
             </div>
 
-            {/* Dónde presta el servicio: lo primero que busca quien controla el ingreso */}
-            <section aria-labelledby="titulo-asignacion" className="border-primary/25 bg-secondary/50 mt-6 rounded-2xl border p-4">
-                <h2 id="titulo-asignacion" className="text-xs font-bold tracking-[0.12em] uppercase">
-                    Presta el servicio en
+            {/* Su línea, como en la franja del carnet: lo primero que busca quien controla el ingreso */}
+            <section aria-labelledby="titulo-linea" className="border-primary/25 bg-secondary/50 mt-6 rounded-2xl border p-4">
+                <h2 id="titulo-linea" className="text-xs font-bold tracking-[0.12em] uppercase">
+                    {p.lineas.length > 1 ? 'Líneas de servicio' : 'Línea de servicio'}
                 </h2>
-                {p.asignaciones.length === 0 ? (
-                    <p className="text-muted-foreground mt-3 text-sm">Hoy no tiene asignaciones vigentes.</p>
+                {p.lineas.length === 0 ? (
+                    <p className="text-muted-foreground mt-3 text-sm">Hoy no tiene una línea asignada.</p>
                 ) : (
-                    <ul role="list" className="mt-3 grid gap-3">
-                        {p.asignaciones.map((a, i) => (
-                            <li key={i} className="bg-card rounded-xl border p-3.5">
-                                <div className="flex items-start gap-3">
-                                    <span className="bg-brand-navy-deep flex size-10 shrink-0 items-center justify-center rounded-xl">
-                                        <Building2 className="text-brand-coral-on-dark size-5" aria-hidden="true" />
-                                    </span>
-                                    <div className="min-w-0">
-                                        <p className="text-lg leading-tight font-extrabold break-words">{a.empresa ?? 'Todas las empresas de su línea'}</p>
-                                        {(a.sede || a.sucursal) && (
-                                            <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-sm">
-                                                <MapPinned className="size-4 shrink-0" aria-hidden="true" />
-                                                {[a.sede, a.sucursal].filter(Boolean).join(' · ')}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <ul role="list" aria-label="Líneas de servicio" className="mt-3 flex flex-wrap gap-1.5">
-                                    {a.lineas.map((l) => (
-                                        <li key={l} className="bg-muted inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold">
-                                            <Layers className="text-primary size-3.5" aria-hidden="true" />
-                                            {l}
-                                        </li>
-                                    ))}
-                                </ul>
-                                <p className="text-muted-foreground mt-2 text-xs">{a.hasta ? `Asignado hasta el ${fechaLarga.format(aFecha(a.hasta))}` : 'Asignación indefinida'}</p>
+                    <ul role="list" className="mt-3 grid gap-2.5">
+                        {p.lineas.map((l) => (
+                            <li key={l} className="flex items-center gap-3">
+                                <span className="bg-brand-navy-deep flex size-10 shrink-0 items-center justify-center rounded-xl">
+                                    <Layers className="text-brand-coral-on-dark size-5" aria-hidden="true" />
+                                </span>
+                                <span className="min-w-0 text-lg leading-tight font-extrabold break-words">{l}</span>
                             </li>
                         ))}
                     </ul>

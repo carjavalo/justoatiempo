@@ -167,6 +167,9 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permiso:programacion.editar')->group(function () {
         Route::post('lineas/{linea}/programacion', [ProgramacionController::class, 'store'])->name('programacion.store');
         Route::post('lineas/{linea}/programacion/copiar', [ProgramacionController::class, 'copiar'])->name('programacion.copiar');
+        Route::delete('lineas/{linea}/programacion/dia', [ProgramacionController::class, 'quitarDia'])->name('programacion.dia.destroy');
+        Route::patch('programacion/{programacion}/orden', [ProgramacionController::class, 'ordenar'])->name('programacion.orden');
+        Route::patch('programacion/personas/{fila}/mover', [ProgramacionController::class, 'moverPersona'])->name('programacion.personas.mover');
         Route::put('programacion/{programacion}', [ProgramacionController::class, 'update'])->name('programacion.update');
         Route::delete('programacion/{programacion}', [ProgramacionController::class, 'destroy'])->name('programacion.destroy');
         Route::post('programacion/{programacion}/personas', [ProgramacionController::class, 'agregarPersonas'])->name('programacion.personas.store');

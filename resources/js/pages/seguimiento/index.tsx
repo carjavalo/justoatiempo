@@ -459,7 +459,7 @@ function DetallePersona({ persona, tiposAccion }: { persona: Persona; tiposAccio
                     abierto
                     nombre={`esta acción (${quitando.tipoLabel} del ${fmt.fechaMedia(quitando.fecha)})`}
                     url={route('seguimiento.eliminar', quitando.id)}
-                    consecuencia="Deja de contar en el seguimiento de la persona. No se puede deshacer."
+                    consecuencia="Deja de contar en el seguimiento de la persona. No se borra: queda en el historial, con quién y cuándo se eliminó."
                     onCerrar={() => setQuitando(null)}
                     focoAlCerrar={historial}
                 />

@@ -41,6 +41,10 @@ interface FilaUsuario {
     segundoApellido: string | null;
     cedula: string | null;
     cargo: string | null;
+    /** Van en el carnet. */
+    rh: string | null;
+    eps: string | null;
+    arlEntidad: string | null;
     email: string | null;
     /** Si entra a la plataforma (con su correo o su cédula); sin acceso, sigue teniendo su carnet. */
     acceso: boolean;
@@ -88,6 +92,10 @@ const VACIO = {
     segundo_apellido: '',
     cedula: '',
     cargo: '',
+    rh: '',
+    eps: '',
+    // La ARL de la empresa; se cambia si la persona está en otra
+    arl_entidad: 'SURA',
     telefono: '',
     ciudad: '',
     fecha_nacimiento: '',
@@ -108,6 +116,9 @@ const ORDEN_CAMPOS = [
     'segundo_apellido',
     'cedula',
     'cargo',
+    'rh',
+    'eps',
+    'arl_entidad',
     'telefono',
     'ciudad',
     'fecha_nacimiento',
@@ -192,6 +203,9 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                       segundo_apellido: usuario.segundoApellido ?? '',
                       cedula: usuario.cedula ?? '',
                       cargo: usuario.cargo ?? '',
+                      rh: usuario.rh ?? '',
+                      eps: usuario.eps ?? '',
+                      arl_entidad: usuario.arlEntidad ?? '',
                       telefono: usuario.telefono ?? '',
                       ciudad: usuario.ciudad ?? '',
                       fecha_nacimiento: usuario.fechaNacimiento ?? '',
@@ -346,6 +360,7 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
             urlEstado={!u.esUsted && u.editable && puede('usuarios.estado') ? route('usuarios.estado', u.id) : undefined}
             onEditar={u.editable && puede('usuarios.editar') ? (boton) => abrir(u, boton) : undefined}
             urlEliminar={!u.esUsted && u.editable && puede('usuarios.eliminar') ? route('usuarios.destroy', u.id) : undefined}
+            consecuenciaEliminar="Deja de verse y no puede entrar. Sus asignaciones terminan (siguen en su historial) y sale de la programación de los días por venir. Lo que hizo conserva su nombre."
             consecuencia={
                 u.acceso
                     ? 'Perderá el acceso de inmediato, incluso si tiene la sesión abierta, y su carnet dejará de estar vigente. Podrás activarla de nuevo cuando quieras.'
@@ -641,6 +656,41 @@ export default function Usuarios({ usuarios, total, filtros, contexto, roles, li
                             maxLength={60}
                             value={form.data.cargo}
                             onChange={(e) => form.setData('cargo', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                </div>
+
+                {/* También van en el carnet, donde antes iba el correo */}
+                <div className="grid gap-4 sm:grid-cols-[7.5rem_minmax(0,1fr)_minmax(0,1fr)]">
+                    <Campo id="rh" etiqueta="RH" error={form.errors.rh}>
+                        <Selector
+                            {...propsCampo('rh', form.errors.rh)}
+                            valor={form.data.rh}
+                            onCambio={(v) => form.setData('rh', v)}
+                            placeholder="Elige"
+                            opciones={['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map((g) => ({ valor: g, texto: g }))}
+                        />
+                    </Campo>
+                    <Campo id="eps" etiqueta="EPS" error={form.errors.eps}>
+                        <Input
+                            {...propsCampo('eps', form.errors.eps)}
+                            autoComplete="off"
+                            placeholder="Ej.: Nueva EPS"
+                            maxLength={80}
+                            value={form.data.eps}
+                            onChange={(e) => form.setData('eps', e.target.value)}
+                            className="h-10 rounded-lg"
+                        />
+                    </Campo>
+                    <Campo id="arl_entidad" etiqueta="ARL" error={form.errors.arl_entidad}>
+                        <Input
+                            {...propsCampo('arl_entidad', form.errors.arl_entidad)}
+                            autoComplete="off"
+                            placeholder="Ej.: SURA"
+                            maxLength={80}
+                            value={form.data.arl_entidad}
+                            onChange={(e) => form.setData('arl_entidad', e.target.value)}
                             className="h-10 rounded-lg"
                         />
                     </Campo>

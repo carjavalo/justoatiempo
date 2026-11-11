@@ -116,6 +116,32 @@ final class OperacionLinea
     }
 
     /**
+     * Todas las personas activas de la línea ese día, para programarlas en cualquier lugar (no solo donde está su
+     * asignación): las de toda la línea y las asignadas a un lugar que se ve. Cada una con dónde está asignada.
+     *
+     * @return Collection<int, array{persona: User, asignadaEn: string}>
+     */
+    public function personasDeLaLinea(Carbon $dia): Collection
+    {
+        $asignaciones = Asignacion::vigentes($dia)
+            ->whereHas('lineas', fn ($q) => $q->whereKey($this->linea->id))
+            ->whereIn('user_id', User::where('activo', true)->select('id'))
+            ->with('empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre')
+            ->orderBy('fecha_inicio')
+            ->get()
+            ->filter(fn (Asignacion $a) => $a->empresa_id === null || $this->incluye($a->empresa_id, $a->sede_id, $a->sucursal_id)
+                // Una asignación a toda la empresa o la sede también cuenta si se ve alguno de sus lugares
+                || $this->lugares()->contains(fn ($l) => $l['empresa_id'] === $a->empresa_id && ($a->sede_id === null || $l['sede_id'] === $a->sede_id)));
+
+        $personas = User::whereIn('id', $asignaciones->pluck('user_id')->unique())->orderBy('name')->get(['id', 'name', 'cedula', 'cargo']);
+
+        return $personas->map(fn (User $u) => [
+            'persona' => $u,
+            'asignadaEn' => $asignaciones->where('user_id', $u->id)->map(fn (Asignacion $a) => $a->lugar())->unique()->implode(' / '),
+        ])->values();
+    }
+
+    /**
      * Las personas activas que pueden trabajar en un lugar ese día: las que tienen una asignación vigente en la
      * línea que cubre el lugar (o toda la línea), y las de una sede o sucursal dentro de él.
      *

@@ -320,6 +320,12 @@ class CargaDrivinTest extends TestCase
         // Sus órdenes ya no cuentan, pero no se borran: quedan marcadas con la carga anulada
         $this->assertSame(0, Orden::count());
         $this->assertSame(1, Orden::onlyTrashed()->where('carga_id', $carga->id)->count());
+        // Siguen a la vista: en su carga, con su nota, y en la trazabilidad, marcadas como retiradas
+        $this->get("/cargas/{$carga->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('ordenes.total', 1)
+            ->where('ordenes.data.0.codigo', 'PDVT1')
+            ->where('ordenes.data.0.estado', 'aprobada'));
+        $this->get('/trazabilidad?q=PDVT1')->assertInertia(fn (Assert $p) => $p->where('traza.resumen.retirada', true));
 
         $copia = sys_get_temp_dir().'/'.uniqid('drivin_').'.xlsx';
         file_put_contents($copia, $contenido);
@@ -334,6 +340,11 @@ class CargaDrivinTest extends TestCase
         $this->post("/cargas/{$nueva->id}/confirmar")->assertRedirect();
         $this->assertSame(1, Orden::count());
         $this->assertSame(2, Orden::withTrashed()->count());
+        // La misma jornada importada otra vez es una sola en el recorrido, y vigente
+        $this->get('/trazabilidad?q=PDVT1')->assertInertia(fn (Assert $p) => $p->where('traza.resumen.retirada', false)->where('traza.resumen.jornadas', 1));
+        // Las órdenes de cada carga se buscan por su nota, destinatario o placa
+        $this->get("/cargas/{$nueva->id}?q=PDVT1")->assertInertia(fn (Assert $p) => $p->where('ordenes.total', 1)->where('filtrosOrdenes.q', 'PDVT1'));
+        $this->get("/cargas/{$nueva->id}?q=no-existe")->assertInertia(fn (Assert $p) => $p->where('ordenes.total', 0));
     }
 
     public function test_solo_coordinador_y_administrador_cargan_archivos()

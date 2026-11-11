@@ -127,11 +127,12 @@ class TrazabilidadTest extends TestCase
         app(ImportadorPreliquidacion::class)->anular($this->carga);
         $this->assertSame(0, Orden::count());
 
+        // Se retiró, no se borró: su recorrido completo sigue a la vista y termina en la anulación
         $this->get('/trazabilidad?q=NP500')->assertInertia(fn (Assert $p) => $p
             ->where('traza.codigo', 'NP500')
-            ->where('traza.resumen', null)
-            ->where('traza.eventos.0.titulo', 'Importación anulada')
-            ->where('traza.eventos.0.responsable', 'Quien Revisa')
+            ->where('traza.resumen.destinatario', 'DIANA CUELLAR')
+            ->where('traza.resumen.retirada', true)
+            ->where('traza.eventos', fn ($e) => collect($e)->last()['titulo'] === 'Importación anulada' && collect($e)->last()['responsable'] === 'Quien Revisa')
         );
     }
 

@@ -19,6 +19,9 @@ class UsuarioRequest extends FormRequest
 {
     use LimpiaTexto;
 
+    /** Grupos sanguíneos con su factor RH, como van en el carnet. */
+    public const RH = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+
     /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
     {
@@ -38,6 +41,10 @@ class UsuarioRequest extends FormRequest
             // La cédula se guarda solo con sus números ("1.144.123.456" → "1144123456")
             'cedula' => is_string($c = $this->input('cedula')) ? (preg_replace('/[\s.,-]/', '', $c) ?: null) : $c,
             'cargo' => $this->texto('cargo') ?: null,
+            // "o +" o "o positivo" llegan como "O+"
+            'rh' => is_string($rh = $this->input('rh')) ? (strtr(mb_strtoupper(preg_replace('/\s+/', '', $rh)), ['POSITIVO' => '+', 'NEGATIVO' => '-']) ?: null) : $rh,
+            'eps' => $this->texto('eps') ?: null,
+            'arl_entidad' => $this->texto('arl_entidad') ?: null,
             'email' => is_string($e = $this->texto('email')) ? (mb_strtolower($e) ?: null) : $e,
             'password' => $this->input('password') ?: null,
             // Sin decirlo, como siempre: entra a la plataforma
@@ -63,6 +70,10 @@ class UsuarioRequest extends FormRequest
             'cedula' => ['nullable', 'required_unless:acceso,true', 'string', 'regex:/^\d{5,12}$/', Rule::unique('users', 'cedula')->whereNull('deleted_at')->ignore($usuario?->id)],
             // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
+            // Van en el carnet, donde antes iba el correo
+            'rh' => ['nullable', Rule::in(self::RH)],
+            'eps' => ['nullable', 'string', 'max:80'],
+            'arl_entidad' => ['nullable', 'string', 'max:80'],
             'acceso' => ['required', 'boolean'],
             // Ingresa con su correo o con su cédula: con acceso, al menos uno de los dos
             'email' => ['nullable', Rule::requiredIf(fn () => $this->boolean('acceso') && blank($this->input('cedula'))), 'string', 'email', 'max:150', Rule::unique('users', 'email')->whereNull('deleted_at')->ignore($usuario?->id)],
@@ -138,6 +149,7 @@ class UsuarioRequest extends FormRequest
         return [
             'rol_id.required' => 'Elige el rol.',
             'cargo.required' => 'Escribe el cargo: va en el carnet.',
+            'rh.in' => 'Elige el RH de la lista.',
             'email.required' => 'Escribe el correo o la cédula: con uno de los dos entra a la plataforma.',
             'email.unique' => 'Ya hay un usuario con este correo.',
             'cedula.required_unless' => 'Escribe la cédula: sin acceso a la plataforma, es la que identifica a la persona.',
@@ -159,7 +171,7 @@ class UsuarioRequest extends FormRequest
 
     public function attributes(): array
     {
-        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'foto' => 'la foto', 'arl' => 'la ARL', 'acceso' => 'el acceso', 'telefono' => 'el teléfono', 'ciudad' => 'la ciudad', 'fecha_nacimiento' => 'la fecha de nacimiento', 'fecha_ingreso' => 'la fecha de ingreso'];
+        return ['nombres' => 'los nombres', 'primer_apellido' => 'el primer apellido', 'segundo_apellido' => 'el segundo apellido', 'email' => 'el correo', 'rol_id' => 'el rol', 'password' => 'la contraseña', 'cedula' => 'la cédula', 'cargo' => 'el cargo', 'rh' => 'el RH', 'eps' => 'la EPS', 'arl_entidad' => 'la ARL', 'foto' => 'la foto', 'arl' => 'el certificado de ARL', 'acceso' => 'el acceso', 'telefono' => 'el teléfono', 'ciudad' => 'la ciudad', 'fecha_nacimiento' => 'la fecha de nacimiento', 'fecha_ingreso' => 'la fecha de ingreso'];
     }
 
     /**
@@ -177,6 +189,9 @@ class UsuarioRequest extends FormRequest
             'segundo_apellido' => $datos['segundo_apellido'] ?? null,
             'cedula' => $datos['cedula'] ?? null,
             'cargo' => $datos['cargo'],
+            'rh' => $datos['rh'] ?? null,
+            'eps' => $datos['eps'] ?? null,
+            'arl_entidad' => $datos['arl_entidad'] ?? null,
             'acceso' => $acceso,
             'email' => $datos['email'] ?? null,
             'telefono' => $datos['telefono'] ?? null,

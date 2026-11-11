@@ -193,6 +193,7 @@ export default function Empresas({ empresas, total, filtros, lineas }: Props) {
             urlEstado={puede('empresas.estado') ? route('empresas.estado', e.id) : undefined}
             onEditar={puede('empresas.editar') ? (boton) => abrir(e, boton) : undefined}
             urlEliminar={puede('empresas.eliminar') ? route('empresas.destroy', e.id) : undefined}
+            consecuenciaEliminar={`Se eliminan también sus sedes y sucursales. Quienes estaban asignados a ella quedan sin esa asignación (sigue en su historial) y se quita su programación de los días por venir. Sus órdenes e informes se conservan.`}
             consecuencia={`No se le podrán asignar nuevas sedes ni usuarios. ${mayuscula(seConserva(e.sedes, 'sede', 'sedes'))} y ${seConserva(e.usuarios, 'usuario', 'usuarios')}. Puedes volver a activarla cuando quieras.`}
         />
     );

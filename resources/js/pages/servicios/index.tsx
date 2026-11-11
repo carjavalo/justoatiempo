@@ -118,6 +118,7 @@ export default function Servicios({ lineas }: Props) {
             onEditar={puede('servicios.editar') ? (boton) => abrir(l, boton) : undefined}
             // De la de Drivin dependen el tablero, las cargas y la auditoría
             urlEliminar={!l.drivin && puede('servicios.eliminar') ? route('servicios.destroy', l.id) : undefined}
+            consecuenciaEliminar="Quien solo la tenía en una asignación queda sin ella (sigue en su historial) y se quita su programación de los días por venir. Su operación pasada se conserva."
             consecuencia="Ya no se ofrecerá al marcar las líneas de una empresa ni al crear asignaciones. Las empresas que la reciben la conservan y su historial se mantiene. Si alguien tiene una asignación vigente o por empezar en ella, primero hay que terminarla."
         />
     );

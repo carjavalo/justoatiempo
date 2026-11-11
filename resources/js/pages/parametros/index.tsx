@@ -356,7 +356,8 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
                                             activo={m.activo}
                                             urlEstado={editable ? route('parametros.motivos.estado', m.id) : undefined}
                                             onEditar={editable ? (boton) => abrirMotivo(m, boton) : undefined}
-                                            urlEliminar={editable && !m.usos ? route('parametros.motivos.destroy', m.id) : undefined}
+                                            urlEliminar={editable ? route('parametros.motivos.destroy', m.id) : undefined}
+                                            consecuenciaEliminar="Las próximas cargas de Drivin ya no lo reconocen; las órdenes que ya lo tienen lo conservan. No se borra: queda en el historial."
                                             consecuencia="Las próximas cargas de Drivin ya no lo reconocen: esas órdenes guardan solo el texto del motivo. Las órdenes ya cargadas lo conservan."
                                         />
                                     </div>
@@ -403,6 +404,7 @@ function Catalogos({ motivos, novedades, editable }: { motivos: Motivo[]; noveda
                                         urlEstado={editable ? route('parametros.novedades.estado', n.id) : undefined}
                                         onEditar={editable ? (boton) => abrirNovedad(n, boton) : undefined}
                                         urlEliminar={editable && !n.sistema ? route('parametros.novedades.destroy', n.id) : undefined}
+                                        consecuenciaEliminar="Ya no se ofrece al auditar; las auditorías que ya lo tienen lo conservan. No se borra: queda en el historial."
                                         consecuencia="Ya no se ofrece al auditar las evidencias. Las órdenes que ya lo tienen lo conservan."
                                     />
                                 </li>

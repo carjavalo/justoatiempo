@@ -28,8 +28,13 @@ class Carnet
             // Sin cargo escrito (usuarios de antes de que fuera obligatorio), el carnet lleva su rol
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
             'tieneCargo' => filled($usuario->cargo),
+            // Donde el diseño traía el correo
+            'rh' => $usuario->rh,
+            'eps' => $usuario->eps,
+            'entidadArl' => $usuario->arl_entidad,
+            // No va en el carnet: con él se busca a la persona en Usuarios para completarle lo que falte
             'email' => $usuario->email,
-            // Dónde presta el servicio hoy y qué hace allí: va abajo en el carnet
+            // Sus líneas de servicio van abajo en el carnet (la empresa no: cambia de cliente)
             'asignaciones' => self::asignaciones($usuario),
             'foto' => $foto,
             'arl' => $arl,
@@ -40,9 +45,9 @@ class Carnet
     }
 
     /**
-     * Lo que ve quien escanea el QR (página pública, p. ej. la portería de un cliente): quién es, dónde trabaja y
-     * su certificado de ARL. Si la persona ya no está activa solo se dice que el carnet no es vigente: no se
-     * muestran sus datos.
+     * Lo que ve quien escanea el QR (página pública, p. ej. la portería de un cliente): lo mismo que dice el carnet
+     * (quién es, su cargo, su cédula, su RH, su EPS, su ARL y su línea, sin la empresa) más su certificado de ARL. Si
+     * la persona ya no está activa solo se dice que el carnet no es vigente: no se muestran sus datos.
      */
     public static function verificacion(User $usuario): array
     {
@@ -57,10 +62,12 @@ class Carnet
             'nombre' => $usuario->name,
             'cedula' => $usuario->cedula,
             'cargo' => $usuario->cargo ?: $usuario->nombreRol(),
-            'email' => $usuario->email,
-            // Dónde presta el servicio hoy (todos son personal de Justo a Tiempo): cada empresa con su sede, su
-            // sucursal, las líneas que hace allí y hasta cuándo
-            'asignaciones' => self::asignaciones($usuario),
+            // Lo mismo que el carnet: sin el correo ni la empresa
+            'rh' => $usuario->rh,
+            'eps' => $usuario->eps,
+            'entidadArl' => $usuario->arl_entidad,
+            // Las líneas de servicio que hace hoy, sin repetir
+            'lineas' => collect(self::asignaciones($usuario))->pluck('lineas')->flatten()->unique()->values()->all(),
             'foto' => $usuario->foto_path ? route('carnet.foto', ['codigo' => $codigo, 'v' => self::version($usuario->foto_path)]) : null,
             'arl' => $usuario->arl_path ? [
                 'url' => route('carnet.arl', ['codigo' => $codigo, 'v' => self::version($usuario->arl_path)]),

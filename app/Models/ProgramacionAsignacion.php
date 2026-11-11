@@ -15,7 +15,7 @@ class ProgramacionAsignacion extends Model
     protected $table = 'programacion_asignaciones';
 
     protected $fillable = [
-        'programacion_id', 'user_id', 'hora_entrada', 'hora_salida', 'vehiculo_id', 'ruta',
+        'programacion_id', 'user_id', 'orden', 'hora_entrada', 'hora_salida', 'vehiculo_id', 'ruta',
         'asistencia', 'hora_llegada', 'observacion', 'asistencia_por', 'asistencia_en',
     ];
 

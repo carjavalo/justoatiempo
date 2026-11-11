@@ -44,6 +44,9 @@ class CarnetUsuarioTest extends TestCase
         $this->actingAs($this->admin)->post('/usuarios', $this->datos([
             'cedula' => '1.144.123.456',
             'cargo' => 'Gerente general',
+            'rh' => 'o +',
+            'eps' => ' Nueva EPS ',
+            'arl_entidad' => 'SURA',
             'foto' => UploadedFile::fake()->image('foto.png', 600, 800),
         ]))->assertSessionHasNoErrors();
 
@@ -51,6 +54,9 @@ class CarnetUsuarioTest extends TestCase
         // La cédula se guarda solo con sus números
         $this->assertSame('1144123456', $usuario->cedula);
         $this->assertSame('Gerente general', $usuario->cargo);
+        // Lo que va en el carnet donde antes iba el correo
+        $this->assertSame(['O+', 'Nueva EPS', 'SURA'], [$usuario->rh, $usuario->eps, $usuario->arl_entidad]);
+        $this->actingAs($this->admin)->post('/usuarios', $this->datos(['email' => 'otro@example.com', 'rh' => 'C+']))->assertSessionHasErrors(['rh' => 'Elige el RH de la lista.']);
         $this->assertStringStartsWith("fotos/{$usuario->id}/", $usuario->foto_path);
         Storage::disk('local')->assertExists($usuario->foto_path);
         // Nunca en el disco público (no tiene dirección abierta)
@@ -67,7 +73,7 @@ class CarnetUsuarioTest extends TestCase
             }));
     }
 
-    public function test_al_reemplazar_la_foto_se_borra_la_anterior_y_al_quitarla_queda_sin_foto(): void
+    public function test_al_reemplazar_la_foto_la_anterior_se_conserva_y_al_quitarla_queda_sin_foto(): void
     {
         $this->actingAs($this->admin)->post('/usuarios', $this->datos(['foto' => UploadedFile::fake()->image('uno.jpg')]));
         $usuario = User::where('email', 'johnny@example.com')->sole();
@@ -78,8 +84,10 @@ class CarnetUsuarioTest extends TestCase
             ->assertSessionHasNoErrors();
         $nueva = $usuario->fresh()->foto_path;
         $this->assertNotSame($anterior, $nueva);
-        Storage::disk('local')->assertMissing($anterior);
+        // Nada se borra: la anterior queda en el disco y en la bitácora
+        Storage::disk('local')->assertExists($anterior);
         Storage::disk('local')->assertExists($nueva);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'archivo_reemplazado', 'modelo_id' => $usuario->id]);
 
         // Editar otros datos no toca la foto
         $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", $this->datos(['nombres' => 'Johnny Alberto', 'password' => '']))->assertSessionHasNoErrors();
@@ -87,7 +95,8 @@ class CarnetUsuarioTest extends TestCase
 
         $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", $this->datos(['password' => '', 'quitar_foto' => true]))->assertSessionHasNoErrors();
         $this->assertNull($usuario->fresh()->foto_path);
-        Storage::disk('local')->assertMissing($nueva);
+        Storage::disk('local')->assertExists($nueva);
+        $this->assertDatabaseHas('bitacora', ['accion' => 'archivo_quitado', 'modelo_id' => $usuario->id]);
     }
 
     public function test_valida_la_foto_la_cedula_y_el_cargo(): void
@@ -172,6 +181,7 @@ class CarnetUsuarioTest extends TestCase
         $usuario = User::factory()->create([
             'nombres' => 'Ana María', 'primer_apellido' => 'Gómez', 'segundo_apellido' => 'Ruiz',
             'cedula' => '1144123456', 'cargo' => 'Auxiliar logístico', 'email' => 'ana@example.com',
+            'rh' => 'AB-', 'eps' => 'Sanitas', 'arl_entidad' => 'SURA',
         ]);
 
         $this->actingAs($this->admin)->get("/usuarios/{$usuario->id}/carnet")
@@ -184,6 +194,10 @@ class CarnetUsuarioTest extends TestCase
                 ->where('persona.cedula', '1144123456')
                 ->where('persona.cargo', 'Auxiliar logístico')
                 ->where('persona.tieneCargo', true)
+                ->where('persona.rh', 'AB-')
+                ->where('persona.eps', 'Sanitas')
+                ->where('persona.entidadArl', 'SURA')
+                // No va en el carnet: sirve para encontrarla en Usuarios
                 ->where('persona.email', 'ana@example.com')
                 ->where('persona.foto', null)
                 // Asignada a toda la línea logística (sin empresa)
@@ -229,23 +243,23 @@ class CarnetUsuarioTest extends TestCase
         }));
         $this->actingAs($this->admin)->get("/usuarios/{$usuario->id}/arl")->assertOk()->assertHeader('Content-Type', 'application/pdf');
 
-        // Reemplazarla por una imagen borra el PDF y renueva la fecha
+        // Reemplazarla por una imagen conserva el PDF (en el disco y la bitácora) y renueva la fecha
         $this->travel(2)->days();
         $this->actingAs($this->admin)->post("/usuarios/{$usuario->id}", $this->datos(['_method' => 'put', 'password' => '', 'arl' => UploadedFile::fake()->image('arl.jpg')]))
             ->assertSessionHasNoErrors();
         $usuario->refresh();
-        Storage::disk('local')->assertMissing($pdf);
+        Storage::disk('local')->assertExists($pdf);
         $this->assertStringEndsWith('.jpg', $usuario->arl_path);
         $this->assertTrue($usuario->arl_subida_en->equalTo(now()));
 
-        // Editar otros datos no la toca; quitarla la borra
+        // Editar otros datos no la toca; quitarla la deja sin certificado, con el archivo guardado
         $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", $this->datos(['password' => '', 'cargo' => 'Auxiliar']))->assertSessionHasNoErrors();
         $this->assertNotNull($usuario->fresh()->arl_path);
         $imagen = $usuario->fresh()->arl_path;
         $this->actingAs($this->admin)->put("/usuarios/{$usuario->id}", $this->datos(['password' => '', 'quitar_arl' => true]))->assertSessionHasNoErrors();
         $this->assertNull($usuario->fresh()->arl_path);
         $this->assertNull($usuario->fresh()->arl_subida_en);
-        Storage::disk('local')->assertMissing($imagen);
+        Storage::disk('local')->assertExists($imagen);
     }
 
     public function test_la_arl_debe_ser_pdf_o_imagen_liviana(): void
@@ -263,7 +277,7 @@ class CarnetUsuarioTest extends TestCase
         $usuario = User::factory()->create([
             'nombres' => 'Johnny', 'primer_apellido' => 'Correa', 'cargo' => 'Gerente general', 'cedula' => '1144123456',
             'email' => 'johnny@example.com', 'empresa_id' => $empresa->id, 'sede_id' => $sede->id,
-            'linea_servicio_id' => LineaServicio::logistica()->id,
+            'linea_servicio_id' => LineaServicio::logistica()->id, 'rh' => 'O+', 'eps' => 'Nueva EPS', 'arl_entidad' => 'SURA',
         ]);
         Storage::disk('local')->put("fotos/{$usuario->id}/foto.jpg", UploadedFile::fake()->image('foto.jpg')->getContent());
         Storage::disk('local')->put("arl/{$usuario->id}/arl.pdf", '%PDF-1.4 prueba');
@@ -279,8 +293,14 @@ class CarnetUsuarioTest extends TestCase
                 ->where('nombre', 'Johnny Correa')
                 ->where('cargo', 'Gerente general')
                 ->where('cedula', '1144123456')
-                ->where('email', 'johnny@example.com')
-                ->where('asignaciones', [['empresa' => 'Ditransa', 'sede' => 'TuGo', 'sucursal' => null, 'lineas' => [LineaServicio::logistica()->nombre], 'hasta' => null]])
+                // Lo mismo que el carnet: RH, EPS y ARL, sin el correo
+                ->where('rh', 'O+')
+                ->where('eps', 'Nueva EPS')
+                ->where('entidadArl', 'SURA')
+                ->missing('email')
+                // Su línea, como en el carnet: sin la empresa, la sede ni la sucursal
+                ->where('lineas', [LineaServicio::logistica()->nombre])
+                ->missing('asignaciones')
                 ->where('foto', fn ($url) => str_contains($url, "/carnet/{$codigo}/foto"))
                 ->where('arl.pdf', true)
                 ->where('arl.url', fn ($url) => str_contains($url, "/carnet/{$codigo}/arl")));

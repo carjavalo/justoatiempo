@@ -344,7 +344,7 @@ export default function Asignaciones({ personas, filtros, resumen, opciones, emp
                     abierto
                     nombre={`la asignación de ${eliminando.persona.nombre}`}
                     url={route('asignaciones.destroy', eliminando.asignacion.id)}
-                    consecuencia="No se puede deshacer y no queda en su historial. Si la persona solo dejó de trabajar allí, mejor termínala."
+                    consecuencia="Para una asignación hecha por error: deja de verse y de contar. No se borra: queda en el historial. Si la persona solo dejó de trabajar allí, mejor termínala."
                     onCerrar={() => setEliminando(null)}
                 />
             )}

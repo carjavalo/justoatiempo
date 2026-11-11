@@ -153,6 +153,7 @@ export default function Vehiculos({ vehiculos, total, filtros, personas, tipos }
             urlEstado={puede('vehiculos.estado') ? route('vehiculos.estado', v.id) : undefined}
             onEditar={puede('vehiculos.editar') ? (boton) => abrir(v, boton) : undefined}
             urlEliminar={puede('vehiculos.eliminar') ? route('vehiculos.destroy', v.id) : undefined}
+            consecuenciaEliminar="Deja de ofrecerse en la programación. Sus órdenes lo conservan y su placa queda libre por si vuelve a llegar. No se borra: queda en el historial."
             consecuencia="Su historial de órdenes se conserva. Si vuelve a llegar en una preliquidación, sus órdenes se cargan igual. Puedes activarlo de nuevo cuando quieras."
         />
     );

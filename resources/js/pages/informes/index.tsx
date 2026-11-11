@@ -651,7 +651,7 @@ function AccionRegistrada({ accion, editable }: { accion: Accion; editable: bool
                         abierto={eliminando}
                         nombre={`esta acción (${accion.tipoLabel})`}
                         url={route('seguimiento.eliminar', accion.id)}
-                        consecuencia="Deja de contar en el seguimiento de la persona. No se puede deshacer."
+                        consecuencia="Deja de contar en el seguimiento de la persona. No se borra: queda en el historial, con quién y cuándo se eliminó."
                         onCerrar={() => setEliminando(false)}
                     />
                     {modificando && <DialogoModificarAccion accion={accion} onCerrar={() => setModificando(false)} />}

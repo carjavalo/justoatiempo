@@ -168,7 +168,8 @@ class AsignacionesTest extends TestCase
         // Trabaja en dos líneas: al ingresar ve el panel con las dos
         $this->actingAs($ana)->get('/panel')->assertInertia(fn (Assert $p) => $p->has('lineas', 2));
         $this->actingAs($ana)->get('/lineas/aseo-general')->assertOk();
-        $this->actingAs($ana)->get('/carnet/'.$ana->carnet_codigo)->assertInertia(fn (Assert $p) => $p->has('asignaciones', 2));
+        // Al escanear su QR se ven sus dos líneas, como en el carnet (sin las empresas)
+        $this->actingAs($ana)->get('/carnet/'.$ana->carnet_codigo)->assertInertia(fn (Assert $p) => $p->has('lineas', 2)->missing('asignaciones'));
     }
 
     public function test_solo_las_vigentes_cuentan_hoy(): void

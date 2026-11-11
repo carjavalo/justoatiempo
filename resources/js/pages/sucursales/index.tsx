@@ -183,6 +183,7 @@ export default function Sucursales({ sucursales, total, filtros, sedes }: Props)
             urlEstado={puede('sucursales.estado') ? route('sucursales.estado', s.id) : undefined}
             onEditar={puede('sucursales.editar') ? (boton) => abrir(s, boton) : undefined}
             urlEliminar={puede('sucursales.eliminar') ? route('sucursales.destroy', s.id) : undefined}
+            consecuenciaEliminar="Quienes estaban asignados a ella quedan sin esa asignación (sigue en su historial) y se quita su programación de los días por venir. Sus órdenes e informes se conservan."
             consecuencia="No se le podrán asignar nuevas personas; quien trabaja ahí conserva su asignación. Puedes volver a activarla cuando quieras."
         />
     );

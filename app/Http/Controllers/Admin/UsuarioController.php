@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UsuarioRequest;
 use App\Models\Asignacion;
+use App\Models\Bitacora;
 use App\Models\Empresa;
 use App\Models\LineaServicio;
 use App\Models\RolUsuario;
@@ -18,7 +19,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -82,6 +82,9 @@ class UsuarioController extends Controller
                 'segundoApellido' => $u->segundo_apellido,
                 'cedula' => $u->cedula,
                 'cargo' => $u->cargo,
+                'rh' => $u->rh,
+                'eps' => $u->eps,
+                'arlEntidad' => $u->arl_entidad,
                 'email' => $u->email,
                 'acceso' => $u->acceso,
                 'tieneContrasena' => filled($u->password),
@@ -244,8 +247,8 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Guarda el archivo nuevo de un campo o lo quita; el anterior se borra una vez guardado el cambio.
-     * Devuelve si hubo cambio.
+     * Guarda el archivo nuevo de un campo o lo quita. El anterior no se borra: queda en el disco y en la bitácora, con
+     * quién y cuándo lo cambió. Devuelve si hubo cambio.
      */
     private function guardarArchivo(UsuarioRequest $request, User $usuario, string $campo, string $columna, string $carpeta): bool
     {
@@ -260,7 +263,7 @@ class UsuarioController extends Controller
         }
 
         if ($anterior && $anterior !== $usuario->{$columna}) {
-            Storage::disk('local')->delete($anterior);
+            Bitacora::registrar($usuario->{$columna} ? 'archivo_reemplazado' : 'archivo_quitado', $usuario, ['campo' => $campo, 'anterior' => $anterior]);
         }
 
         return true;

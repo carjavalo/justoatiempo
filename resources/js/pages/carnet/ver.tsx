@@ -2,7 +2,7 @@ import { contenedorModulo, EncabezadoModulo } from '@/components/admin/piezas';
 import { AlertTriangle, ArrowUpRight, Download, FileText, LoaderCircle } from '@/components/iconos';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { cedulaLegible, dibujarCarnet, lineasCarnet, partesAsignacion, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
+import { cedulaLegible, dibujarCarnet, partesFranja, partesSalud, prepararCarnet, type DatosCarnet, type RecursosCarnet } from '@/lib/carnet';
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -10,6 +10,8 @@ interface Persona extends DatosCarnet {
     id: number;
     nombreCompleto: string;
     tieneCargo: boolean;
+    /** No va en el carnet: sirve para encontrar a la persona en Usuarios. */
+    email: string | null;
     activo: boolean;
     /** Dirección del certificado de ARL para quien mira, si está cargado. */
     arl: string | null;
@@ -69,6 +71,9 @@ export default function VerCarnet({ persona, propio, editable = false }: Props) 
         !persona.foto && 'la foto',
         !persona.cedula && 'la cédula',
         !persona.tieneCargo && 'el cargo',
+        !persona.rh && 'el RH',
+        !persona.eps && 'la EPS',
+        !persona.entidadArl && 'la ARL',
         !persona.arl && 'el certificado de ARL',
     ].filter(Boolean) as string[];
     const titulo = propio ? 'Mi carnet' : `Carnet de ${persona.nombreCompleto}`;
@@ -76,11 +81,7 @@ export default function VerCarnet({ persona, propio, editable = false }: Props) 
         `Carnet de ${persona.nombreCompleto}`,
         persona.cargo,
         persona.cedula ? cedulaLegible(persona.cedula) : null,
-        persona.email,
-        partesAsignacion(persona)
-            .map(([etiqueta, valor]) => `${etiqueta.toLowerCase()} ${valor}`)
-            .join(', '),
-        lineasCarnet(persona).length ? `líneas ${lineasCarnet(persona).join(', ')}` : null,
+        [...partesSalud(persona).flat(), ...partesFranja(persona)].map(([etiqueta, valor]) => `${etiqueta} ${valor}`).join(', '),
         'con código QR',
     ]
         .filter(Boolean)

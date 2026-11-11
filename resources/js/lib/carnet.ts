@@ -16,14 +16,22 @@ const HOJA_FUENTE = 'https://fonts.bunny.net/css?family=montserrat:600,700,800';
 /** Círculo de la foto, por dentro del aro blanco y coral. */
 const FOTO = { x: 146.2, y: 266.6, radio: 125.4 };
 /**
- * Franja azul de abajo: dónde presta el servicio (empresa, sede y sucursal), en blanco. Va de x 22 hasta antes del
- * corte en diagonal de la franja (x ≈ 488) y su renglón base centra el texto en la franja (y 585 a 612). Debajo,
- * en la franja blanca del borde (y 612 a 637), van sus líneas de servicio.
+ * Franja azul de abajo: la línea de servicio que hace (no la empresa: cambia de cliente y el carnet impreso quedaría
+ * viejo), en blanco. Va de x 22 hasta antes del corte en diagonal de la franja (x ≈ 488) y su renglón base centra el
+ * texto en la franja (y 585 a 612).
  */
 const FRANJA = { x: 22, y: 605, ancho: 458 };
-const ETIQUETA = { peso: 700, tamano: 10.5, espaciado: 0.08, color: '#ffb4a9' };
-const VALOR = { peso: 800, tamano: 18, espaciado: 0, color: '#ffffff' };
-const LINEAS = { x: 22, y: 629, ancho: 593, peso: 700, tamano: 11.5, espaciado: 0.04 };
+const ETIQUETA = { peso: 700, tamano: 10.5, espaciado: 0.08 };
+const VALOR = { peso: 800, tamano: 18, espaciado: 0 };
+const EN_LA_FRANJA = { etiqueta: '#ffb4a9', valor: '#ffffff' };
+
+/**
+ * Donde el diseño traía el correo (el renglón del sobre) van el RH, la EPS y la ARL, en dos renglones a la altura del
+ * círculo coral. El sobre se cubre con el mismo coral y lleva una cruz de salud en blanco.
+ */
+const SALUD = { x: 297, ancho: 236, renglones: [507.5, 532.5], tamano: 0.92 };
+const EN_BLANCO = { etiqueta: 'rgba(11, 29, 85, 0.68)', valor: AZUL };
+const ICONO_SALUD = { x: 258, y: 515.8, radio: 24.8, coral: '#fa6d60' };
 
 /** Recuadro blanco del QR, sobre las siluetas de los edificios. */
 const QR = { x: 540, y: 438, lado: 90, margen: 6 };
@@ -36,7 +44,6 @@ const TEXTOS = {
     apellidos: { x: 298, y: 347, ancho: 272, peso: 800, tamano: 48, espaciado: -0.09 },
     cargo: { x: 299, y: 400, ancho: 277, peso: 700, tamano: 28, espaciado: -0.02 },
     cedula: { x: 297, y: 456, ancho: 236, peso: 700, tamano: 20.2, espaciado: 0 },
-    correo: { x: 297, y: 520.5, ancho: 236, peso: 700, tamano: 21, espaciado: -0.03 },
 };
 
 export interface DatosCarnet {
@@ -44,8 +51,11 @@ export interface DatosCarnet {
     apellidos: string;
     cedula: string | null;
     cargo: string;
-    /** Sin acceso a la plataforma puede no tener correo: ese renglón queda vacío. */
-    email: string | null;
+    /** Grupo sanguíneo y factor RH ("O+"). */
+    rh: string | null;
+    eps: string | null;
+    /** La ARL a la que está afiliada ("SURA"). */
+    entidadArl: string | null;
     /** Dónde presta el servicio hoy: cada asignación vigente con su empresa (sin empresa: toda la línea), sede, sucursal y líneas. */
     asignaciones: { empresa: string | null; sede: string | null; sucursal: string | null; lineas: string[]; hasta: string | null }[];
     /** Dirección de la foto (fondo blanco o sin fondo), si la tiene. */
@@ -151,42 +161,48 @@ export function dibujarCarnet(lienzo: HTMLCanvasElement, recursos: RecursosCarne
     escribir(ctx, apellidos, TEXTOS.apellidos, factorNombre);
     escribir(ctx, datos.cargo.toLocaleUpperCase('es-CO'), TEXTOS.cargo);
     escribir(ctx, datos.cedula ? cedulaLegible(datos.cedula) : '', TEXTOS.cedula);
-    escribir(ctx, datos.email ?? '', TEXTOS.correo);
 
-    dibujarAsignacion(ctx, datos);
-    dibujarLineas(ctx, datos);
+    dibujarSalud(ctx, datos);
+    escribirPares(ctx, partesFranja(datos), { x: FRANJA.x, y: FRANJA.y, ancho: FRANJA.ancho, tamano: 1 }, EN_LA_FRANJA);
     dibujarQr(ctx, recursos.qr);
 }
 
-/** En la franja blanca del borde, en azul: "LÍNEAS  SERVICIOS LOGÍSTICOS · ASEO GENERAL" (se achica si no cabe). */
-function dibujarLineas(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
+/** Lo que dice la franja: "LÍNEA SERVICIOS LOGÍSTICOS"; con varias, "LÍNEAS SERVICIOS LOGÍSTICOS · ASEO GENERAL". */
+export function partesFranja(datos: Pick<DatosCarnet, 'asignaciones'>): [string, string][] {
     const lineas = lineasCarnet(datos);
-    if (lineas.length === 0) return;
-    const texto = `${lineas.length === 1 ? 'LÍNEA' : 'LÍNEAS'}  ${lineas.join('  ·  ').toLocaleUpperCase('es-CO')}`;
-    ctx.save();
-    ctx.fillStyle = AZUL;
-    ctx.textBaseline = 'alphabetic';
-    escribir(ctx, texto, LINEAS);
-    ctx.restore();
+    return [[lineas.length > 1 ? 'Líneas' : 'Línea', lineas.length ? lineas.join(' · ') : 'Sin asignar']];
 }
 
-/**
- * Lo que dice la franja: con una asignación, "EMPRESA DITRANSA · SEDE TUGO · SUCURSAL CALI SUR"; con varias, sus
- * empresas ("EMPRESAS DITRANSA · SODIMAC"); sin empresa, toda la línea; sin asignaciones, "EMPRESA SIN ASIGNAR".
- */
-export function partesAsignacion(datos: Pick<DatosCarnet, 'asignaciones'>): [string, string][] {
-    const asignaciones = datos.asignaciones;
-    if (asignaciones.length === 0) return [['Empresa', 'Sin asignar']];
-    if (asignaciones.length === 1) {
-        const a = asignaciones[0];
-        return [
-            ['Empresa', a.empresa ?? 'Todas las de su línea'],
-            ['Sede', a.sede],
-            ['Sucursal', a.sucursal],
-        ].filter((p): p is [string, string] => Boolean(p[1]));
-    }
-    const empresas = [...new Set(asignaciones.map((a) => a.empresa).filter((e): e is string => Boolean(e)))];
-    return [[empresas.length === 1 ? 'Empresa' : 'Empresas', empresas.length ? empresas.join(' · ') : 'Todas las de sus líneas']];
+/** El RH, la EPS y la ARL que tenga, en los dos renglones del carnet: "RH O+ · ARL SURA" y "EPS NUEVA EPS". */
+export function partesSalud(datos: Pick<DatosCarnet, 'rh' | 'eps' | 'entidadArl'>): [string, string][][] {
+    const pares = (lista: [string, string | null][]) => lista.filter((p): p is [string, string] => Boolean(p[1]));
+    return [
+        pares([
+            ['RH', datos.rh],
+            ['ARL', datos.entidadArl],
+        ]),
+        pares([['EPS', datos.eps]]),
+    ];
+}
+
+function dibujarSalud(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
+    // El sobre del diseño se cubre con su mismo coral y lleva una cruz de salud
+    const { x, y, radio, coral } = ICONO_SALUD;
+    ctx.save();
+    ctx.fillStyle = coral;
+    ctx.beginPath();
+    ctx.arc(x, y, radio, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    const largo = 22;
+    const grueso = 7.5;
+    ctx.beginPath();
+    ctx.roundRect(x - grueso / 2, y - largo / 2, grueso, largo, 1.6);
+    ctx.roundRect(x - largo / 2, y - grueso / 2, largo, grueso, 1.6);
+    ctx.fill();
+    ctx.restore();
+
+    partesSalud(datos).forEach((partes, i) => escribirPares(ctx, partes, { x: SALUD.x, y: SALUD.renglones[i], ancho: SALUD.ancho, tamano: SALUD.tamano }, EN_BLANCO));
 }
 
 /** Las líneas de servicio que hace hoy, sin repetir: "SERVICIOS LOGÍSTICOS · ASEO GENERAL". */
@@ -195,11 +211,17 @@ export function lineasCarnet(datos: Pick<DatosCarnet, 'asignaciones'>): string[]
 }
 
 /**
- * Escribe en la franja azul dónde presta el servicio: cada dato con su etiqueta en coral claro y su valor en
- * blanco. Si no cabe, se achica (hasta un 62 %) y, si aún así no cabe, se angosta: nunca pasa del corte de la franja.
+ * Escribe datos con su etiqueta: la etiqueta pequeña y el valor grande, separados por un punto. Si no caben, se achican
+ * (hasta un 62 %) y, si aún así no caben, se angostan: nunca pasan del espacio del diseño.
  */
-function dibujarAsignacion(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
-    const partes = partesAsignacion(datos).map(([etiqueta, valor]) => [etiqueta.toLocaleUpperCase('es-CO'), valor.toLocaleUpperCase('es-CO')] as const);
+function escribirPares(
+    ctx: CanvasRenderingContext2D,
+    lista: [string, string][],
+    caja: { x: number; y: number; ancho: number; tamano: number },
+    colores: { etiqueta: string; valor: string },
+) {
+    if (lista.length === 0) return;
+    const partes = lista.map(([etiqueta, valor]) => [etiqueta.toLocaleUpperCase('es-CO'), valor.toLocaleUpperCase('es-CO')] as const);
     const separacion = 6;
     const entrePartes = 16;
 
@@ -211,29 +233,29 @@ function dibujarAsignacion(ctx: CanvasRenderingContext2D, datos: DatosCarnet) {
             return total + anchoEtiqueta + separacion * factor + ctx.measureText(valor).width + (i > 0 ? entrePartes * factor : 0);
         }, 0);
 
-    const factor = Math.max(0.62, Math.min(1, FRANJA.ancho / Math.max(1, medir(1))));
-    const angosto = Math.min(1, FRANJA.ancho / Math.max(1, medir(factor)));
+    const factor = caja.tamano * Math.max(0.62, Math.min(1, caja.ancho / Math.max(1, medir(caja.tamano))));
+    const angosto = Math.min(1, caja.ancho / Math.max(1, medir(factor)));
 
     ctx.save();
-    ctx.translate(FRANJA.x, FRANJA.y);
+    ctx.translate(caja.x, caja.y);
     ctx.scale(angosto, 1);
     ctx.textBaseline = 'alphabetic';
     let x = 0;
     partes.forEach(([etiqueta, valor], i) => {
         if (i > 0) {
-            // Punto coral entre un dato y otro
-            ctx.fillStyle = ETIQUETA.color;
+            // Un punto entre un dato y otro
+            ctx.fillStyle = colores.etiqueta;
             ctx.beginPath();
             ctx.arc(x + (entrePartes * factor) / 2, -VALOR.tamano * factor * 0.36, 1.6 * factor, 0, Math.PI * 2);
             ctx.fill();
             x += entrePartes * factor;
         }
         letra(ctx, ETIQUETA, ETIQUETA.tamano * factor);
-        ctx.fillStyle = ETIQUETA.color;
+        ctx.fillStyle = colores.etiqueta;
         ctx.fillText(etiqueta, x, 0);
         x += ctx.measureText(etiqueta).width + separacion * factor;
         letra(ctx, VALOR, VALOR.tamano * factor);
-        ctx.fillStyle = VALOR.color;
+        ctx.fillStyle = colores.valor;
         ctx.fillText(valor, x, 0);
         x += ctx.measureText(valor).width;
     });
