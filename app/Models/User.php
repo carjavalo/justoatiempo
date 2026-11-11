@@ -28,6 +28,12 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
 
+    /** Grupos sanguíneos con su factor RH, como van en el carnet. */
+    public const RH = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+
+    /** La ARL de la empresa: la de quien no tiene otra. */
+    public const ARL_EMPRESA = 'SURA';
+
     /**
      * The attributes that are mass assignable.
      *

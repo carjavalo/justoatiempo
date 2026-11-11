@@ -9,6 +9,7 @@ use App\Services\Drivin\MapeoColumnas;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Csv;
 use PhpOffice\PhpSpreadsheet\Shared\Date as FechaExcel;
@@ -16,7 +17,7 @@ use RuntimeException;
 
 /**
  * Importa el Excel del personal (como "AUXILIARES ACTIVOS.xlsx": cédula, nombres, apellidos, cargo, operación, ciudad,
- * teléfono, correo, nacimiento e ingreso) a Usuarios: cada persona queda con su carnet (y, si se elige, entra con su
+ * teléfono, correo, nacimiento, ingreso, RH, EPS y ARL) a Usuarios: cada persona queda con su carnet (y, si se elige, entra con su
  * cédula) y, si la operación corresponde a una empresa, asignada a ella con sus líneas.
  *
  * Quien ya existe (por cédula) no se reemplaza ni se duplica: solo se le completan los datos que le falten, si quien
@@ -44,6 +45,10 @@ class ImportadorPersonal
         'email' => ['correo', 'correo electronico', 'email', 'e mail'],
         'fecha_nacimiento' => ['fecha nacimiento', 'fecha de nacimiento'],
         'fecha_ingreso' => ['fecha de ingreso', 'fecha ingreso'],
+        // Van en el carnet
+        'rh' => ['rh', 'grupo sanguineo', 'grupo sanguineo y rh', 'grupo sanguineo rh', 'tipo de sangre', 'gs rh', 'g s rh', 'gs y rh', 'g s y rh'],
+        'eps' => ['eps', 'entidad promotora de salud'],
+        'arl_entidad' => ['arl', 'administradora de riesgos laborales'],
     ];
 
     /** Palabras frecuentes en los cargos que el Excel trae sin tilde. */
@@ -168,6 +173,7 @@ class ImportadorPersonal
             }
 
             $telefono = $this->telefono($d['telefono'] ?? null, $avisos);
+            $rh = $this->rh($d['rh'] ?? null, $avisos);
 
             $operacion = $this->texto($d['operacion'] ?? null);
             $empresaId = null;
@@ -189,6 +195,9 @@ class ImportadorPersonal
                 'email' => $email,
                 'fecha_nacimiento' => $nacimiento?->toDateString(),
                 'fecha_ingreso' => $ingreso?->toDateString(),
+                'rh' => $rh,
+                'eps' => $this->entidad($d['eps'] ?? null),
+                'arl_entidad' => $this->entidad($d['arl_entidad'] ?? null),
             ];
 
             $persona = $cedula ? ($existentes[$cedula] ?? null) : null;
@@ -277,12 +286,14 @@ class ImportadorPersonal
             $resultado = ['nuevas' => 0, 'completadas' => 0, 'asignadas' => 0, 'sinAsignar' => 0, 'otraEmpresa' => 0];
 
             foreach ($analisis['filas'] as $f) {
-                $datos = collect($f)->only(['cedula', 'nombres', 'primer_apellido', 'segundo_apellido', 'cargo', 'ciudad', 'telefono', 'email', 'fecha_nacimiento', 'fecha_ingreso'])->all();
+                $datos = collect($f)->only(['cedula', 'nombres', 'primer_apellido', 'segundo_apellido', 'cargo', 'ciudad', 'telefono', 'email', 'fecha_nacimiento', 'fecha_ingreso', 'rh', 'eps', 'arl_entidad'])->all();
 
                 if ($f['accion'] === 'nueva') {
                     $persona = User::create([
                         ...$datos,
                         'cargo' => $datos['cargo'] ?? $rol->nombre,
+                        // Sin ARL en el archivo, la de la empresa (como al crearla a mano)
+                        'arl_entidad' => $datos['arl_entidad'] ?? User::ARL_EMPRESA,
                         'rol_id' => $rol->id,
                         'activo' => true,
                         'acceso' => $acceso,
@@ -331,7 +342,7 @@ class ImportadorPersonal
     private function completar(User $persona, array $datos): array
     {
         $faltan = [];
-        foreach (['cargo', 'ciudad', 'telefono', 'email', 'fecha_nacimiento', 'fecha_ingreso', 'segundo_apellido'] as $campo) {
+        foreach (['cargo', 'ciudad', 'telefono', 'email', 'fecha_nacimiento', 'fecha_ingreso', 'segundo_apellido', 'rh', 'eps', 'arl_entidad'] as $campo) {
             if (blank($persona->{$campo}) && filled($datos[$campo] ?? null)) {
                 $faltan[$campo] = $datos[$campo];
             }
@@ -421,6 +432,32 @@ class ImportadorPersonal
         $avisos[] = "El teléfono «{$texto}» no es válido: se omite.";
 
         return null;
+    }
+
+    /** "o positivo", "0+", "A POS.", "AB RH-" → "O+", "O+", "A+", "AB-"; lo que no se reconoce se omite con un aviso. */
+    private function rh(mixed $valor, array &$avisos): ?string
+    {
+        $texto = $this->texto($valor);
+        if ($texto === null) {
+            return null;
+        }
+        $rh = preg_replace(['/POSITIVO|POS\b/', '/NEGATIVO|NEG\b/', '/RH|[\s.()]/'], ['+', '-', ''], mb_strtoupper(Str::ascii($texto)));
+        // El cero que se escribe en lugar de la O
+        $rh = preg_replace('/^0/', 'O', (string) $rh);
+        if (in_array($rh, User::RH, true)) {
+            return $rh;
+        }
+        $avisos[] = "El RH «{$texto}» no se reconoce: se omite.";
+
+        return null;
+    }
+
+    /** El nombre de la EPS o de la ARL como viene ("NUEVA EPS"), sin espacios de más. */
+    private function entidad(mixed $valor): ?string
+    {
+        $texto = $this->texto($valor);
+
+        return $texto === null ? null : mb_substr(preg_replace('/\s+/u', ' ', $texto), 0, 80);
     }
 
     /** "AUXILIAR LOGISTICO" → "Auxiliar logístico". */

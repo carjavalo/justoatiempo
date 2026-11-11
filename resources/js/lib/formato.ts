@@ -53,12 +53,21 @@ export function saludo(): string {
     return hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 
-/** Semáforo del Excel de la operación: 100 % completa, 80 a 99 % revisar pendientes, menos de 80 % seguimiento inmediato. */
+/**
+ * Semáforo del Excel de la operación, de mayor a menor: desde qué porcentaje aplica cada estado. Lo usan el cálculo y
+ * su leyenda (EscalaSemaforo), así que no pueden decir cosas distintas.
+ */
+export const ESCALA_SEMAFORO: { nivel: NivelEstado; desde: number; rango: string; texto: string }[] = [
+    { nivel: 'good', desde: 100, rango: '100%', texto: 'operación completa' },
+    { nivel: 'warning', desde: 80, rango: '80–99%', texto: 'revisar pendientes' },
+    { nivel: 'critical', desde: -Infinity, rango: 'menos de 80%', texto: 'seguimiento inmediato' },
+];
+
+/** El estado de un porcentaje en el semáforo: "Operación completa", "Revisar pendientes" o "Seguimiento inmediato". */
 export function semaforo(cumplimiento: number | null): { nivel: NivelEstado; texto: string } | null {
     if (cumplimiento === null) return null;
-    if (cumplimiento >= 100) return { nivel: 'good', texto: 'Operación completa' };
-    if (cumplimiento >= 80) return { nivel: 'warning', texto: 'Revisar pendientes' };
-    return { nivel: 'critical', texto: 'Seguimiento inmediato' };
+    const { nivel, texto } = ESCALA_SEMAFORO.find((e) => cumplimiento >= e.desde)!;
+    return { nivel, texto: texto.charAt(0).toUpperCase() + texto.slice(1) };
 }
 
 /** Semáforo frente a la meta: en meta, hasta 10 pts por debajo, o crítico. */

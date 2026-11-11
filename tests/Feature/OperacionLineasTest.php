@@ -260,6 +260,8 @@ class OperacionLineasTest extends TestCase
             ->assertSessionHasErrors(['fecha']);
 
         $novedad = NovedadLinea::sole();
+        // Una primera nota: queda en seguimiento
+        $this->patch("/novedades/{$novedad->id}", ['estado' => 'en_seguimiento', 'seguimiento' => 'Se pidió a la bodega.'])->assertSessionHasNoErrors();
         $this->patch("/novedades/{$novedad->id}", ['estado' => 'cerrada'])->assertSessionHasErrors(['seguimiento']);
         $this->patch("/novedades/{$novedad->id}", ['estado' => 'cerrada', 'seguimiento' => 'Se repuso del inventario.', 'accion' => TipoAccion::Retroalimentacion->value])
             ->assertSessionHasNoErrors();
@@ -277,8 +279,34 @@ class OperacionLineasTest extends TestCase
             ->component('lineas/novedades')
             ->has('novedades.data', 0)
             ->where('conteo.cerrada', 1));
+        // Ninguna nota se reemplaza: las dos quedan, en orden, con quién las escribió y qué hizo con el estado
         $this->get('/lineas/aseo-general/novedades?estado=cerrada')->assertInertia(fn (Assert $p) => $p
-            ->where('novedades.data.0.acciones.0.tipo', 'retroalimentacion'));
+            ->where('novedades.data.0.acciones.0.tipo', 'retroalimentacion')
+            ->has('novedades.data.0.seguimientos', 2)
+            ->where('novedades.data.0.seguimientos.0.nota', 'Se pidió a la bodega.')
+            ->where('novedades.data.0.seguimientos.0.estado', 'en_seguimiento')
+            ->where('novedades.data.0.seguimientos.1.nota', 'Se repuso del inventario.')
+            ->where('novedades.data.0.seguimientos.1.de', 'en_seguimiento')
+            ->where('novedades.data.0.seguimientos.1.estado', 'cerrada')
+            ->where('novedades.data.0.seguimientos.1.quien', $this->coordinador->name)
+            ->where('novedades.data.0.seguimientos.1.accion', TipoAccion::Retroalimentacion->label())
+            ->missing('novedades.data.0.seguimiento'));
+
+        // Ya cerrada, se le puede agregar una nota sin repetir cómo se resolvió; reabrirla también queda
+        $this->patch("/novedades/{$novedad->id}", ['estado' => 'cerrada', 'seguimiento' => 'El proveedor confirmó el despacho.'])->assertSessionHasNoErrors();
+        $this->patch("/novedades/{$novedad->id}", ['estado' => 'en_seguimiento'])->assertSessionHasNoErrors();
+        $this->assertSame(['Se pidió a la bodega.', 'Se repuso del inventario.', 'El proveedor confirmó el despacho.', null], collect($novedad->fresh()->historialSeguimiento())->pluck('nota')->all());
+        $this->assertSame('El proveedor confirmó el despacho.', $novedad->fresh()->seguimiento);
+
+        // El Excel de la línea lleva todo el seguimiento, no solo la última nota
+        $excel = $this->get('/lineas/aseo-general/informe/descargar?desde='.today()->toDateString().'&hasta='.today()->toDateString());
+        $excel->assertOk();
+        $ruta = tempnam(sys_get_temp_dir(), 'informe');
+        file_put_contents($ruta, $excel->streamedContent());
+        $celda = (string) IOFactory::load($ruta)->getSheetByName('Novedades')->getCell('H5')->getValue();
+        @unlink($ruta);
+        $this->assertStringContainsString('Se pidió a la bodega.', $celda);
+        $this->assertStringContainsString('El proveedor confirmó el despacho.', $celda);
     }
 
     public function test_las_novedades_sin_cerrar_van_por_atender_y_lo_que_no_fue_falta_se_cierra_sin_texto(): void

@@ -1,4 +1,4 @@
-import { fmt, type NivelEstado } from '@/lib/formato';
+import { ESCALA_SEMAFORO, fmt, type NivelEstado } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronDown, Minus, XCircle } from '@/components/iconos';
 import { type KeyboardEvent, type ReactNode, useEffect, useState } from 'react';
@@ -150,6 +150,30 @@ const ESTADO = {
     warning: { icono: AlertTriangle, clase: 'bg-warning-soft text-warning' },
     critical: { icono: XCircle, clase: 'bg-critical-soft text-critical' },
 } as const;
+
+/**
+ * La escala del semáforo, una vez por página (bajo las cifras): qué porcentaje lleva a cada estado. `que` dice qué se
+ * mide ("Efectividad, como en el Excel", "Cobertura de cada lugar").
+ */
+export function EscalaSemaforo({ que, className }: { que: string; className?: string }) {
+    const color: Record<NivelEstado, string> = { good: 'text-good', warning: 'text-warning', critical: 'text-critical' };
+    return (
+        <p className={cn('text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs', className)}>
+            <span>{que}:</span>
+            {ESCALA_SEMAFORO.map(({ nivel, rango, texto }) => {
+                const Icono = ESTADO[nivel].icono;
+                return (
+                    <span key={nivel} className="inline-flex items-center gap-1">
+                        <Icono className={cn('size-3.5 shrink-0', color[nivel])} aria-hidden="true" />
+                        <span>
+                            <span className="text-foreground font-semibold">{rango}</span> {texto}
+                        </span>
+                    </span>
+                );
+            })}
+        </p>
+    );
+}
 
 /** Estado con ícono + texto: el color nunca carga el significado solo. */
 export function EstadoBadge({ nivel, children, className }: { nivel: NivelEstado; children: ReactNode; className?: string }) {

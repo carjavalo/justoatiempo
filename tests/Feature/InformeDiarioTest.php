@@ -103,6 +103,29 @@ class InformeDiarioTest extends TestCase
         app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->tugo->id, $this->informe->sucursal_id);
 
         $this->assertSame('Verificar el Drivin', $this->informe->lineas()->sole()->observacion);
+        // Es la misma fila, actualizada en su sitio: no se acumulan copias al recalcular
+        $this->assertSame($linea->id, $this->informe->lineas()->sole()->id);
+        $this->assertSame(1, $this->informe->lineas()->withTrashed()->count());
+    }
+
+    public function test_la_fila_sin_ordenes_se_retira_y_vuelve_con_su_observacion(): void
+    {
+        $linea = $this->informe->lineas()->sole();
+        $linea->update(['observacion' => 'Revisar con el conductor']);
+        $consolidar = fn () => app(ConsolidadorInforme::class)->consolidar('2026-10-02', $this->tugo->id, $this->informe->sucursal_id);
+
+        // Sus órdenes se retiran (como al anular la carga): la fila deja de verse, sin borrarse
+        $ordenes = Orden::where('informe_id', $this->informe->id)->get();
+        $ordenes->each->delete();
+        $consolidar();
+        $this->assertSame(0, $this->informe->lineas()->count());
+        $this->assertSoftDeleted($linea);
+
+        // Vuelven (otra carga del mismo día): reaparece la misma fila, con su observación
+        $ordenes->each->restore();
+        $consolidar();
+        $this->assertSame(['id' => $linea->id, 'observacion' => 'Revisar con el conductor', 'ordenes' => 6], $this->informe->lineas()->sole()->only(['id', 'observacion', 'ordenes']));
+        $this->assertSame(1, $this->informe->lineas()->withTrashed()->count());
     }
 
     public function test_pasa_a_seguimiento_se_cierra_y_se_reabre(): void

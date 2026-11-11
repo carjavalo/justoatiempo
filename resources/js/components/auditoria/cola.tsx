@@ -49,7 +49,9 @@ export function Cola({ ordenes, seleccionadaId, filtros }: { ordenes: OrdenCola[
             {ordenes.length === 0 ? (
                 <p className="text-muted-foreground px-4 py-8 text-center text-sm">No hay órdenes con este filtro.</p>
             ) : (
-                <ul role="list" className="max-h-[calc(100svh-15rem)] min-h-0 divide-y overflow-y-auto overscroll-contain">
+                // Con su propio desplazamiento solo al lado de la orden (computador); en el celular va debajo y se recorre con
+                // la página: una lista con scroll dentro de otra atrapa el dedo
+                <ul role="list" className="min-h-0 divide-y lg:max-h-[calc(100svh-15rem)] lg:overflow-y-auto lg:overscroll-contain">
                     {ordenes.map((o) => {
                         const activa = o.id === seleccionadaId;
                         return (

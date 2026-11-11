@@ -1,4 +1,4 @@
-import { EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
+import { EscalaSemaforo, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import { AlertTriangle, CheckCircle2, Download, Info, type TipoIcono, XCircle } from '@/components/iconos';
 import { FranjaHoy, type Paso, pasosDelDia, plural } from '@/components/linea/dia';
 import { DialogoDescarga } from '@/components/linea/dialogo-descarga';
@@ -135,7 +135,11 @@ export default function InformeLinea({ linea, fecha, hoy, ultima, anterior, sigu
                 </section>
             ) : (
                 <>
-                    <FranjaHoy titulo="Resumen de la jornada" tituloOculto pasos={pasos} />
+                    <div className="flex flex-col gap-2">
+                        <FranjaHoy titulo="Resumen de la jornada" tituloOculto pasos={pasos} />
+                        {/* Qué quiere decir el estado de cada lugar, una vez (solo si alguno ya está calificado) */}
+                        {lugares.some((l) => estadoLugar(l).nivel) && <EscalaSemaforo que="Cobertura de cada lugar (asistieron frente a las requeridas)" />}
+                    </div>
                     {lugares.map((l, i) => (
                         <LugarInforme key={`${l.lugar}-${i}`} lugar={l} />
                     ))}

@@ -19,9 +19,6 @@ class UsuarioRequest extends FormRequest
 {
     use LimpiaTexto;
 
-    /** Grupos sanguíneos con su factor RH, como van en el carnet. */
-    public const RH = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
-
     /** Crear o editar, según el permiso de su rol (la ruta ya lo pide; aquí se confirma). */
     public function authorize(): bool
     {
@@ -71,7 +68,7 @@ class UsuarioRequest extends FormRequest
             // Sin rol y cargo no se crea el usuario: el cargo va en su carnet
             'cargo' => ['required', 'string', 'max:60'],
             // Van en el carnet, donde antes iba el correo
-            'rh' => ['nullable', Rule::in(self::RH)],
+            'rh' => ['nullable', Rule::in(User::RH)],
             'eps' => ['nullable', 'string', 'max:80'],
             'arl_entidad' => ['nullable', 'string', 'max:80'],
             'acceso' => ['required', 'boolean'],

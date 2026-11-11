@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\EstadoInforme;
 use App\Models\InformeDiario;
+use App\Models\InformeLinea;
 use App\Models\Orden;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -88,17 +89,33 @@ class ConsolidadorInforme
 
             Orden::whereIn('id', $ordenes->pluck('id'))->update(['informe_id' => $informe->id]);
 
-            // Lo escrito a mano en cada fila se conserva al recalcular (al auditar o al cargar otra preliquidación)
+            // Cada fila (ruta, placa y auxiliar) se actualiza en su sitio al recalcular (al auditar o al cargar otra
+            // preliquidación): no se acumulan copias, conserva lo escrito a mano y sigue siendo la misma para quien
+            // está escribiendo su observación. La que se quedó sin órdenes se retira con rastro y, si sus órdenes
+            // vuelven (otra carga del mismo día), reaparece con su observación.
             $clave = fn ($ruta, $placa, $auxiliar) => implode('|', [$ruta, $placa, $auxiliar]);
-            $observaciones = $informe->lineas()->whereNotNull('observacion')->get()
-                ->mapWithKeys(fn ($l) => [$clave($l->ruta, $l->vehiculo_id ?? $l->placa, $l->auxiliar_id ?? $l->auxiliar_nombre) => $l->observacion]);
-            $informe->lineas()->delete();
+            $deLaFila = fn (InformeLinea $l) => $clave($l->ruta, $l->vehiculo_id ?? $l->placa, $l->auxiliar_id ?? $l->auxiliar_nombre);
+            $todas = $informe->lineas()->withTrashed()->orderBy('id')->get();
+            $vigentes = $todas->whereNull('deleted_at')->keyBy($deLaFila);
+            // De las retiradas con la misma clave, la más reciente
+            $retiradas = $todas->whereNotNull('deleted_at')->keyBy($deLaFila);
 
             $grupos = $ordenes->groupBy(fn (Orden $o) => $clave($o->ruta, $o->vehiculo_id ?? $o->placa, $o->auxiliar_id ?? $o->auxiliar_nombre));
 
             foreach ($grupos as $llave => $grupo) {
-                $informe->lineas()->create([...$this->calcularLinea($grupo), 'observacion' => $observaciones[$llave] ?? null]);
+                $datos = $this->calcularLinea($grupo);
+                if ($linea = $vigentes->pull($llave)) {
+                    $linea->update($datos);
+                } elseif ($linea = $retiradas->get($llave)) {
+                    $linea->restore();
+                    $linea->update($datos);
+                } else {
+                    $informe->lineas()->create($datos);
+                }
             }
+
+            // Las que ya no tienen órdenes (p. ej. al anular su carga) dejan de verse, sin borrarse
+            $vigentes->each->delete();
 
             $e = self::entregas($ordenes);
 

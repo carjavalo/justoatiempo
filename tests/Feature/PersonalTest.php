@@ -309,6 +309,46 @@ class PersonalTest extends TestCase
         $this->assertSame(3, User::whereIn('cedula', ['1061428366', '1144203579', '1111750549'])->count());
     }
 
+    public function test_la_importacion_trae_el_rh_la_eps_y_la_arl_del_carnet(): void
+    {
+        // Ya estaba registrado sin RH ni EPS: se le completan
+        $juan = User::factory()->sinAcceso()->create(['cedula' => '1144203579', 'nombres' => 'Juan', 'primer_apellido' => 'Plaza', 'rh' => null, 'eps' => null, 'linea_servicio_id' => null]);
+
+        $libro = new Spreadsheet;
+        $libro->getActiveSheet()->fromArray([
+            ['CÉDULA', 'NOMBRES', 'APELLIDOS', 'GRUPO SANGUÍNEO Y RH', 'EPS', 'ARL'],
+            ['1061428366', 'CRISTIAN', 'APONZA MINA', 'o positivo', ' NUEVA  EPS ', null],
+            ['1111750549', 'WISTHON', 'MONDRAGON', '0-', 'Sanitas', 'Colmena'],
+            ['1144203579', 'JUAN', 'PLAZA', 'AB RH+', 'Coosalud', null],
+            ['1000000001', 'ANA', 'RÍOS', 'X+', null, null],
+        ], null, 'A1', true);
+        $ruta = sys_get_temp_dir().'/'.uniqid('personal_').'.xlsx';
+        (new Xlsx($libro))->save($ruta);
+
+        $this->actingAs($this->admin)->post('/usuarios/importar', ['archivo' => new UploadedFile($ruta, 'personal.xlsx', null, null, true)]);
+        $this->get('/usuarios/importar')->assertInertia(fn (Assert $p) => $p
+            // Como sea que venga escrito: "o positivo", "0-" (cero por O) o "AB RH+"
+            ->where('revision.filas.0.rh', 'O+')
+            ->where('revision.filas.0.eps', 'NUEVA EPS')
+            ->where('revision.filas.1.rh', 'O-')
+            ->where('revision.filas.1.arl_entidad', 'Colmena')
+            ->where('revision.filas.2.accion', 'completa')
+            ->where('revision.filas.2.completa', ['rh', 'eps'])
+            ->where('revision.filas.3.rh', null)
+            ->where('revision.filas.3.avisos.0', 'El RH «X+» no se reconoce: se omite.'));
+
+        $token = pathinfo(Storage::files('importaciones')[0], PATHINFO_FILENAME);
+        $this->post('/usuarios/importar/confirmar', ['token' => $token, 'rol_id' => $this->rolBase(Rol::Auxiliar)])->assertSessionHasNoErrors();
+
+        // Sin ARL en el archivo queda la de la empresa; con otra, la suya
+        $persona = fn (string $cedula) => User::where('cedula', $cedula)->sole()->only(['rh', 'eps', 'arl_entidad']);
+        $this->assertSame(['rh' => 'O+', 'eps' => 'NUEVA EPS', 'arl_entidad' => 'SURA'], $persona('1061428366'));
+        $this->assertSame(['rh' => 'O-', 'eps' => 'Sanitas', 'arl_entidad' => 'Colmena'], $persona('1111750549'));
+        $this->assertSame(['rh' => 'AB+', 'eps' => 'Coosalud'], collect($persona('1144203579'))->only(['rh', 'eps'])->all());
+        $this->assertNull($persona('1000000001')['rh']);
+        $this->assertSame('Plaza', $juan->fresh()->primer_apellido);
+    }
+
     public function test_la_importacion_no_muestra_ni_toca_a_quien_no_se_puede_editar_y_confirma_el_archivo_revisado(): void
     {
         $empresaA = $this->empresa('Empresa A');

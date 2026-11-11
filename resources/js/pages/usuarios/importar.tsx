@@ -1,6 +1,7 @@
 import { Campo } from '@/components/admin/campo';
 import { claseTd, claseTh, contenedorModulo, EncabezadoModulo, Tabla } from '@/components/admin/piezas';
 import { AlertTriangle, FileSpreadsheet, Info, LoaderCircle, UploadCloud, UsersRound, XCircle } from '@/components/iconos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { Selector } from '@/components/selector';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +23,9 @@ interface FilaImportacion {
     telefono: string | null;
     email: string | null;
     fecha_ingreso: string | null;
+    rh: string | null;
+    eps: string | null;
+    arl_entidad: string | null;
     operacion: string | null;
     empresaId: number | null;
     /** Los datos que se le completan a quien ya estaba registrado. */
@@ -60,6 +64,7 @@ const COLUMNAS = [
     ['OPERACIÓN', 'la empresa donde presta el servicio'],
     ['CIUDAD, TELÉFONO y CORREO', ''],
     ['FECHA NACIMIENTO y FECHA DE INGRESO', ''],
+    ['RH, EPS y ARL', 'van en el carnet; sin ARL, queda SURA'],
 ];
 
 const CAMPOS: Record<string, string> = {
@@ -70,6 +75,9 @@ const CAMPOS: Record<string, string> = {
     fecha_nacimiento: 'nacimiento',
     fecha_ingreso: 'ingreso',
     segundo_apellido: 'segundo apellido',
+    rh: 'RH',
+    eps: 'EPS',
+    arl_entidad: 'ARL',
 };
 
 const ACCIONES: Record<Accion, { texto: string; clase: string }> = {
@@ -89,7 +97,7 @@ export default function ImportarPersonal({ revision, roles, rolPorDefecto, empre
             <div className={contenedorModulo}>
                 <EncabezadoModulo
                     titulo="Importar personal"
-                    descripcion="Sube el Excel del personal (como «Auxiliares activos»). Cada persona queda en Usuarios con su carnet y, si lo eliges, entra con su cédula; a quien ya estaba registrado solo se le completan los datos que le falten."
+                    descripcion="Sube el Excel del personal (como «Auxiliares activos»): cada persona queda en Usuarios con su carnet. A quien ya estaba solo se le completa lo que le falte."
                 />
 
                 {revision ? (
@@ -179,8 +187,19 @@ function SubirArchivo() {
                         <>
                             <UploadCloud className="text-primary size-9" aria-hidden="true" />
                             <span className="text-base font-bold text-balance">
-                                Arrastra aquí el Excel del personal o{' '}
-                                <span className="text-primary underline underline-offset-4">elige el archivo</span>
+                                <SegunPuntero
+                                    mouse={
+                                        <>
+                                            Arrastra aquí el Excel del personal o{' '}
+                                            <span className="text-primary underline underline-offset-4">elige el archivo</span>
+                                        </>
+                                    }
+                                    dedo={
+                                        <>
+                                            <span className="text-primary underline underline-offset-4">Elige el Excel del personal</span>
+                                        </>
+                                    }
+                                />
                             </span>
                             <span id="archivo-ayuda" className="text-muted-foreground text-xs text-pretty">
                                 Excel (.xlsx, .xls) o CSV · máximo 5 MB. Antes de importar verás qué pasará con cada persona.
@@ -380,7 +399,7 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                             Persona
                         </th>
                         <th scope="col" className={claseTh}>
-                            Cargo
+                            Carnet
                         </th>
                         <th scope="col" className={claseTh}>
                             Contacto
@@ -403,7 +422,21 @@ function RevisionArchivo({ revision, roles, rolPorDefecto, empresas, puedeAsigna
                                 </p>
                                 <p className="text-muted-foreground text-xs tabular-nums">{f.cedula ? `C.C. ${f.cedula}` : 'Sin cédula'}</p>
                             </th>
-                            <td className={cn(claseTd, 'text-xs')}>{f.cargo ?? <span className="text-muted-foreground">Sin cargo</span>}</td>
+                            <td className={cn(claseTd, 'text-xs')}>
+                                {f.cargo ?? <span className="text-muted-foreground">Sin cargo</span>}
+                                {/* La ARL de la empresa (SURA) no se repite en cada fila: solo si el archivo trae otra */}
+                                {(f.rh || f.eps || (f.arl_entidad && f.arl_entidad.toUpperCase() !== 'SURA')) && (
+                                    <p className="text-muted-foreground mt-0.5">
+                                        {[
+                                            f.rh && `RH ${f.rh}`,
+                                            f.eps && `EPS ${f.eps}`,
+                                            f.arl_entidad && f.arl_entidad.toUpperCase() !== 'SURA' && `ARL ${f.arl_entidad}`,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </p>
+                                )}
+                            </td>
                             <td className={cn(claseTd, 'text-xs leading-relaxed')}>
                                 {f.telefono || f.email || f.ciudad ? (
                                     <>

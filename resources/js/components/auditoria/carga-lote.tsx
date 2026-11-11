@@ -2,6 +2,7 @@ import { subirEnTandas, type ResultadoSubida } from '@/lib/subida';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, FolderUp, LoaderCircle, X } from '@/components/iconos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { useRef, useState } from 'react';
 
 /**
@@ -77,7 +78,8 @@ export function CargaLote({ fecha }: { fecha: string }) {
                         </span>
                     ) : (
                         <span id="ayuda-lote" className="text-muted-foreground block text-xs text-pretty">
-                            Arrastra aquí los PDF de Drivin o fotos: cada uno va a su orden por el código del nombre
+                            <SegunPuntero mouse="Arrastra aquí los PDF de Drivin o fotos" dedo="Elige los PDF de Drivin o fotos" />: cada uno va a su orden
+                            por el código del nombre
                             <span className="hidden sm:inline"> (p. ej. POD_PDVT000228311.pdf)</span>.
                         </span>
                     )}

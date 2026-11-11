@@ -1,5 +1,6 @@
 import { Campo } from '@/components/admin/campo';
 import { FileText, LoaderCircle } from '@/components/iconos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { propsCampo } from '@/lib/formularios';
 import { pesoLegible, reducirImagen } from '@/lib/imagen';
 import { cn } from '@/lib/utils';
@@ -115,7 +116,7 @@ export function CampoDocumento({ id, etiqueta, ayuda, error, archivo, actual, ac
                     ) : (
                         <span className="text-muted-foreground flex flex-col items-center gap-0.5 text-[0.65rem] font-bold">
                             <FileText className="size-7" aria-hidden="true" />
-                            {hayDocumento ? (esPdf ? 'PDF' : 'Imagen') : 'Arrastra aquí'}
+                            {hayDocumento ? esPdf ? 'PDF' : 'Imagen' : <SegunPuntero mouse="Arrastra aquí" dedo="Sin archivo" />}
                         </span>
                     )}
                 </div>

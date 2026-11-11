@@ -3,9 +3,8 @@ import { Campo } from '@/components/admin/campo';
 import { claseTd, claseTh } from '@/components/admin/piezas';
 import { DialogoFormulario } from '@/components/dialogo-formulario';
 import { Cifra, Cifras } from '@/components/cargas/piezas';
-import { EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
+import { EscalaSemaforo, EstadoBadge as EstadoNivel, Panel } from '@/components/dashboard/piezas';
 import {
-    AlertTriangle,
     CheckCircle2,
     ClipboardCheck,
     Download,
@@ -16,7 +15,6 @@ import {
     Plus,
     Trash2,
     Undo2,
-    XCircle,
 } from '@/components/iconos';
 import InputError from '@/components/input-error';
 import { DialogoDescarga } from '@/components/linea/dialogo-descarga';
@@ -124,13 +122,6 @@ interface Props {
 
 const plural = (n: number, uno: string, varios: string) => `${fmt.numero(n)} ${n === 1 ? uno : varios}`;
 
-/** La escala de la efectividad, la misma del Excel del informe (su leyenda): se muestra una vez, bajo las cifras. */
-const ESCALA = [
-    { icono: CheckCircle2, clase: 'text-good', rango: '100%', texto: 'operación completa' },
-    { icono: AlertTriangle, clase: 'text-warning', rango: '80–99%', texto: 'revisar pendientes' },
-    { icono: XCircle, clase: 'text-critical', rango: 'menos de 80%', texto: 'seguimiento inmediato' },
-];
-
 export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede, sedes, informes, resumen, porCiudad, tiposAccion, umbrales }: Props) {
     const puede = usePuede();
     const [descargar, setDescargar] = useState(false);
@@ -235,17 +226,8 @@ export default function Informes({ fecha, hoy, ultima, anterior, siguiente, sede
                                 }
                             />
                         </Cifras>
-                        <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                            <span>Efectividad, como en el Excel:</span>
-                            {ESCALA.map(({ icono: Icono, clase, rango, texto }) => (
-                                <span key={rango} className="inline-flex items-center gap-1">
-                                    <Icono className={cn('size-3.5 shrink-0', clase)} aria-hidden="true" />
-                                    <span>
-                                        <span className="text-foreground font-semibold">{rango}</span> {texto}
-                                    </span>
-                                </span>
-                            ))}
-                        </p>
+                        {/* La escala de la efectividad, la misma del Excel del informe: una vez, bajo las cifras */}
+                        <EscalaSemaforo que="Efectividad, como en el Excel" />
                     </div>
 
                     {informes.map((informe) => (

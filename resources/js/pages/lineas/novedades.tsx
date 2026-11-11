@@ -8,6 +8,7 @@ import {
     AlertTriangle,
     Check,
     CheckCircle2,
+    ChevronDown,
     CircleDashed,
     EnRevision,
     Felicitacion,
@@ -38,6 +39,16 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 type Gravedad = 'ninguna' | 'leve' | 'grave';
 type Estado = 'abierta' | 'en_seguimiento' | 'cerrada';
 
+/** Un paso del seguimiento, con quién y cuándo (sin fecha ni autor: lo escrito antes de que hubiera historial). */
+interface Paso {
+    fecha: string | null;
+    quien: string | null;
+    de: Estado | null;
+    estado: Estado | null;
+    nota: string | null;
+    accion: string | null;
+}
+
 interface Novedad {
     id: number;
     fecha: string;
@@ -50,7 +61,8 @@ interface Novedad {
     gravedad: Gravedad;
     descripcion: string;
     estado: Estado;
-    seguimiento: string | null;
+    /** Todo el seguimiento, del primero al último: ninguna nota se reemplaza. */
+    seguimientos: Paso[];
     registradaPor: string | null;
     registradaEn: string | null;
     cerradaPor: string | null;
@@ -129,7 +141,7 @@ export default function Novedades({ linea, novedades, filtros, conteo, lugares, 
     const cerrar = (n: Novedad) =>
         router.patch(
             route('novedades.seguimiento', n.id),
-            { estado: 'cerrada', seguimiento: n.seguimiento ?? '' },
+            { estado: 'cerrada', seguimiento: '' },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -286,6 +298,37 @@ export default function Novedades({ linea, novedades, filtros, conteo, lugares, 
 
 const plural = (n: number) => `${fmt.numero(n)} ${n === 1 ? 'novedad' : 'novedades'}`;
 
+/** Lo que hizo con el estado en ese paso: "la cerró", "la reabrió", "la pasó a seguimiento". */
+function cambioDeEstado(p: Paso): string | null {
+    if (!p.de || !p.estado || p.de === p.estado) return null;
+    if (p.estado === 'cerrada') return 'la cerró';
+    if (p.de === 'cerrada') return 'la reabrió';
+    return p.estado === 'en_seguimiento' ? 'la pasó a seguimiento' : 'la dejó abierta';
+}
+
+/**
+ * Quién escribió la nota, qué hizo con el estado y cuándo: "Ana Ríos · la cerró · hace 2 horas". En la última nota de la
+ * tarjeta no se dice el estado: ya lo dice su pie.
+ */
+function AutorPaso({ paso: p, conEstado = true }: { paso: Paso; conEstado?: boolean }) {
+    if (!p.quien && !p.fecha) return null;
+    const cambio = conEstado ? cambioDeEstado(p) : null;
+    return (
+        <p className="text-muted-foreground mt-0.5 text-xs">
+            {p.quien && <span className="text-foreground font-semibold">{p.quien}</span>}
+            {cambio && ` · ${cambio}`}
+            {p.fecha && (
+                <>
+                    {' · '}
+                    <time dateTime={p.fecha} title={new Date(p.fecha).toLocaleString('es-CO')}>
+                        {haceCuanto(p.fecha)}
+                    </time>
+                </>
+            )}
+        </p>
+    );
+}
+
 /**
  * Una novedad: su gravedad a la izquierda (dibujo y color), qué pasó, y su estado y quién la registró al pie. A la vista,
  * solo la acción que sigue (dar seguimiento; cerrar, si no fue una falta; ver o reabrir, si ya se cerró); editar y
@@ -324,6 +367,9 @@ function FilaNovedad({
     const deCual = ` la novedad ${n.tipo} del ${fechaDia(n.fecha)}`;
     // Lo que no es la acción principal; sin nada, no hay menú
     const masDarSeguimiento = puedeCerrar && !cerrada && sinFalta;
+    // Las notas, de la más reciente a la primera: la última a la vista y las demás en el historial
+    const notas = n.seguimientos.filter((p) => p.nota).reverse();
+    const [ultima, ...anteriores] = notas;
     const masEditar = puedeEditar && !cerrada;
     const conMenu = masDarSeguimiento || masEditar || puedeEliminar;
 
@@ -411,11 +457,33 @@ function FilaNovedad({
                 </div>
 
                 <p className="mt-2 text-sm leading-relaxed whitespace-pre-line">{n.descripcion}</p>
-                {n.seguimiento && (
-                    <p className="bg-muted/50 mt-2 rounded-lg px-3 py-2 text-sm whitespace-pre-line">
-                        <span className="font-semibold">Seguimiento: </span>
-                        {n.seguimiento}
-                    </p>
+                {ultima && (
+                    <div className="bg-muted/50 mt-2 rounded-lg px-3 py-2 text-sm">
+                        <p className="whitespace-pre-line">
+                            <span className="font-semibold">Seguimiento: </span>
+                            {ultima.nota}
+                        </p>
+                        <AutorPaso paso={ultima} conEstado={false} />
+                        {anteriores.length > 0 && (
+                            <details className="group mt-2">
+                                <summary className="text-primary focus-visible:ring-ring inline-flex min-h-6 cursor-pointer list-none items-center gap-1 rounded-sm text-xs font-semibold focus-visible:ring-2 focus-visible:outline-hidden [&::-webkit-details-marker]:hidden">
+                                    <ChevronDown
+                                        className="size-3.5 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                                        aria-hidden="true"
+                                    />
+                                    {anteriores.length === 1 ? 'Ver la nota anterior' : `Ver las ${anteriores.length} notas anteriores`}
+                                </summary>
+                                <ol role="list" className="border-border mt-2 grid gap-2.5 border-l-2 pl-3">
+                                    {anteriores.map((p, i) => (
+                                        <li key={i}>
+                                            <p className="whitespace-pre-line">{p.nota}</p>
+                                            <AutorPaso paso={p} />
+                                        </li>
+                                    ))}
+                                </ol>
+                            </details>
+                        )}
+                    </div>
                 )}
                 {n.acciones.length > 0 && (
                     <p className="mt-2 text-sm">
@@ -630,12 +698,15 @@ function DialogoSeguimiento({
 }) {
     const form = useForm<{ estado: Estado; seguimiento: string; accion: string; accion_descripcion: string }>({
         estado: novedad.estado === 'abierta' ? 'en_seguimiento' : novedad.estado,
-        seguimiento: novedad.seguimiento ?? '',
+        // Una nota nueva: lo anterior queda en el historial con quién y cuándo
+        seguimiento: '',
         accion: '',
         accion_descripcion: '',
     });
-    // Para cerrarla hay que contar cómo se resolvió, salvo que no haya sido una falta
-    const pideCierre = form.data.estado === 'cerrada' && novedad.gravedad !== 'ninguna';
+    // Para cerrarla hay que contar cómo se resolvió, salvo que no haya sido una falta o ya esté cerrada
+    const pideCierre = form.data.estado === 'cerrada' && novedad.estado !== 'cerrada' && novedad.gravedad !== 'ninguna';
+    const ultima = novedad.seguimientos.filter((p) => p.nota).slice(-1)[0];
+    const notas = novedad.seguimientos.filter((p) => p.nota).length;
 
     const enviar = (e: FormEvent) => {
         e.preventDefault();
@@ -661,6 +732,15 @@ function DialogoSeguimiento({
             }
         >
             <p className="bg-muted/50 rounded-lg px-3 py-2 text-sm whitespace-pre-line">{novedad.descripcion}</p>
+            {ultima && (
+                <div className="rounded-lg border px-3 py-2 text-sm">
+                    <p className="whitespace-pre-line">
+                        <span className="font-semibold">{notas > 1 ? `Último seguimiento (de ${notas}): ` : 'Último seguimiento: '}</span>
+                        {ultima.nota}
+                    </p>
+                    <AutorPaso paso={ultima} />
+                </div>
+            )}
             <OpcionesRadio
                 id="estado"
                 etiqueta="Estado"
@@ -672,11 +752,11 @@ function DialogoSeguimiento({
             />
             <Campo
                 id="seguimiento"
-                etiqueta="Seguimiento"
+                etiqueta={ultima ? 'Nueva nota' : 'Seguimiento'}
                 requerido={pideCierre}
-                ayuda={
-                    form.data.estado !== 'cerrada' ? 'Qué se ha hecho y qué falta.' : pideCierre ? 'Cómo se resolvió.' : 'Opcional: no fue una falta.'
-                }
+                ayuda={`${
+                    form.data.estado !== 'cerrada' ? 'Qué se hizo y qué falta.' : pideCierre ? 'Cómo se resolvió.' : 'Opcional.'
+                } Queda con tu nombre y la fecha${ultima ? ', sin reemplazar lo anterior' : ''}.`}
                 error={form.errors.seguimiento}
             >
                 <Textarea

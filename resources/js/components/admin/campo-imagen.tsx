@@ -1,5 +1,6 @@
 import { Campo } from '@/components/admin/campo';
 import { LoaderCircle, UserRound } from '@/components/iconos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { propsCampo } from '@/lib/formularios';
 import { pesoLegible, reducirImagen } from '@/lib/imagen';
 import { quitarFondo, tieneFondo } from '@/lib/quitar-fondo';
@@ -204,7 +205,7 @@ export function CampoImagen({ id, etiqueta, ayuda, error, archivo, actual, quita
                     ) : (
                         <span className="text-muted-foreground flex flex-col items-center gap-1 px-2 text-center text-[0.7rem] leading-tight">
                             <UserRound className="size-7" aria-hidden="true" />
-                            Arrastra la foto aquí
+                            <SegunPuntero mouse="Arrastra la foto aquí" dedo="Sin foto" />
                         </span>
                     )}
                 </div>

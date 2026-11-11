@@ -55,7 +55,7 @@ class NovedadController extends Controller
                 ->orderByRaw("case gravedad when 'grave' then 0 when 'leve' then 1 else 2 end")
                 ->orderBy('fecha'))
             ->orderByDesc('id')
-            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'persona:id,name,cedula', 'registradaPor:id,name', 'cerradaPor:id,name', 'acciones.registradoPor:id,name'])
+            ->with(['empresa:id,nombre', 'sede:id,nombre', 'sucursal:id,nombre', 'persona:id,name,cedula', 'registradaPor:id,name', 'cerradaPor:id,name', 'acciones.registradoPor:id,name', 'seguimientos.usuario:id,name'])
             ->paginate(20)
             ->withQueryString()
             ->through(fn (NovedadLinea $n) => [
@@ -70,7 +70,8 @@ class NovedadController extends Controller
                 'gravedad' => $n->gravedad,
                 'descripcion' => $n->descripcion,
                 'estado' => $n->estado,
-                'seguimiento' => $n->seguimiento,
+                // Cada nota con quién y cuándo: el seguimiento no se reemplaza
+                'seguimientos' => $n->historialSeguimiento(),
                 'registradaPor' => $n->registradaPor?->name,
                 'registradaEn' => $n->created_at?->toIso8601String(),
                 'cerradaPor' => $n->cerradaPor?->name,
@@ -172,7 +173,10 @@ class NovedadController extends Controller
         ];
     }
 
-    /** El seguimiento: en qué va, cómo se cerró y, si se toma, la acción de desempeño con la persona. */
+    /**
+     * Un paso más del seguimiento: una nota nueva (en qué va o cómo se cerró), el estado y, si se toma, la acción de
+     * desempeño con la persona. Lo anterior no se reemplaza: cada paso queda en la bitácora con quién y cuándo.
+     */
     public function seguimiento(Request $request, NovedadLinea $novedad): RedirectResponse
     {
         $yo = $request->user();
@@ -181,8 +185,8 @@ class NovedadController extends Controller
 
         $datos = $request->validate([
             'estado' => ['required', Rule::in(array_keys(NovedadLinea::ESTADOS))],
-            // Lo que no fue una falta (una felicitación del cliente) se cierra sin contar cómo se resolvió
-            'seguimiento' => ['nullable', 'string', 'max:2000', Rule::requiredIf(fn () => $request->input('estado') === 'cerrada' && $novedad->gravedad !== 'ninguna')],
+            // Al cerrarla se cuenta cómo se resolvió, salvo que no haya sido una falta (una felicitación del cliente)
+            'seguimiento' => ['nullable', 'string', 'max:2000', Rule::requiredIf(fn () => $request->input('estado') === 'cerrada' && $novedad->estado !== 'cerrada' && $novedad->gravedad !== 'ninguna')],
             'accion' => ['nullable', Rule::in(TipoAccion::values())],
             'accion_descripcion' => ['nullable', 'string', 'max:500'],
         ], ['seguimiento.required' => 'Para cerrarla, cuenta cómo se resolvió.', 'accion.in' => 'Elige una de las acciones de la lista.']);
@@ -198,12 +202,24 @@ class NovedadController extends Controller
 
         DB::transaction(function () use ($novedad, $datos, $yo) {
             $cerrada = $datos['estado'] === 'cerrada';
+            $de = $novedad->estado;
+            $nota = trim((string) ($datos['seguimiento'] ?? '')) ?: null;
             $novedad->update([
                 'estado' => $datos['estado'],
-                'seguimiento' => trim((string) ($datos['seguimiento'] ?? '')) ?: null,
+                // La última nota (la que va en el Excel con las demás); sin una nueva, sigue la anterior
+                'seguimiento' => $nota ?? $novedad->seguimiento,
                 'cerrada_por' => $cerrada ? ($novedad->cerrada_por ?? $yo->id) : null,
                 'cerrada_en' => $cerrada ? ($novedad->cerrada_en ?? now()) : null,
             ]);
+
+            if ($nota !== null || $de !== $datos['estado'] || ! empty($datos['accion'])) {
+                Bitacora::registrar('seguimiento', $novedad, [
+                    'de' => $de,
+                    'estado' => $datos['estado'],
+                    'nota' => $nota,
+                    'accion' => ! empty($datos['accion']) ? TipoAccion::from($datos['accion'])->label() : null,
+                ]);
+            }
 
             if (! empty($datos['accion'])) {
                 AccionDesempeno::create([

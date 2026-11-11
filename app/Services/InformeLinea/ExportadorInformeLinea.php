@@ -6,6 +6,7 @@ use App\Models\NovedadLinea;
 use App\Models\ProgramacionAsignacion;
 use App\Services\FormatoExcel;
 use App\Support\OperacionLinea;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Shared\Date as FechaExcel;
@@ -86,6 +87,9 @@ class ExportadorInformeLinea
         $this->titulo($hoja, 'NOVEDADES Y SEGUIMIENTO', 'Novedades registradas '.$this->periodo($desde, $hasta), count($encabezados));
         $this->encabezados($hoja, $encabezados, 4);
 
+        // Todo el seguimiento de cada una, no solo la última nota
+        (new EloquentCollection($novedades->all()))->loadMissing('seguimientos.usuario:id,name');
+
         $fila = 5;
         foreach ($novedades as $n) {
             $hoja->fromArray([
@@ -96,7 +100,9 @@ class ExportadorInformeLinea
                 NovedadLinea::GRAVEDADES[$n->gravedad] ?? $n->gravedad,
                 $n->descripcion,
                 NovedadLinea::ESTADOS[$n->estado] ?? $n->estado,
-                $n->seguimiento,
+                collect($n->historialSeguimiento())->whereNotNull('nota')
+                    ->map(fn (array $p) => ($p['fecha'] ? Carbon::parse($p['fecha'])->format('d/m/Y').($p['quien'] ? " ({$p['quien']})" : '').': ' : '').$p['nota'])
+                    ->implode("\n"),
                 $n->registradaPor?->name,
             ], null, "A{$fila}", true);
             $fila++;

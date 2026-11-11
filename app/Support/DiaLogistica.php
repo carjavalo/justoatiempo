@@ -21,7 +21,7 @@ use Illuminate\Support\Carbon;
  */
 final class DiaLogistica
 {
-    /** Las jornadas de Drivin son días de Colombia; el servidor corre en UTC (a las 7 p. m. ya sería mañana). */
+    /** Las jornadas de Drivin son días de Colombia (la aplicación ya corre en esa hora; se dice por si se cambia). */
     private const ZONA = 'America/Bogota';
 
     private ?OperacionLogistica $op = null;

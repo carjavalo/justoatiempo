@@ -6,6 +6,7 @@ import { fmt } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 import { Link, router, usePage } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, UploadCloud, XCircle } from '@/components/iconos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { type DragEvent, useRef, useState } from 'react';
 
 interface FilaCarga {
@@ -140,8 +141,9 @@ export default function Cargas({ cargas, jornadaPendiente }: { cargas: Paginado<
                                             )}
                                         </span>
                                         <span id="archivo-ayuda" className="text-muted-foreground text-xs text-pretty">
-                                            Arrástrala aquí: Excel (.xlsx, .xls) o CSV exportado de Drivin, máximo 10 MB. Antes de importar la revisas con
-                                            el sistema; nada se guarda hasta que la confirmes.
+                                            <SegunPuntero mouse="Arrástrala aquí: " dedo={null} />
+                                            Excel (.xlsx, .xls) o CSV exportado de Drivin, máximo 10 MB. Antes de importar la revisas con el sistema; nada
+                                            se guarda hasta que la confirmes.
                                         </span>
                                     </span>
                                     <span className="border-input bg-background text-foreground inline-flex h-10 shrink-0 items-center rounded-lg border px-4 text-sm font-semibold">

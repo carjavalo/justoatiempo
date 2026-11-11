@@ -87,6 +87,36 @@ class NovedadLinea extends Model
         return $this->hasMany(AccionDesempeno::class, 'novedad_id');
     }
 
+    /** Cada vez que se le dio seguimiento (su nota, su cambio de estado y su acción), en orden, con quién y cuándo. */
+    public function seguimientos(): HasMany
+    {
+        return $this->hasMany(Bitacora::class, 'modelo_id')->where('modelo_tipo', self::class)->where('accion', 'seguimiento')->orderBy('id');
+    }
+
+    /**
+     * El historial del seguimiento: nada se reemplaza, cada nota queda con quién la escribió y cuándo. Lo escrito antes
+     * de que hubiera historial es una sola nota, sin fecha ni autor.
+     *
+     * @return list<array{fecha: string|null, quien: string|null, de: string|null, estado: string|null, nota: string|null, accion: string|null}>
+     */
+    public function historialSeguimiento(): array
+    {
+        $pasos = $this->seguimientos->map(fn (Bitacora $b) => [
+            'fecha' => $b->created_at?->toIso8601String(),
+            'quien' => $b->usuario?->name,
+            'de' => $b->cambios['de'] ?? null,
+            'estado' => $b->cambios['estado'] ?? null,
+            'nota' => $b->cambios['nota'] ?? null,
+            'accion' => $b->cambios['accion'] ?? null,
+        ])->values()->all();
+
+        if ($pasos === [] && filled($this->seguimiento)) {
+            return [['fecha' => null, 'quien' => null, 'de' => null, 'estado' => null, 'nota' => $this->seguimiento, 'accion' => null]];
+        }
+
+        return $pasos;
+    }
+
     /** "Ditransa · TuGo · Cali Sur". */
     public function lugar(): string
     {

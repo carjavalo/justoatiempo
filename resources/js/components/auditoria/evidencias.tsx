@@ -8,6 +8,7 @@ import { router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Download, Expand, FileText, ImagePlus, LoaderCircle, Trash2 } from '@/components/iconos';
 import { useId, useRef, useState } from 'react';
 import { type EvidenciaOrden } from './tipos';
+import { SegunPuntero } from '@/components/segun-puntero';
 import { Selector } from '@/components/selector';
 
 const tamano = (bytes: number | null) => (bytes === null ? '' : bytes > 1048576 ? `${(bytes / 1048576).toLocaleString('es-CO', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
@@ -56,7 +57,9 @@ function AgregarEvidencias({ ordenId, deshabilitado }: { ordenId: number; deshab
             >
                 {subiendo ? <LoaderCircle className="text-primary size-5 motion-safe:animate-spin" aria-hidden="true" /> : <ImagePlus className="text-primary size-5" aria-hidden="true" />}
                 <span className="font-semibold">{subiendo ? 'Subiendo…' : 'Agregar PDF o fotos'}</span>
-                <span className="text-muted-foreground">Arrastra aquí o elige · máx. 15 MB c/u</span>
+                <span className="text-muted-foreground">
+                    <SegunPuntero mouse="Arrastra aquí o elige" dedo="Toca para elegir" /> · máx. 15 MB c/u
+                </span>
             </label>
             <p role="status" className={cn('mt-2 text-xs font-medium', mensaje ? 'text-muted-foreground' : 'sr-only')}>
                 {subiendo ? 'Subiendo evidencias…' : mensaje}
