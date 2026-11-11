@@ -106,8 +106,8 @@ class Trazabilidad
     /** Las evidencias y la auditoría, con lo que cada persona hizo en la plataforma. */
     private function deLaPlataforma(Collection $eventos, Orden $o, Collection $bitacora): void
     {
-        // Las que se subieron juntas son un solo paso
-        $o->evidencias->groupBy(fn (Evidencia $e) => $e->subido_por.'|'.$e->created_at?->format('Y-m-d H:i'))->each(function (Collection $grupo) use ($eventos) {
+        // Las que se subieron juntas son un solo paso; las fotos separadas de un PDF van con su PDF
+        $o->evidencias->whereNull('origen_id')->groupBy(fn (Evidencia $e) => $e->subido_por.'|'.$e->created_at?->format('Y-m-d H:i'))->each(function (Collection $grupo) use ($eventos) {
             $primera = $grupo->first();
             $n = $grupo->count();
             $eventos->push($this->evento($primera->created_at, 'evidencia', $n === 1 ? 'Evidencia subida' : "{$n} evidencias subidas", $grupo->pluck('nombre_original')->filter()->take(5)->implode(', '), $primera->subidoPor?->name, 'neutro'));

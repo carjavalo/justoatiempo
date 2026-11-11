@@ -73,7 +73,7 @@ export function evaluar(c: Checklist): Evaluacion {
     return { cumple: false, faltantes, novedad, concepto: `Falta: ${enumerar(faltantes)}.${notaIlegibles}` };
 }
 
-export type TipoEvidencia = 'fachada' | 'sellado' | 'destapado' | 'remesa' | 'rotulo' | 'pdf_pod' | 'ilegible' | 'otro';
+export type TipoEvidencia = 'fachada' | 'sellado' | 'destapado' | 'remesa' | 'rotulo' | 'pdf_pod' | 'ilegible' | 'repetida' | 'firma' | 'otro';
 
 /** En el orden del protocolo; `corto` cabe en el selector de cada foto. */
 export const TIPOS_FOTO: { valor: TipoEvidencia; texto: string; corto: string }[] = [
@@ -82,8 +82,9 @@ export const TIPOS_FOTO: { valor: TipoEvidencia; texto: string; corto: string }[
     { valor: 'destapado', texto: 'Producto destapado', corto: 'Destapado' },
     { valor: 'remesa', texto: 'Remesa o factura firmada', corto: 'Remesa' },
     { valor: 'rotulo', texto: 'Rótulo', corto: 'Rótulo' },
-    // No cuenta para el protocolo
+    // No cuentan para el protocolo
     { valor: 'ilegible', texto: 'Borrosa o ilegible', corto: 'Borrosa o ilegible' },
+    { valor: 'repetida', texto: 'Repetida (copia de otra foto)', corto: 'Repetida' },
     { valor: 'otro', texto: 'Sin clasificar', corto: 'Sin clasificar' },
 ];
 

@@ -86,6 +86,106 @@ class GeneradorPodEjemplo
         $poner($paginas, '<< /Type /Pages /Kids ['.implode(' ', array_map(fn ($h) => "{$h} 0 R", $hijos)).'] /Count '.count($hijos).' >>');
         $poner($catalogo, "<< /Type /Catalog /Pages {$paginas} 0 R >>");
 
+        return $this->ensamblar($objetos, $catalogo);
+    }
+
+    /**
+     * PDF como el de Drivin: los datos de la entrega, la tabla de la orden (con el código partido en dos renglones),
+     * las fotos después de "Fotografías de la dirección", la firma del cliente y el comentario, en la misma página
+     * de las últimas fotos. Trae también el logo del cliente y el sello de Drivin (con transparencia), que no son
+     * fotos y se dibujan al final de la primera página, como en el real.
+     *
+     * @param  list<string>  $fotos  bytes JPEG
+     * @param  array{hora?: string, ventana?: string, intento?: int, unidades?: string, estado?: string, comentario?: ?string, firma?: bool}  $o
+     */
+    public function pdfDrivin(string $codigo, array $fotos, array $o = []): string
+    {
+        $o += ['hora' => '10:00', 'ventana' => '07:00 - 17:00', 'intento' => 1, 'unidades' => '1.0 / 1.0', 'estado' => 'Aprobada', 'comentario' => 'Entrega exitosa, el cliente revisa y está en buen estado', 'firma' => true];
+
+        $objetos = [];
+        $nuevo = function (?string $contenido = null) use (&$objetos): int {
+            $objetos[] = $contenido;
+
+            return count($objetos);
+        };
+        $imagen = fn (string $jpeg, string $extra = '') => $nuevo('<< /Type /XObject /Subtype /Image /Width '.getimagesizefromstring($jpeg)[0].' /Height '.getimagesizefromstring($jpeg)[1]." /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode{$extra} /Length ".strlen($jpeg)." >>\nstream\n{$jpeg}\nendstream");
+        // Una línea de texto por orden de escribir, en WinAnsi (las tildes)
+        $linea = fn (string $texto, int $x, int $y, int $tamano = 9) => "BT /F1 {$tamano} Tf {$x} {$y} Td (".str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], mb_convert_encoding($texto, 'Windows-1252', 'UTF-8')).") Tj ET\n";
+
+        $catalogo = $nuevo();
+        $paginas = $nuevo();
+        $fuente = $nuevo('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+
+        $logo = $imagen($this->lienzo(150, 70, [40, 40, 40]));
+        $mascara = $nuevo("<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 4 >>\nstream\n\xFF\x00\x00\xFF\nendstream");
+        $sello = $imagen($this->lienzo(480, 480, [0, 190, 210]), " /SMask {$mascara} 0 R");
+        $idsFotos = array_map($imagen, $fotos);
+        $firma = $o['firma'] ? $imagen($this->lienzo(320, 240, [252, 252, 252])) : null;
+
+        // Página 1: datos, tabla y las dos primeras fotos; después, de a cuatro por página
+        $primera = '';
+        $y = 800;
+        foreach (array_filter([
+            'Informe de prueba de entrega', 'Información general', 'Nombre dirección: CLIENTE DE PRUEBA', 'Vehículo: abc123',
+            'Conductor: CONDUCTOR DE PRUEBA', 'Código de ruta: 1000001', "Ventana horaria: {$o['ventana']}", 'Fecha de entrega: 2026-10-05',
+            "Hora de entrega: {$o['hora']}", "Número de intento: {$o['intento']}", 'Detalle de órdenes',
+            'Código de orden', 'Estado', 'Código ítem', 'Descripción', 'Unidades entregadas', 'ENTRGE', 'AS',
+            substr($codigo, 0, 9), substr($codigo, 9), $o['estado'], '3068813', 'SOFACAMA GRIS', $o['unidades'], 'Aprobada',
+            'Fotografías de la dirección',
+        ], fn (string $t) => $t !== '') as $texto) {
+            $primera .= $linea($texto, 40, $y);
+            $y -= 12;
+        }
+
+        $grupos = [array_slice($idsFotos, 0, 2), ...array_chunk(array_slice($idsFotos, 2), 4)];
+        $hijos = [];
+        foreach ($grupos as $p => $grupo) {
+            $contenido = $p === 0 ? $primera : '';
+            $recursos = '';
+            foreach ($grupo as $i => $id) {
+                $contenido .= 'q 200 0 0 150 '.(40 + ($i % 2) * 260).' '.(($p === 0 ? 300 : 620) - intdiv($i, 2) * 170)." cm /Im{$id} Do Q\n".$linea(' ', 40, 40);
+                $recursos .= "/Im{$id} {$id} 0 R ";
+            }
+            // La firma y el comentario, en la página de las últimas fotos
+            if ($p === count($grupos) - 1) {
+                $contenido .= $linea('Firma', 40, 250, 12);
+                if ($firma) {
+                    $contenido .= "q 80 0 0 60 40 180 cm /Im{$firma} Do Q\n";
+                    $recursos .= "/Im{$firma} {$firma} 0 R ";
+                }
+                $contenido .= $linea('Comentario', 40, 150, 12).($o['comentario'] ? $linea($o['comentario'], 40, 130) : '').$linea('Drivin 2026 | Todos los derechos reservados.', 200, 40, 7);
+            }
+            // El logo y el sello se dibujan al final de la primera página
+            if ($p === 0) {
+                $contenido .= "q 100 0 0 47 250 790 cm /Im{$logo} Do Q\nq 120 0 0 120 440 680 cm /Im{$sello} Do Q\n";
+                $recursos .= "/Im{$logo} {$logo} 0 R /Im{$sello} {$sello} 0 R ";
+            }
+            $flujo = $nuevo('<< /Length '.strlen($contenido)." >>\nstream\n{$contenido}endstream");
+            $hijos[] = $nuevo("<< /Type /Page /Parent {$paginas} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 {$fuente} 0 R >> /XObject << {$recursos}>> >> /Contents {$flujo} 0 R >>");
+        }
+
+        $objetos[$paginas - 1] = '<< /Type /Pages /Kids ['.implode(' ', array_map(fn ($h) => "{$h} 0 R", $hijos)).'] /Count '.count($hijos).' >>';
+        $objetos[$catalogo - 1] = "<< /Type /Catalog /Pages {$paginas} 0 R >>";
+
+        return $this->ensamblar($objetos, $catalogo);
+    }
+
+    /** Un JPEG de un color, del tamaño dado (el logo, el sello, la firma). */
+    private function lienzo(int $ancho, int $alto, array $color): string
+    {
+        $img = imagecreatetruecolor($ancho, $alto);
+        imagefilledrectangle($img, 0, 0, $ancho, $alto, imagecolorallocate($img, ...$color));
+        imageline($img, 10, $alto - 20, $ancho - 10, 20, imagecolorallocate($img, 20, 20, 20));
+        ob_start();
+        imagejpeg($img, null, 80);
+        imagedestroy($img);
+
+        return (string) ob_get_clean();
+    }
+
+    /** @param  list<?string>  $objetos */
+    private function ensamblar(array $objetos, int $catalogo): string
+    {
         $pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
         $offsets = [];
         foreach ($objetos as $i => $contenido) {

@@ -50,6 +50,8 @@ export async function subirEnTandas(
                 total.ordenes.push(...(json.ordenes ?? []));
                 total.sinOrden.push(...(json.sinOrden ?? []));
                 total.cerrados.push(...(json.cerrados ?? []));
+                // Los archivos que no se agregaron, con su motivo (p. ej. el PDF de otra orden)
+                total.errores.push(...(json.errores ?? []));
             } else if (r.status === 422 && json.errors) {
                 // Error de validación de una tanda: se informa y se sigue con las demás
                 const mensajes = Object.values(json.errors as Record<string, string[]>).flat();

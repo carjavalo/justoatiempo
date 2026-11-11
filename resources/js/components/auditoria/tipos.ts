@@ -48,6 +48,14 @@ export interface EvidenciaOrden {
     url: string;
 }
 
+/** Algo que dice el PDF de Drivin de la entrega, leído al subirlo. */
+export interface AvisoPdf {
+    nivel: 'bien' | 'atencion' | 'info';
+    texto: string;
+    /** La firma del cliente, junto al aviso de que firmó. */
+    imagen?: string;
+}
+
 export interface OrdenDetalle {
     id: number;
     codigo: string;
@@ -67,6 +75,8 @@ export interface OrdenDetalle {
     productos: string[];
     informeCerrado: boolean;
     evidencias: EvidenciaOrden[];
+    /** Lo que dice el PDF de prueba de entrega más reciente que se pudo leer. */
+    lecturaPdf: { avisos: AvisoPdf[] } | null;
     auditoria: Checklist & {
         tipo_novedad_id: number | null;
         concepto: string | null;

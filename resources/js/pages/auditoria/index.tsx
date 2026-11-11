@@ -2,6 +2,7 @@ import { CargaLote } from '@/components/auditoria/carga-lote';
 import { Cola, consultaFiltros, EstadoAuditoriaBadge } from '@/components/auditoria/cola';
 import { Evidencias } from '@/components/auditoria/evidencias';
 import { FormularioAuditoria } from '@/components/auditoria/formulario';
+import { LecturaPdf } from '@/components/auditoria/lectura-pdf';
 import { type FiltrosAuditoria, type Jornada, type OrdenCola, type OrdenDetalle, type Resumen, type TipoNovedad } from '@/components/auditoria/tipos';
 import { Search } from '@/components/iconos';
 import { LINEA_LOGISTICA, MarcoLinea } from '@/components/linea/marco-linea';
@@ -279,6 +280,8 @@ function Detalle({
                             <figcaption className="text-muted-foreground mt-0.5 text-xs">Comentario del auxiliar en Drivin</figcaption>
                         </figure>
                     )}
+
+                    {orden.lecturaPdf && orden.lecturaPdf.avisos.length > 0 && <LecturaPdf avisos={orden.lecturaPdf.avisos} />}
 
                     <Evidencias ordenId={orden.id} evidencias={orden.evidencias} deshabilitado={orden.informeCerrado} />
                 </div>

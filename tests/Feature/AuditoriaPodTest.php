@@ -14,6 +14,7 @@ use App\Models\Sede;
 use App\Models\TipoNovedad;
 use App\Models\User;
 use App\Services\ConsolidadorInforme;
+use App\Services\Pod\AvisosPod;
 use App\Services\Pod\EvaluadorProtocolo;
 use App\Services\Pod\GeneradorPodEjemplo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,6 +59,16 @@ class AuditoriaPodTest extends TestCase
         $g = new GeneradorPodEjemplo;
         $ruta = sys_get_temp_dir().'/'.uniqid('pod_').'.pdf';
         file_put_contents($ruta, $g->pdf('POD', $g->fotosEntrega(true, 4, $completo ? 4 : 0, true)));
+
+        return new UploadedFile($ruta, $nombre, 'application/pdf', null, true);
+    }
+
+    /** Un PDF como el de Drivin (con logo, sello, firma y comentario) para la orden dada. */
+    private function pdfDrivin(string $codigo, string $nombre, array $opciones = [], int $destapado = 4): UploadedFile
+    {
+        $g = new GeneradorPodEjemplo;
+        $ruta = sys_get_temp_dir().'/'.uniqid('pod_').'.pdf';
+        file_put_contents($ruta, $g->pdfDrivin($codigo, $g->fotosEntrega(true, 4, $destapado, true), $opciones));
 
         return new UploadedFile($ruta, $nombre, 'application/pdf', null, true);
     }
@@ -178,8 +189,10 @@ class AuditoriaPodTest extends TestCase
         $pdf = Evidencia::where('mime', 'application/pdf')->sole();
         $this->assertSame(10, $pdf->imagenes); // fachada + 4 sellado + 4 destapado + remesa
         $this->assertSame('pdf_pod', $pdf->tipo->value);
+        // Sus fotos se separan, sin clasificar, ligadas al PDF
+        $this->assertSame(10, $pdf->separadas()->where('tipo', 'otro')->count());
 
-        $foto = Evidencia::where('mime', '!=', 'application/pdf')->sole();
+        $foto = Evidencia::where('mime', '!=', 'application/pdf')->whereNull('origen_id')->sole();
         $this->assertSame('fachada', $foto->tipo->value); // preclasificada por el nombre
         $this->assertSame('PDVT1002', $foto->orden->codigo_orden);
 
@@ -192,6 +205,97 @@ class AuditoriaPodTest extends TestCase
         $this->get(route('evidencias.ver', $pdf))->assertOk()->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_el_pdf_de_drivin_se_lee_y_sus_fotos_se_separan_sin_logo_sello_ni_firma()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+
+        // El nombre no trae el código: la orden sale del código que el PDF trae adentro
+        $this->actingAs($this->coordinador)
+            ->post('/auditoria/lote', ['archivos' => [$this->pdfDrivin('PDVT1001', 'prueba de entrega (1).pdf')], 'fecha' => '2026-10-05'])
+            ->assertSessionHas('success');
+
+        $pdf = Evidencia::where('mime', 'application/pdf')->sole();
+        $this->assertSame($orden->id, $pdf->orden_id);
+        $this->assertSame(10, $pdf->imagenes); // las fotos de la entrega, sin el logo ni el sello
+        $this->assertSame('10:00', $pdf->datos['hora']);
+        $this->assertSame(['07:00', '17:00'], $pdf->datos['ventana']);
+        $this->assertSame(1, $pdf->datos['intento']);
+        $this->assertEquals(['entregadas' => 1, 'pedidas' => 1], $pdf->datos['unidades']);
+        $this->assertSame('Entrega exitosa, el cliente revisa y está en buen estado', $pdf->datos['comentario']);
+
+        $this->assertSame(10, $pdf->separadas()->where('tipo', 'otro')->count());
+        $firma = $pdf->separadas()->where('tipo', 'firma')->sole();
+        $this->assertSame(3, $firma->pagina_pdf);
+        Storage::disk('local')->assertExists($firma->path);
+
+        // La orden muestra lo que dice el PDF; la firma va con su aviso, no entre las fotos del protocolo
+        $this->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('seleccionada.lecturaPdf.avisos', fn ($avisos) => collect($avisos)->pluck('texto')->all() === [
+                'Entregó 1 de 1 unidad',
+                'A las 10:00, dentro de la ventana de 07:00 a 17:00',
+                'En el primer intento',
+                'El cliente firmó en la app',
+            ] && collect($avisos)->firstWhere('texto', 'El cliente firmó en la app')['imagen'] === route('evidencias.ver', $firma))
+            ->where('seleccionada.comentarioPod', 'Entrega exitosa, el cliente revisa y está en buen estado')
+            ->where('seleccionada.auditoria.sin_evidencia', false)
+            ->where('seleccionada.auditoria.fotos_sellado', 0) // sin clasificar, aún no cuentan
+        );
+
+        // La cola cuenta el archivo subido, no sus fotos
+        $this->get('/auditoria')->assertInertia(fn (Assert $p) => $p->where('ordenes.0.evidencias', 1));
+
+        // La firma no se clasifica como foto
+        $this->patch("/evidencias/{$firma->id}", ['tipo' => 'sellado'])->assertStatus(422);
+        $this->patch('/evidencias/'.$pdf->separadas()->first()->id, ['tipo' => 'firma'])->assertSessionHasErrors('tipo');
+
+        // Al eliminar el PDF, sus fotos y su firma se van con él (marcadas, sin borrarse)
+        $this->delete("/evidencias/{$pdf->id}")->assertRedirect();
+        $this->assertSame(0, Evidencia::count());
+        $this->assertSame(12, Evidencia::onlyTrashed()->count());
+    }
+
+    public function test_lo_que_dice_el_pdf_avisa_lo_que_hay_que_mirar()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+        $this->actingAs($this->coordinador)->post("/auditoria/{$orden->id}/evidencias", ['archivos' => [$this->pdfDrivin('PDVT1001', 'POD_PDVT1001.pdf', [
+            'hora' => '18:10', 'intento' => 2, 'unidades' => '1.0 / 2.0', 'firma' => false,
+            'comentario' => 'Sin novedad, pero la caja llegó con un golpe. Recibe sin destapar a conformidad',
+        ], destapado: 0)]]);
+
+        $this->get("/auditoria/{$orden->id}")->assertInertia(fn (Assert $p) => $p
+            ->where('seleccionada.lecturaPdf.avisos', fn ($avisos) => collect($avisos)->map(fn ($a) => "{$a['nivel']}: {$a['texto']}")->all() === [
+                'atencion: Entregó 1 de 2 unidades',
+                'atencion: A las 18:10, fuera de la ventana de 07:00 a 17:00',
+                'atencion: En el intento n.° 2',
+                'info: El cliente no firmó en la app',
+                'atencion: El comentario habla de un posible daño («golpe»): revisa las fotos del producto',
+                'info: El comentario dice que el cliente recibió sin destapar: confírmalo en la remesa',
+            ])
+            // La excepción del protocolo queda sugerida en la lista; el auditor la confirma en la remesa
+            ->where('seleccionada.auditoria.recibe_sin_destapar', true)
+        );
+    }
+
+    public function test_el_comentario_que_niega_el_dano_no_es_un_aviso()
+    {
+        $this->assertNull(AvisosPod::posibleDano('Entrega exitosa, sin daños y en buen estado'));
+        $this->assertNull(AvisosPod::posibleDano('No hay golpes ni rayones'));
+        $this->assertSame('rayado', AvisosPod::posibleDano('Sin novedad, rayado en la puerta'));
+        $this->assertSame('roto', AvisosPod::posibleDano('El vidrio llegó roto'));
+    }
+
+    public function test_el_pdf_de_otra_orden_no_se_agrega_a_esta()
+    {
+        $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
+
+        $this->actingAs($this->coordinador)
+            ->postJson("/auditoria/{$orden->id}/evidencias", ['archivos' => [$this->pdfDrivin('PDVT1002', 'POD_PDVT1001.pdf')]])
+            ->assertOk()
+            ->assertJson(['asignados' => 0, 'errores' => ['«POD_PDVT1001.pdf» es la prueba de entrega de la orden PDVT1002, no de esta.']]);
+
+        $this->assertSame(0, Evidencia::count());
+    }
+
     public function test_clasificar_y_eliminar_evidencias()
     {
         $orden = Orden::firstWhere('codigo_orden', 'PDVT1001');
@@ -202,6 +306,10 @@ class AuditoriaPodTest extends TestCase
 
         $this->patch("/evidencias/{$e->id}", ['tipo' => 'remesa'])->assertRedirect();
         $this->assertSame('remesa', $e->fresh()->tipo->value);
+
+        // Una copia de otra foto se marca como repetida: no cuenta para el protocolo
+        $this->patch("/evidencias/{$e->id}", ['tipo' => 'repetida'])->assertRedirect();
+        $this->assertSame('repetida', $e->fresh()->tipo->value);
 
         // Se elimina sin borrarse: deja de verse, queda marcada y su archivo se conserva
         $this->delete("/evidencias/{$e->id}")->assertRedirect();

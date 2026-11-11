@@ -32,11 +32,12 @@ function AgregarEvidencias({ ordenId, deshabilitado }: { ordenId: number; deshab
         const r = await subirEnTandas(`/auditoria/${ordenId}/evidencias`, archivos, {}, () => {});
         setSubiendo(false);
         if (input.current) input.current.value = '';
-        setMensaje(
-            r.errores.length
-                ? r.errores.join(' ')
-                : `${r.asignados === 1 ? 'Se agregó 1 evidencia' : `Se agregaron ${r.asignados} evidencias`}.${r.repetidos ? ` ${r.repetidos} ya estaban cargadas.` : ''}`,
-        );
+        // Lo que se agregó y, aparte, lo que no (p. ej. el PDF de otra orden)
+        const agregadas =
+            r.asignados || r.repetidos || !r.errores.length
+                ? `${r.asignados === 1 ? 'Se agregó 1 evidencia' : `Se agregaron ${r.asignados} evidencias`}.${r.repetidos ? ` ${r.repetidos} ya estaban cargadas.` : ''}`
+                : '';
+        setMensaje([agregadas, ...r.errores].filter(Boolean).join(' '));
         router.reload();
     };
 
@@ -95,9 +96,13 @@ function EliminarEvidencia({ evidencia, deshabilitado }: { evidencia: EvidenciaO
     );
 }
 
+/** Clasifica una foto. En paralelo (async): una clasificación no cancela la anterior al clasificar varias seguidas. */
+const clasificar = (evidencia: EvidenciaOrden, tipo: string) =>
+    router.patch(`/evidencias/${evidencia.id}`, { tipo }, { preserveScroll: true, preserveState: true, async: true });
+
 /** Selector del tipo de foto: la clasificación alimenta la lista de chequeo de órdenes aún sin auditar. */
-function TipoFoto({ evidencia, deshabilitado }: { evidencia: EvidenciaOrden; deshabilitado: boolean }) {
-    const id = `tipo-${evidencia.id}`;
+function TipoFoto({ evidencia, deshabilitado, contexto = '' }: { evidencia: EvidenciaOrden; deshabilitado: boolean; contexto?: string }) {
+    const id = `tipo-${contexto}${evidencia.id}`;
     return (
         <div>
             <label htmlFor={id} className="sr-only">
@@ -107,7 +112,7 @@ function TipoFoto({ evidencia, deshabilitado }: { evidencia: EvidenciaOrden; des
                 id={id}
                 valor={evidencia.tipo}
                 disabled={deshabilitado}
-                onCambio={(v) => router.patch(`/evidencias/${evidencia.id}`, { tipo: v }, { preserveScroll: true, preserveState: true })}
+                onCambio={(v) => clasificar(evidencia, v)}
                 opciones={TIPOS_FOTO.map((t) => ({ valor: t.valor, texto: t.corto }))}
                 tamano="sm"
                 claseValor={evidencia.tipo === 'otro' || evidencia.tipo === 'ilegible' ? 'text-warning' : undefined}
@@ -116,27 +121,75 @@ function TipoFoto({ evidencia, deshabilitado }: { evidencia: EvidenciaOrden; des
     );
 }
 
-/** Foto ampliada con anterior/siguiente (flechas del teclado incluidas). */
-function Ampliacion({ fotos, indice, onCambio, onCerrar }: { fotos: EvidenciaOrden[]; indice: number | null; onCambio: (i: number) => void; onCerrar: () => void }) {
-    const foto = indice !== null ? fotos[indice] : null;
-    const mover = (d: number) => indice !== null && onCambio((indice + d + fotos.length) % fotos.length);
+/**
+ * Foto ampliada con anterior/siguiente (flechas del teclado incluidas). Quien revisa la clasifica ahí mismo: con la
+ * lista o con las teclas 1 a 8, que además pasan a la siguiente (para recorrer las fotos de un PDF de corrido).
+ */
+function Ampliacion({
+    fotos,
+    id,
+    puedeClasificar,
+    onCambio,
+    onCerrar,
+}: {
+    fotos: EvidenciaOrden[];
+    id: number | null;
+    puedeClasificar: boolean;
+    onCambio: (id: number) => void;
+    onCerrar: () => void;
+}) {
+    const indice = fotos.findIndex((f) => f.id === id);
+    const foto = indice >= 0 ? fotos[indice] : null;
+    const mover = (d: number) => indice >= 0 && onCambio(fotos[(indice + d + fotos.length) % fotos.length].id);
 
     return (
         <Dialog open={foto !== null} onOpenChange={(abierto) => !abierto && onCerrar()}>
             <DialogContent
                 className="max-w-5xl gap-3 p-4 sm:p-5"
                 onKeyDown={(e) => {
+                    // Las teclas dentro de la lista desplegable son de la lista
+                    if (!foto || e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement).closest('[role="listbox"]')) return;
                     if (e.key === 'ArrowRight') mover(1);
                     if (e.key === 'ArrowLeft') mover(-1);
+                    const tipo = /^[1-9]$/.test(e.key) ? TIPOS_FOTO[Number(e.key) - 1] : undefined;
+                    if (puedeClasificar && tipo) {
+                        e.preventDefault();
+                        clasificar(foto, tipo.valor);
+                        if (indice < fotos.length - 1) mover(1);
+                    }
                 }}
             >
                 {foto && (
                     <>
                         <DialogTitle className="pr-8 text-base">
-                            {textoTipo(foto.tipo)} <span className="text-muted-foreground text-sm font-normal">· {indice! + 1} de {fotos.length}</span>
+                            Foto {indice + 1} de {fotos.length}
+                            {!puedeClasificar && <span className="text-muted-foreground text-sm font-normal"> · {textoTipo(foto.tipo)}</span>}
                         </DialogTitle>
                         <DialogDescription className="truncate">{foto.nombre}</DialogDescription>
-                        <img src={foto.url} alt={`${textoTipo(foto.tipo)}: ${foto.nombre ?? ''}`} className="bg-muted max-h-[70svh] w-full rounded-lg object-contain" />
+                        {puedeClasificar && (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <div className="w-52">
+                                    <TipoFoto evidencia={foto} deshabilitado={false} contexto="ampliada-" />
+                                </div>
+                                <p className="text-muted-foreground text-xs">
+                                    <SegunPuntero
+                                        mouse={
+                                            <>
+                                                Teclas:{' '}
+                                                {TIPOS_FOTO.map((t, i) => (
+                                                    <span key={t.valor} className="whitespace-nowrap">
+                                                        <kbd className="bg-muted rounded border px-1 font-mono">{i + 1}</kbd> {t.corto}
+                                                        {i < TIPOS_FOTO.length - 1 ? ' · ' : ''}
+                                                    </span>
+                                                ))}
+                                            </>
+                                        }
+                                        dedo={null}
+                                    />
+                                </p>
+                            </div>
+                        )}
+                        <img src={foto.url} alt={`${textoTipo(foto.tipo)}: ${foto.nombre ?? ''}`} className="bg-muted max-h-[65svh] w-full rounded-lg object-contain" />
                         {fotos.length > 1 && (
                             <div className="flex items-center justify-between">
                                 <Button variant="outline" className="rounded-lg" onClick={() => mover(-1)} aria-keyshortcuts="ArrowLeft">
@@ -187,16 +240,24 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
     const puede = usePuede();
     const puedeEliminar = puede('auditoria.eliminar');
     const pdfs = evidencias.filter((e) => e.esPdf);
-    // Fotos en el orden del protocolo: fachada, sellado, destapado, remesa, rótulo y sin clasificar
-    const orden = (t: string) => TIPOS_FOTO.findIndex((x) => x.valor === t);
-    const fotos = evidencias.filter((e) => !e.esPdf).sort((a, b) => orden(a.tipo) - orden(b.tipo) || a.id - b.id);
+    // Las fotos en el orden en que llegaron (las de un PDF, en el suyo): el orden no cambia al clasificarlas. La firma
+    // del cliente no es una foto del protocolo: se ve con lo que dice el PDF
+    const fotos = evidencias.filter((e) => !e.esPdf && e.tipo !== 'firma').sort((a, b) => a.id - b.id);
     const [ampliada, setAmpliada] = useState<number | null>(null);
+    const puedeClasificar = !deshabilitado && puede('auditoria.revisar');
+    const sinClasificar = fotos.filter((f) => f.tipo === 'otro').length;
 
     return (
         <section aria-labelledby="titulo-evidencias">
             <h3 id="titulo-evidencias" className="text-sm font-bold">
-                Evidencias <span className="text-muted-foreground font-medium">({evidencias.length})</span>
+                Evidencias <span className="text-muted-foreground font-medium">({pdfs.length + fotos.length})</span>
             </h3>
+            {puedeClasificar && sinClasificar > 0 && (
+                <p className="text-muted-foreground mt-1 text-xs text-pretty">
+                    {sinClasificar === 1 ? '1 foto sin clasificar' : `${sinClasificar} fotos sin clasificar`}: ábrelas y elige qué muestra cada una para que
+                    cuenten en la lista de chequeo.
+                </p>
+            )}
 
             <div className="mt-3 grid gap-3">
                 {pdfs.map((p) => (
@@ -204,7 +265,8 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                         <span className="bg-critical-soft text-critical flex size-10 shrink-0 items-center justify-center rounded-lg">
                             <FileText className="size-5" aria-hidden="true" />
                         </span>
-                        <div className="min-w-0 flex-1">
+                        {/* En pantallas angostas, los botones bajan a otra línea antes que partir el nombre letra a letra */}
+                        <div className="min-w-0 flex-1 basis-44">
                             <p className="text-sm font-semibold break-all">{p.nombre}</p>
                             <p className="text-muted-foreground text-xs">
                                 {p.imagenes !== null ? `${p.imagenes} ${p.imagenes === 1 ? 'foto' : 'fotos'} en el PDF` : 'No se pudieron contar las fotos'} · {tamano(p.tamano)}
@@ -225,11 +287,11 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
 
                 {fotos.length > 0 && (
                     <ul role="list" className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-3">
-                        {fotos.map((f, i) => (
+                        {fotos.map((f) => (
                             <li key={f.id} className="bg-card overflow-hidden rounded-xl border">
                                 <button
                                     type="button"
-                                    onClick={() => setAmpliada(i)}
+                                    onClick={() => setAmpliada(f.id)}
                                     className="focus-visible:ring-ring group relative block aspect-[4/3] w-full focus-visible:ring-2 focus-visible:outline-hidden focus-visible:ring-inset"
                                 >
                                     <img src={f.url} alt="" loading="lazy" className="size-full object-cover transition-transform group-hover:scale-[1.03]" />
@@ -239,7 +301,7 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                                 </button>
                                 <div className="flex items-center gap-1 p-2">
                                     <div className="min-w-0 flex-1">
-                                        <TipoFoto evidencia={f} deshabilitado={deshabilitado || !puede('auditoria.revisar')} />
+                                        <TipoFoto evidencia={f} deshabilitado={!puedeClasificar} />
                                     </div>
                                     {puedeEliminar && <EliminarEvidencia evidencia={f} deshabilitado={deshabilitado} />}
                                 </div>
@@ -251,7 +313,7 @@ export function Evidencias({ ordenId, evidencias, deshabilitado }: { ordenId: nu
                 {!deshabilitado && puede('auditoria.subir') && <AgregarEvidencias ordenId={ordenId} deshabilitado={deshabilitado} />}
             </div>
 
-            <Ampliacion fotos={fotos} indice={ampliada} onCambio={setAmpliada} onCerrar={() => setAmpliada(null)} />
+            <Ampliacion fotos={fotos} id={ampliada} puedeClasificar={puedeClasificar} onCambio={setAmpliada} onCerrar={() => setAmpliada(null)} />
         </section>
     );
 }

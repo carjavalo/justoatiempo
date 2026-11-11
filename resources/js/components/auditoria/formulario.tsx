@@ -7,7 +7,7 @@ import { evaluar, MIN_DESTAPADO, MIN_SELLADO, type Checklist } from '@/lib/proto
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, Lock, Minus, Plus, XCircle } from '@/components/iconos';
-import { type FormEventHandler, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type FormEventHandler, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { consultaFiltros } from './cola';
 import { type FiltrosAuditoria, type OrdenDetalle, type TipoNovedad } from './tipos';
 import { Selector } from '@/components/selector';
@@ -124,6 +124,29 @@ export function FormularioAuditoria({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const evaluacion = useMemo(() => evaluar(data as Checklist), [data]);
+
+    // Sin auditar, la lista parte de las fotos clasificadas: al clasificar una (sin salir de la orden), cada punto que
+    // no se ha cambiado a mano sigue a la clasificación
+    const previa = useRef<Checklist>(inicial);
+    const servidor: Checklist = {
+        foto_fachada: a.foto_fachada,
+        fotos_sellado: a.fotos_sellado,
+        fotos_destapado: a.fotos_destapado,
+        fotos_ilegibles: a.fotos_ilegibles ?? 0,
+        foto_remesa: a.foto_remesa,
+        foto_rotulo: a.foto_rotulo,
+        recibe_sin_destapar: a.recibe_sin_destapar,
+        sin_evidencia: a.sin_evidencia,
+    };
+    useEffect(() => {
+        if (a.auditada) return;
+        const antes = previa.current;
+        previa.current = servidor;
+        const campos = Object.keys(servidor) as (keyof Checklist)[];
+        const cambios = Object.fromEntries(campos.filter((k) => servidor[k] !== antes[k] && data[k] === antes[k]).map((k) => [k, servidor[k]]));
+        if (Object.keys(cambios).length) setData((d) => ({ ...d, ...cambios }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [JSON.stringify(servidor)]);
 
     useEffect(() => {
         if (!editado.novedad) setData('tipo_novedad_id', idNovedad(evaluacion.novedad));

@@ -74,7 +74,10 @@ class GenerarPodEjemplo extends Command
                 default => [true, mt_rand(4, 5), 4, true, 'completas'],
             };
 
-            $pdf = $generador->pdf("POD {$o->codigo_orden}", $generador->fotosEntrega($fachada, $sellado, $destapado, $remesa));
+            // Como el de Drivin: con sus datos, la firma y el comentario del conductor
+            $pdf = $generador->pdfDrivin($o->codigo_orden, $generador->fotosEntrega($fachada, $sellado, $destapado, $remesa), [
+                'comentario' => $caso === 'sin_destapar' ? 'Cliente recibe sin destapar a conformidad' : 'Entrega exitosa, el cliente revisa y está en buen estado',
+            ]);
             file_put_contents("{$carpeta}/POD_{$o->codigo_orden}_{$sufijo}.pdf", $pdf);
             $conteo[$caso]++;
         }

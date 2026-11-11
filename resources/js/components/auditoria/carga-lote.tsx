@@ -79,8 +79,8 @@ export function CargaLote({ fecha }: { fecha: string }) {
                     ) : (
                         <span id="ayuda-lote" className="text-muted-foreground block text-xs text-pretty">
                             <SegunPuntero mouse="Arrastra aquí los PDF de Drivin o fotos" dedo="Elige los PDF de Drivin o fotos" />: cada uno va a su orden
-                            por el código del nombre
-                            <span className="hidden sm:inline"> (p. ej. POD_PDVT000228311.pdf)</span>.
+                            por el código que trae adentro o en el nombre
+                            <span className="hidden sm:inline"> (p. ej. POD_PDVT000228311.pdf)</span>, y las fotos del PDF se separan para clasificarlas.
                         </span>
                     )}
                 </span>

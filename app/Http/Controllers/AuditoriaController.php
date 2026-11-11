@@ -13,12 +13,15 @@ use App\Models\Sede;
 use App\Models\TipoNovedad;
 use App\Services\ConsolidadorInforme;
 use App\Services\Pod\AlmacenEvidencias;
+use App\Services\Pod\AvisosPod;
 use App\Services\Pod\EmparejadorArchivos;
 use App\Services\Pod\EvaluadorProtocolo;
+use App\Services\Pod\LectorPod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -43,6 +46,7 @@ class AuditoriaController extends Controller
         private AlmacenEvidencias $almacen,
         private EmparejadorArchivos $emparejador,
         private ConsolidadorInforme $consolidador,
+        private LectorPod $lector,
     ) {}
 
     public function index(Request $request): Response
@@ -119,22 +123,44 @@ class AuditoriaController extends Controller
         $request->validate(['archivos' => self::ARCHIVOS, 'archivos.*' => self::ARCHIVO], $this->mensajesArchivos());
 
         $nuevas = 0;
+        $repetidas = 0;
+        $errores = [];
         foreach ($request->file('archivos') as $archivo) {
-            [, $nueva] = $this->almacen->guardar($orden, $archivo, $request->user()->id);
-            $nuevas += (int) $nueva;
-        }
+            $lectura = $this->leerPdf($archivo);
 
-        $repetidas = count($request->file('archivos')) - $nuevas;
+            // El PDF de otra orden no se agrega aquí: lo dice el código que trae adentro
+            if ($lectura && ! in_array(strtoupper($orden->codigo_orden), $lectura['codigos'], true)) {
+                $otras = $this->emparejador->ordenes($lectura['codigos'])->pluck('codigo_orden');
+                if ($otras->isNotEmpty()) {
+                    $errores[] = "«{$archivo->getClientOriginalName()}» es la prueba de entrega de ".($otras->count() === 1 ? "la orden {$otras[0]}" : 'las órdenes '.$otras->implode(', ')).', no de esta.';
+
+                    continue;
+                }
+            }
+
+            [, $nueva] = $this->almacen->guardar($orden, $archivo, $request->user()->id, $lectura);
+            $nueva ? $nuevas++ : $repetidas++;
+        }
 
         // El navegador envía en tandas (PHP limita los archivos por petición) y arma el resumen al final
         if ($request->wantsJson()) {
-            return response()->json(['asignados' => $nuevas, 'repetidos' => $repetidas, 'ordenes' => [$orden->id], 'sinOrden' => [], 'cerrados' => []]);
+            return response()->json(['asignados' => $nuevas, 'repetidos' => $repetidas, 'ordenes' => [$orden->id], 'sinOrden' => [], 'cerrados' => [], 'errores' => $errores]);
         }
 
-        return back()->with('success', $nuevas === 1 ? 'Se agregó 1 evidencia.' : "Se agregaron {$nuevas} evidencias.".($repetidas ? " {$repetidas} ya estaban cargadas." : ''));
+        $respuesta = back();
+        if ($errores) {
+            $respuesta->with('error', implode(' ', $errores));
+        }
+
+        return $nuevas || $repetidas || ! $errores
+            ? $respuesta->with('success', ($nuevas === 1 ? 'Se agregó 1 evidencia.' : "Se agregaron {$nuevas} evidencias.").($repetidas ? " {$repetidas} ya estaban cargadas." : ''))
+            : $respuesta;
     }
 
-    /** Carga masiva: cada archivo se asigna a su orden por el código que trae en el nombre. */
+    /**
+     * Carga masiva: cada archivo se asigna a su orden por el código que trae adentro (el PDF de Drivin) o en el nombre.
+     * Un PDF con varias órdenes (entregadas en la misma dirección) queda en cada una.
+     */
     public function subirLote(Request $request): RedirectResponse|JsonResponse
     {
         $request->validate(['archivos' => self::ARCHIVOS, 'archivos.*' => self::ARCHIVO, 'fecha' => ['nullable', 'date']], $this->mensajesArchivos());
@@ -147,26 +173,35 @@ class AuditoriaController extends Controller
 
         foreach ($request->file('archivos') as $archivo) {
             $nombre = $archivo->getClientOriginalName();
-            $orden = $this->emparejador->orden($nombre, $request->input('fecha')) ?? $this->emparejador->orden($nombre);
+            $lectura = $this->leerPdf($archivo);
+            $destinos = $this->emparejador->ordenes($lectura['codigos'] ?? [], $request->input('fecha'));
+            if ($destinos->isEmpty()) {
+                $porNombre = $this->emparejador->orden($nombre, $request->input('fecha')) ?? $this->emparejador->orden($nombre);
+                $destinos = $porNombre ? collect([$porNombre]) : collect();
+            }
 
-            if (! $orden) {
+            if ($destinos->isEmpty()) {
                 $sinOrden[] = $nombre;
 
                 continue;
             }
-            if ($this->informeCerrado($orden)) {
+
+            $abiertas = $destinos->reject(fn (Orden $o) => $this->informeCerrado($o));
+            if ($abiertas->isEmpty()) {
                 $cerrados[] = $nombre;
 
                 continue;
             }
 
-            [, $nueva] = $this->almacen->guardar($orden, $archivo, $request->user()->id);
-            if ($nueva) {
-                $asignados++;
-                $ordenes[$orden->id] = true; // solo cuentan las órdenes que recibieron archivos nuevos
-            } else {
-                $repetidos++;
+            $nuevo = false;
+            foreach ($abiertas as $orden) {
+                [, $nueva] = $this->almacen->guardar($orden, $archivo, $request->user()->id, $lectura);
+                if ($nueva) {
+                    $nuevo = true;
+                    $ordenes[$orden->id] = true; // solo cuentan las órdenes que recibieron archivos nuevos
+                }
             }
+            $nuevo ? $asignados++ : $repetidos++;
         }
 
         if ($request->wantsJson()) {
@@ -190,7 +225,9 @@ class AuditoriaController extends Controller
             return back()->with('error', 'El informe de esta jornada ya está cerrado.');
         }
 
-        $datos = $request->validate(['tipo' => ['required', Rule::enum(TipoEvidencia::class)]]);
+        // Solo las fotos se clasifican: el PDF y la firma se reconocen solos
+        abort_if($evidencia->esPdf() || $evidencia->tipo === TipoEvidencia::Firma, 422, 'Esta evidencia no se clasifica.');
+        $datos = $request->validate(['tipo' => ['required', Rule::in(TipoEvidencia::deFotos())]]);
         $evidencia->update($datos);
         Bitacora::registrar('evidencia_clasificada', $evidencia->orden, ['archivo' => $evidencia->nombre_original, 'tipo' => $evidencia->tipo->label()]);
 
@@ -240,7 +277,7 @@ class AuditoriaController extends Controller
 
         $lista = $base->clone()
             ->with(['auditoria:id,orden_id,cumple_protocolo,sin_evidencia', 'sede:id,nombre', 'sucursal:id,nombre', 'auxiliar:id,name', 'informe:id,estado'])
-            ->withCount('evidencias')
+            ->withCount(['evidencias' => fn (Builder $q) => $q->whereNull('origen_id')])
             ->when($busqueda !== '', fn (Builder $q) => $q->where(fn ($w) => $w
                 ->where('codigo_orden', 'like', "%{$busqueda}%")
                 ->orWhere('destinatario', 'like', "%{$busqueda}%")
@@ -301,7 +338,13 @@ class AuditoriaController extends Controller
         $evidencias = $orden->evidencias->sortBy('id')->values();
         $a = $orden->auditoria;
 
-        // Si aún no se ha auditado, la lista de chequeo parte de lo que dicen las fotos clasificadas
+        // Lo que dice Drivin: el PDF más reciente que se pudo leer y el comentario (el de la carga o, si no, el del PDF)
+        $pdf = $evidencias->filter(fn (Evidencia $e) => $e->esPdf() && $e->datos)->last();
+        $comentario = $orden->comentario_pod ?: ($pdf?->datos['comentario'] ?? null);
+        $firma = $pdf ? $evidencias->first(fn (Evidencia $e) => $e->origen_id === $pdf->id && $e->tipo === TipoEvidencia::Firma) : null;
+
+        // Si aún no se ha auditado, la lista de chequeo parte de lo que dicen las fotos clasificadas (la firma no es
+        // una evidencia del protocolo) y de lo que dice el comentario
         $porTipo = $evidencias->countBy(fn (Evidencia $e) => $e->tipo->value);
         $checklist = $a ? $a->only(['foto_fachada', 'fotos_sellado', 'fotos_destapado', 'fotos_ilegibles', 'foto_remesa', 'foto_rotulo', 'recibe_sin_destapar', 'sin_evidencia']) : [
             'foto_fachada' => ($porTipo['fachada'] ?? 0) > 0,
@@ -310,8 +353,8 @@ class AuditoriaController extends Controller
             'fotos_ilegibles' => $porTipo['ilegible'] ?? 0,
             'foto_remesa' => ($porTipo['remesa'] ?? 0) > 0,
             'foto_rotulo' => ($porTipo['rotulo'] ?? 0) > 0,
-            'recibe_sin_destapar' => false,
-            'sin_evidencia' => $evidencias->isEmpty(),
+            'recibe_sin_destapar' => AvisosPod::recibeSinDestapar($comentario),
+            'sin_evidencia' => $evidencias->every(fn (Evidencia $e) => $e->tipo === TipoEvidencia::Firma),
         ];
 
         $productos = $orden->datos_crudos['productos'] ?? [];
@@ -330,7 +373,7 @@ class AuditoriaController extends Controller
             'direccion' => $orden->direccion,
             'ciudad' => $orden->ciudad,
             'horaEntrega' => $orden->hora_entrega?->format('H:i'),
-            'comentarioPod' => $orden->comentario_pod,
+            'comentarioPod' => $comentario,
             'faltante' => $orden->faltante ? ($orden->faltante_detalle ?? 'Entrega parcial') : null,
             'productos' => collect($productos)->pluck('producto')->filter()->unique()->values(),
             'informeCerrado' => $orden->informe?->estado === EstadoInforme::Cerrado,
@@ -343,6 +386,7 @@ class AuditoriaController extends Controller
                 'tamano' => $e->tamano_bytes,
                 'url' => route('evidencias.ver', $e),
             ]),
+            'lecturaPdf' => $pdf ? ['avisos' => AvisosPod::de($pdf->datos, $orden, $comentario, $firma ? route('evidencias.ver', $firma) : null)] : null,
             'auditoria' => [
                 ...$checklist,
                 'tipo_novedad_id' => $a?->tipo_novedad_id,
@@ -405,6 +449,12 @@ class AuditoriaController extends Controller
             (bool) $o->auditoria->cumple_protocolo => 'cumple',
             default => 'no_cumple',
         };
+    }
+
+    /** Lo que dice el archivo si es un PDF (null si no lo es o no se pudo leer). */
+    private function leerPdf(UploadedFile $archivo): ?array
+    {
+        return $archivo->getMimeType() === 'application/pdf' ? $this->lector->leer($archivo->getRealPath()) : null;
     }
 
     private function informeCerrado(Orden $orden): bool

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\TipoEvidencia;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Evidencia extends Model
@@ -12,12 +13,13 @@ class Evidencia extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'imagenes', 'subido_por',
+        'orden_id', 'tipo', 'path', 'hash', 'nombre_original', 'mime', 'tamano_bytes', 'pagina_pdf', 'origen_id', 'imagenes', 'datos', 'subido_por',
     ];
 
     protected function casts(): array
     {
-        return ['tipo' => TipoEvidencia::class];
+        // datos: lo que dice el PDF de prueba de entrega (LectorPod)
+        return ['tipo' => TipoEvidencia::class, 'datos' => 'array'];
     }
 
     public function esPdf(): bool
@@ -28,6 +30,12 @@ class Evidencia extends Model
     public function orden(): BelongsTo
     {
         return $this->belongsTo(Orden::class);
+    }
+
+    /** Las fotos y la firma que se separaron de este PDF. */
+    public function separadas(): HasMany
+    {
+        return $this->hasMany(self::class, 'origen_id');
     }
 
     public function subidoPor(): BelongsTo
