@@ -104,6 +104,70 @@ class DashboardTest extends TestCase
             );
     }
 
+    public function test_el_tablero_usa_las_fechas_elegidas_en_el_calendario()
+    {
+        $this->actingAs(User::factory()->coordinador()->create());
+
+        // Fuera del rango: la jornada del 2 de octubre no entra
+        $this->get('/lineas/logisticos?desde=2026-10-03&hasta=2026-10-20')->assertInertia(fn (Assert $p) => $p
+            ->where('filtros.desde', '2026-10-03')
+            ->where('filtros.hasta', '2026-10-20')
+            ->where('filtros.periodo', null)
+            ->where('kpis.asignadas', 0)
+            // Desde qué año ofrecer el calendario
+            ->where('primeraOperacion', '2026-10-02')
+        );
+
+        // Un rango al revés se endereza
+        $this->get('/lineas/logisticos?desde=2026-10-31&hasta=2026-10-01')->assertInertia(fn (Assert $p) => $p
+            ->where('filtros.desde', '2026-10-01')
+            ->where('filtros.hasta', '2026-10-31')
+            ->where('kpis.asignadas', 9)
+            ->where('agrupacion', 'dia')
+        );
+
+        // Una fecha que no existe se ignora: queda el periodo de 30 días hasta la última jornada
+        $this->get('/lineas/logisticos?desde=2026-02-31')->assertInertia(fn (Assert $p) => $p
+            ->where('filtros.periodo', 30)
+            ->where('filtros.hasta', '2026-10-02')
+        );
+
+        // Más de 3 años: se acorta desde el final
+        $this->get('/lineas/logisticos?desde=2020-01-01&hasta=2026-10-31')->assertInertia(fn (Assert $p) => $p
+            ->where('filtros.desde', '2023-11-01')
+            ->where('filtros.hasta', '2026-10-31')
+        );
+    }
+
+    public function test_la_tendencia_de_un_rango_largo_va_por_semana_o_por_mes()
+    {
+        $carga = Carga::create(['archivo_nombre' => 'q.xlsx', 'archivo_path' => 'q', 'archivo_hash' => str_repeat('c', 64)]);
+        // Martes 1 y jueves 3 de septiembre: la misma semana (desde el lunes 31 de agosto)
+        foreach ([['2026-09-01', EstadoOrden::Aprobada], ['2026-09-01', EstadoOrden::Aprobada], ['2026-09-03', EstadoOrden::Rechazada]] as $i => [$fecha, $estado]) {
+            Orden::create(['carga_id' => $carga->id, 'fecha_operacion' => $fecha, 'sede_id' => $this->sede->id, 'codigo_orden' => "SEP{$i}", 'estado' => $estado]);
+        }
+        $this->actingAs(User::factory()->coordinador()->create());
+
+        $this->get('/lineas/logisticos?desde=2026-06-01&hasta=2026-10-31')->assertInertia(fn (Assert $p) => $p
+            ->where('agrupacion', 'semana')
+            ->has('tendencia', 2)
+            ->where('tendencia.0.fecha', '2026-08-31')
+            ->where('tendencia.0.asignadas', 3)
+            ->where('tendencia.0.aprobadas', 2)
+            ->where('tendencia.1.fecha', '2026-09-28')
+            ->where('tendencia.1.asignadas', 9)
+        );
+
+        // Por mes, cada punto empieza en su mes (o en el primer día del rango, si el mes empieza antes)
+        $this->get('/lineas/logisticos?desde=2025-01-15&hasta=2026-10-31')->assertInertia(fn (Assert $p) => $p
+            ->where('agrupacion', 'mes')
+            ->has('tendencia', 2)
+            ->where('tendencia.0.fecha', '2026-09-01')
+            ->where('tendencia.1.fecha', '2026-10-01')
+            ->where('tendencia.1.efectividad', 66.67)
+        );
+    }
+
     public function test_arriba_va_el_dia_de_la_linea_con_lo_que_falta_por_cerrar()
     {
         $this->travelTo(Carbon::parse('2026-11-06 08:00'));

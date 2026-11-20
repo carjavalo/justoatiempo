@@ -29,6 +29,9 @@ class DashboardController extends Controller
 {
     private const PERIODOS = [7, 30, 90];
 
+    /** El rango más largo que se puede elegir en el calendario: 3 años. */
+    private const MAX_DIAS = 1096;
+
     public function mostrar(Request $request, LineaServicio $linea): Response
     {
         $user = $request->user();
@@ -58,17 +61,28 @@ class DashboardController extends Controller
         $enAlcance = fn (Builder $q) => $ubicacion($q)
             ->when($auxiliarId !== null, fn (Builder $q) => $q->where('auxiliar_id', $auxiliarId));
 
-        // El periodo termina en la última jornada con datos del alcance (la carga es a día vencido)
+        // El periodo termina en la última jornada con datos del alcance (la carga es a día vencido), salvo que se elijan
+        // las fechas en el calendario. Una fecha mal escrita se ignora; un rango al revés se endereza y uno de más de
+        // 3 años se acorta desde el final
         $ultimaOperacion = $enAlcance(Orden::query())->max('fecha_operacion');
-        $hasta = $request->date('hasta') ?? ($ultimaOperacion ? Carbon::parse($ultimaOperacion) : today());
+        $pedidoDesde = $this->fechaPedida($request, 'desde');
+        $hasta = $this->fechaPedida($request, 'hasta') ?? ($ultimaOperacion ? Carbon::parse($ultimaOperacion) : today());
         $periodo = in_array($request->integer('periodo'), self::PERIODOS, true) ? $request->integer('periodo') : 30;
-        $desde = $request->date('desde') ?? $hasta->copy()->subDays($periodo - 1);
+        $desde = $pedidoDesde ?? $hasta->copy()->subDays($periodo - 1);
+        if ($desde->gt($hasta)) {
+            [$desde, $hasta] = [$hasta, $desde];
+        }
+        if ((int) $desde->diffInDays($hasta) + 1 > self::MAX_DIAS) {
+            $desde = $hasta->copy()->subDays(self::MAX_DIAS - 1);
+        }
 
         $base = fn (Carbon $d, Carbon $h) => $enAlcance(Orden::query()->whereBetween('fecha_operacion', [$d->toDateString(), $h->toDateString()]));
         // Con alcance limitado, las acciones de desempeño se limitan a lo ocurrido dentro de ese alcance
         $limitarAcciones = ! $alcance->todo && $auxiliarId === null;
 
-        $dias = $desde->diffInDays($hasta) + 1;
+        $dias = (int) $desde->diffInDays($hasta) + 1;
+        // La tendencia de un rango largo va por semana o por mes: cientos de jornadas no se alcanzan a leer
+        $agrupacion = $dias <= 93 ? 'dia' : ($dias <= 400 ? 'semana' : 'mes');
         $prevHasta = $desde->copy()->subDay();
         $prevDesde = $prevHasta->copy()->subDays($dias - 1);
 
@@ -82,18 +96,21 @@ class DashboardController extends Controller
             'filtros' => [
                 'desde' => $desde->toDateString(),
                 'hasta' => $hasta->toDateString(),
-                'periodo' => $request->filled('desde') ? null : $periodo,
+                'periodo' => $pedidoDesde ? null : $periodo,
                 'sede' => $sedeId,
             ],
             'vista' => $esAuxiliar ? 'auxiliar' : 'gerencial',
             'sedes' => $opcionesSede->map(fn (Sede $s) => ['id' => $s->id, 'nombre' => $s->nombre, 'color' => $s->color, 'empresa' => $s->empresa?->nombre]),
             'ultimaOperacion' => $ultimaOperacion,
+            // Desde qué año ofrecer el calendario: la primera jornada con datos del alcance
+            'primeraOperacion' => $enAlcance(Orden::query())->min('fecha_operacion'),
             'meta' => (float) ($sedeId
                 ? Sede::find($sedeId)?->meta_efectividad
                 : Parametro::valor('meta_efectividad_global', 95)),
             'kpis' => $kpis,
             'kpisPrevios' => $kpisPrevios,
-            'tendencia' => $this->tendencia($base($desde, $hasta)),
+            'tendencia' => $this->tendencia($base($desde, $hasta), $agrupacion, $desde),
+            'agrupacion' => $agrupacion,
             'motivos' => $this->motivos($base($desde, $hasta)),
             'porSede' => $esAuxiliar ? [] : $this->porSede($base($desde, $hasta)),
             'ranking' => $this->ranking($base($desde, $hasta), $desde, $hasta, $limitarAcciones ? $this->informesDe($ubicacion) : null),
@@ -149,21 +166,49 @@ class DashboardController extends Controller
         ];
     }
 
-    private function tendencia(Builder $q): array
+    /**
+     * Las entregas de cada jornada, de cada semana (desde el lunes) o de cada mes. Cada punto lleva su primer día; si
+     * la semana o el mes empiezan antes del rango, el del rango.
+     */
+    private function tendencia(Builder $q, string $agrupacion, Carbon $desde): array
     {
+        $inicio = fn (Carbon $f) => (match ($agrupacion) {
+            'semana' => $f->copy()->startOfWeek(Carbon::MONDAY),
+            'mes' => $f->copy()->startOfMonth(),
+            default => $f,
+        })->max($desde)->toDateString();
+
         return $q->clone()
             ->selectRaw('fecha_operacion as fecha, SUM(productos) as asignadas, SUM(productos_entregados) as aprobadas')
             ->groupBy('fecha_operacion')
             ->orderBy('fecha_operacion')
             ->get()
-            ->map(fn ($r) => [
-                'fecha' => Carbon::parse($r->fecha)->toDateString(),
-                'asignadas' => (int) $r->asignadas,
-                'aprobadas' => (int) $r->aprobadas,
-                'rechazadas' => (int) $r->asignadas - (int) $r->aprobadas,
-                'efectividad' => ConsolidadorInforme::efectividad((int) $r->aprobadas, (int) $r->asignadas),
-            ])
+            ->groupBy(fn ($r) => $inicio(Carbon::parse($r->fecha)))
+            ->map(function ($grupo, string $fecha) {
+                $asignadas = (int) $grupo->sum('asignadas');
+                $aprobadas = (int) $grupo->sum('aprobadas');
+
+                return [
+                    'fecha' => $fecha,
+                    'asignadas' => $asignadas,
+                    'aprobadas' => $aprobadas,
+                    'rechazadas' => $asignadas - $aprobadas,
+                    'efectividad' => ConsolidadorInforme::efectividad($aprobadas, $asignadas),
+                ];
+            })
+            ->values()
             ->all();
+    }
+
+    /** Una fecha AAAA-MM-DD de la consulta, si existe; si no (o mal escrita), null. */
+    private function fechaPedida(Request $request, string $campo): ?Carbon
+    {
+        $valor = (string) $request->input($campo);
+        if (! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $valor, $m) || ! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            return null;
+        }
+
+        return Carbon::parse($valor)->startOfDay();
     }
 
     private function motivos(Builder $q): array

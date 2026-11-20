@@ -8,6 +8,7 @@ import { type DashboardProps } from '@/components/dashboard/tipos';
 import { Building2, PackageSearch } from '@/components/iconos';
 import { fechaDia, FranjaHoy, pasosLogistica } from '@/components/linea/dia';
 import { MarcoLinea, useYaEnPantalla } from '@/components/linea/marco-linea';
+import { RangoFechas } from '@/components/rango-fechas';
 import { Selector } from '@/components/selector';
 import { usePuede } from '@/hooks/use-puede';
 import { cn } from '@/lib/utils';
@@ -26,8 +27,25 @@ type Props = DashboardProps & {
  * su enlace. Debajo, los indicadores del periodo con sus filtros; al final, las acciones de desempeño.
  */
 export default function TableroLogistica(props: Props) {
-    const { linea, alcanceFijo, filtros, vista, sedes, meta, kpis, kpisPrevios, tendencia, motivos, porSede, ranking, protocolo, dia, acciones } =
-        props;
+    const {
+        linea,
+        alcanceFijo,
+        filtros,
+        vista,
+        sedes,
+        meta,
+        kpis,
+        kpisPrevios,
+        tendencia,
+        agrupacion,
+        primeraOperacion,
+        motivos,
+        porSede,
+        ranking,
+        protocolo,
+        dia,
+        acciones,
+    } = props;
     const [cargando, setCargando] = useState(false);
     const gerencial = vista === 'gerencial';
     const puede = usePuede();
@@ -42,8 +60,16 @@ export default function TableroLogistica(props: Props) {
         };
     }, []);
 
-    const filtrar = (cambios: Partial<{ periodo: number; sede: number | null }>) => {
-        const params = { periodo: filtros.periodo ?? 30, sede: filtros.sede, ...cambios };
+    // El periodo (7, 30 o 90 días) o las fechas del calendario: uno reemplaza al otro; la sede se conserva
+    const filtrar = (cambios: Partial<{ periodo: number; desde: string; hasta: string; sede: number | null }>) => {
+        const rango = cambios.periodo
+            ? { periodo: cambios.periodo }
+            : cambios.desde
+              ? { desde: cambios.desde, hasta: cambios.hasta }
+              : filtros.periodo
+                ? { periodo: filtros.periodo }
+                : { desde: filtros.desde, hasta: filtros.hasta };
+        const params = { ...rango, sede: 'sede' in cambios ? cambios.sede : filtros.sede };
         router.get(route('lineas.show', linea.slug), Object.fromEntries(Object.entries(params).filter(([, v]) => v !== null && v !== undefined)), {
             preserveState: true,
             preserveScroll: true,
@@ -106,6 +132,14 @@ export default function TableroLogistica(props: Props) {
                                 { valor: 30, texto: '30 días' },
                                 { valor: 90, texto: '90 días' },
                             ]}
+                        />
+                        {/* O cualquier rango, en el calendario (con el mes y el año) */}
+                        <RangoFechas
+                            desde={filtros.desde}
+                            hasta={filtros.hasta}
+                            activo={filtros.periodo === null}
+                            primera={primeraOperacion}
+                            onAplicar={(desde, hasta) => filtrar({ desde, hasta })}
                         />
                         {/* Con varias sedes en el alcance (todas, o las de su empresa) se puede elegir una */}
                         {gerencial && sedes.length > 1 && (
@@ -175,7 +209,7 @@ export default function TableroLogistica(props: Props) {
 
                             {/* Tendencia y sedes */}
                             <div className={cn('grid gap-4', verPorSede && 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')}>
-                                <GraficaTendencia datos={tendencia} meta={meta} />
+                                <GraficaTendencia datos={tendencia} meta={meta} agrupacion={agrupacion} />
                                 {verPorSede && <EfectividadPorSede sedes={porSede} />}
                             </div>
 

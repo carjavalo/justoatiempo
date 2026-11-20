@@ -19,6 +19,8 @@ export interface Kpis {
     jornadas: number;
 }
 
+export type Agrupacion = 'dia' | 'semana' | 'mes';
+
 export interface PuntoTendencia {
     fecha: string;
     asignadas: number;
@@ -85,6 +87,10 @@ export interface DashboardProps {
     /** Sedes de las empresas que reciben la línea (TuGo, Sodimac…), con la empresa a la que pertenecen. */
     sedes: { id: number; nombre: string; color: string | null; empresa: string | null }[];
     ultimaOperacion: string | null;
+    /** La primera jornada con datos: desde su año se ofrecen los años del calendario. */
+    primeraOperacion: string | null;
+    /** Cada punto de la tendencia es una jornada, una semana o un mes (según lo largo del periodo). */
+    agrupacion: Agrupacion;
     meta: number;
     kpis: Kpis;
     kpisPrevios: Kpis;

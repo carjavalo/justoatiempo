@@ -1,13 +1,41 @@
-import { fmt } from '@/lib/formato';
+import { aFecha, fmt } from '@/lib/formato';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Panel, Segmentado, TablaGrafica, useTooltipDescartable, Vacio } from './piezas';
-import { type PuntoTendencia } from './tipos';
+import { type Agrupacion, type PuntoTendencia } from './tipos';
 
 type Vista = 'efectividad' | 'volumen';
 
-/** Con menos jornadas no hay evolución que ver: una línea entre uno o dos puntos no dice nada. */
+/** Con menos puntos no hay evolución que ver: una línea entre uno o dos puntos no dice nada. */
 const MINIMO_JORNADAS = 3;
+
+/** Cómo se nombra cada punto: una jornada, una semana o un mes. */
+const UNIDAD: Record<Agrupacion, { una: string; varias: string; titulo: string; adjetivo: string; columna: string }> = {
+    dia: { una: 'jornada', varias: 'jornadas', titulo: 'Evolución diaria', adjetivo: 'diaria', columna: 'Fecha' },
+    semana: { una: 'semana', varias: 'semanas', titulo: 'Evolución semanal', adjetivo: 'semanal', columna: 'Semana desde' },
+    mes: { una: 'mes', varias: 'meses', titulo: 'Evolución mensual', adjetivo: 'mensual', columna: 'Mes' },
+};
+
+/**
+ * Las fechas de los puntos, para el eje, el detalle y la tabla. Por mes: "nov 2026". Por día o semana: "3 nov" y, si el
+ * periodo cruza de año, con el año ("3 nov 25").
+ */
+function fechasDe(agrupacion: Agrupacion, datos: PuntoTendencia[]) {
+    const variosAnios = datos.length > 0 && datos[0].fecha.slice(0, 4) !== datos[datos.length - 1].fecha.slice(0, 4);
+    const otroAnio = (iso: string) => variosAnios || aFecha(iso).getFullYear() !== new Date().getFullYear();
+    const mesCorto = (iso: string) => aFecha(iso).toLocaleDateString('es-CO', { month: 'short', year: 'numeric' }).replace('.', '');
+    const mesLargo = (iso: string) => aFecha(iso).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+    const diaCorto = (iso: string) =>
+        variosAnios ? aFecha(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: '2-digit' }).replace('.', '') : fmt.fechaCorta(iso);
+    const diaLargo = (iso: string) =>
+        otroAnio(iso) ? aFecha(iso).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : fmt.fechaLarga(iso);
+
+    return {
+        eje: agrupacion === 'mes' ? mesCorto : diaCorto,
+        detalle: agrupacion === 'mes' ? mesLargo : agrupacion === 'semana' ? (iso: string) => `Semana del ${fmt.fechaMedia(iso)}` : diaLargo,
+        tabla: agrupacion === 'mes' ? mesLargo : fmt.fechaMedia,
+    };
+}
 
 const ejes = {
     tick: { fill: 'var(--chart-ink)', fontSize: 11 },
@@ -35,14 +63,24 @@ function Leyenda({ items }: { items: { color: string; texto: string; linea?: boo
     );
 }
 
-function TooltipTendencia({ active, payload, meta }: { active?: boolean; payload?: { payload: PuntoTendencia }[]; meta: number }) {
+function TooltipTendencia({
+    active,
+    payload,
+    meta,
+    fecha,
+}: {
+    active?: boolean;
+    payload?: { payload: PuntoTendencia }[];
+    meta: number;
+    fecha: (iso: string) => string;
+}) {
     if (!active || !payload?.length) return null;
     const p = payload[0].payload;
 
     return (
-        // Al recorrer la gráfica con las flechas, el lector anuncia cada jornada
+        // Al recorrer la gráfica con las flechas, el lector anuncia cada punto
         <div role="status" className="bg-popover text-popover-foreground min-w-48 rounded-xl border p-3 text-xs shadow-xl">
-            <p className="mb-2 font-bold first-letter:uppercase">{fmt.fechaLarga(p.fecha)}</p>
+            <p className="mb-2 font-bold first-letter:uppercase">{fecha(p.fecha)}</p>
             <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
                 <dt className="flex items-center gap-1.5">
                     <span className="bg-series-1 h-0.5 w-3 rounded-full" aria-hidden="true" />
@@ -71,9 +109,14 @@ function TooltipTendencia({ active, payload, meta }: { active?: boolean; payload
     );
 }
 
-/** Evolución diaria: efectividad vs. meta, o volumen aprobadas/rechazadas. Un solo eje por gráfica. */
-export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; meta: number }) {
+/**
+ * Evolución por jornada (o por semana o mes, si el periodo es largo): efectividad vs. meta, o volumen
+ * aprobadas/rechazadas. Un solo eje por gráfica.
+ */
+export function GraficaTendencia({ datos, meta, agrupacion = 'dia' }: { datos: PuntoTendencia[]; meta: number; agrupacion?: Agrupacion }) {
     const [vista, setVista] = useState<Vista>('efectividad');
+    const u = UNIDAD[agrupacion];
+    const fechas = fechasDe(agrupacion, datos);
     const tooltip = useTooltipDescartable();
     const minimo = Math.max(0, Math.floor((Math.min(...datos.map((d) => d.efectividad), meta) - 5) / 5) * 5);
     const muchos = datos.length > 20;
@@ -82,18 +125,18 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
     const enMeta = datos.filter((d) => d.efectividad >= meta).length;
     const resumen =
         datos.length > 0
-            ? `${datos.length} ${datos.length === 1 ? 'jornada' : 'jornadas'} del ${fmt.fechaMedia(datos[0].fecha)} al ${fmt.fechaMedia(datos[datos.length - 1].fecha)}. ` +
+            ? `${datos.length} ${datos.length === 1 ? u.una : u.varias} del ${fmt.fechaMedia(datos[0].fecha)} al ${fmt.fechaMedia(datos[datos.length - 1].fecha)}. ` +
               `Efectividad entre ${fmt.pct(Math.min(...efectividades))} y ${fmt.pct(Math.max(...efectividades))}; meta ${fmt.pctEntero(meta)}. ` +
-              `${enMeta} ${enMeta === 1 ? 'jornada' : 'jornadas'} en meta.`
+              `${enMeta} ${enMeta === 1 ? u.una : u.varias} en meta.`
             : '';
     const conGrafica = datos.length >= MINIMO_JORNADAS;
 
     return (
         <Panel
             nivel={3}
-            titulo="Evolución diaria"
+            titulo={u.titulo}
             descripcion={
-                !conGrafica ? undefined : vista === 'efectividad' ? 'Efectividad por jornada frente a la meta' : 'Entregas aprobadas y rechazadas por jornada'
+                !conGrafica ? undefined : vista === 'efectividad' ? `Efectividad por ${u.una} frente a la meta` : `Entregas aprobadas y rechazadas por ${u.una}`
             }
             acciones={
                 conGrafica && (
@@ -111,13 +154,15 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
         >
             {!conGrafica ? (
                 // Cuántas jornadas hay ya lo dice la tarjeta de entregas
-                <Vacio>La evolución se ve desde {MINIMO_JORNADAS} jornadas.</Vacio>
+                <Vacio>
+                    La evolución se ve desde {MINIMO_JORNADAS} {u.varias}.
+                </Vacio>
             ) : (
                 <>
                     <div className="mb-3">
                         {vista === 'efectividad' ? (
                             // La meta se rotula directamente sobre su línea de referencia
-                            <Leyenda items={[{ color: 'var(--series-1)', texto: 'Efectividad diaria', linea: true }]} />
+                            <Leyenda items={[{ color: 'var(--series-1)', texto: `Efectividad ${u.adjetivo}`, linea: true }]} />
                         ) : (
                             // Mismo orden que la pila: rechazadas arriba, aprobadas en la base
                             <Leyenda
@@ -131,9 +176,9 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                     <div className="h-72" {...tooltip.manejadores}>
                         <ResponsiveContainer width="100%" height="100%">
                             {vista === 'efectividad' ? (
-                                <LineChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} title="Efectividad diaria frente a la meta" desc={resumen}>
+                                <LineChart data={datos} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} title={`Efectividad ${u.adjetivo} frente a la meta`} desc={resumen}>
                                     <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                                    <XAxis dataKey="fecha" tickFormatter={fmt.fechaCorta} {...ejes} minTickGap={24} />
+                                    <XAxis dataKey="fecha" tickFormatter={fechas.eje} {...ejes} minTickGap={24} />
                                     <YAxis domain={[minimo, 100]} tickFormatter={(v) => `${v}%`} {...ejes} axisLine={false} width={48} />
                                     <ReferenceLine
                                         y={meta}
@@ -144,7 +189,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                                     />
                                     <Tooltip
                                         active={tooltip.oculto ? false : undefined}
-                                        content={<TooltipTendencia meta={meta} />}
+                                        content={<TooltipTendencia meta={meta} fecha={fechas.detalle} />}
                                         cursor={{ stroke: 'var(--chart-axis)', strokeWidth: 1 }}
                                         wrapperStyle={{ outline: 'none' }}
                                     />
@@ -163,7 +208,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                                     data={datos}
                                     margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
                                     barCategoryGap={muchos ? 2 : '20%'}
-                                    title="Entregas aprobadas y rechazadas por jornada"
+                                    title={`Entregas aprobadas y rechazadas por ${u.una}`}
                                     desc={resumen}
                                 >
                                     <defs>
@@ -173,11 +218,11 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                                         </pattern>
                                     </defs>
                                     <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                                    <XAxis dataKey="fecha" tickFormatter={fmt.fechaCorta} {...ejes} minTickGap={24} />
+                                    <XAxis dataKey="fecha" tickFormatter={fechas.eje} {...ejes} minTickGap={24} />
                                     <YAxis allowDecimals={false} {...ejes} axisLine={false} width={48} />
                                     <Tooltip
                                         active={tooltip.oculto ? false : undefined}
-                                        content={<TooltipTendencia meta={meta} />}
+                                        content={<TooltipTendencia meta={meta} fecha={fechas.detalle} />}
                                         cursor={{ fill: 'var(--muted)', opacity: 0.7 }}
                                         wrapperStyle={{ outline: 'none' }}
                                     />
@@ -189,9 +234,9 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                     </div>
                     <TablaGrafica
                         id="tabla-tendencia"
-                        resumen={`Efectividad y volumen por jornada; meta ${fmt.pctEntero(meta)}`}
+                        resumen={`Efectividad y volumen por ${u.una}; meta ${fmt.pctEntero(meta)}`}
                         columnas={[
-                            { texto: 'Fecha' },
+                            { texto: u.columna },
                             { texto: 'Efectividad', numero: true, destacada: true },
                             { texto: 'Aprobadas', numero: true },
                             { texto: 'Rechazadas', numero: true },
@@ -199,7 +244,7 @@ export function GraficaTendencia({ datos, meta }: { datos: PuntoTendencia[]; met
                         ]}
                         filas={datos.map((d) => ({
                             clave: d.fecha,
-                            celdas: [fmt.fechaMedia(d.fecha), fmt.pct(d.efectividad), fmt.numero(d.aprobadas), fmt.numero(d.rechazadas), fmt.numero(d.asignadas)],
+                            celdas: [fechas.tabla(d.fecha), fmt.pct(d.efectividad), fmt.numero(d.aprobadas), fmt.numero(d.rechazadas), fmt.numero(d.asignadas)],
                         }))}
                     />
                 </>
