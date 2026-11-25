@@ -6,6 +6,12 @@
       "runtimeExecutable": "php",
       "runtimeArgs": ["artisan", "serve", "--port=8765"],
       "port": 8765
+    },
+    {
+      "name": "laravel-prueba",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "serve", "--port=8766", "--env=prueba"],
+      "port": 8766
     }
   ]
 }
